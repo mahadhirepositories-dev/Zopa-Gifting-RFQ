@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { users, rfqs, pendingRegistrations } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { EmailService } from "@/lib/email/email-service";
+import { createAndSetAuthSession } from "@/lib/auth-session";
 
 const formatLocationField = (val: any): string => {
   if (!val) return "";
@@ -160,6 +161,8 @@ export async function POST(request: Request) {
     response.cookies.set("zopa_user_mobile", mobileClean, { path: "/", maxAge: 86400 });
     response.cookies.set("zopa_user_company", companyClean, { path: "/", maxAge: 86400 });
 
+    await createAndSetAuthSession(userId, response);
+
     return response;
   } catch (error: any) {
     console.error("Magic link registration error:", error);
@@ -169,4 +172,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

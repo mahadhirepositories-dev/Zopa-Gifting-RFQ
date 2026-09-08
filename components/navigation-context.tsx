@@ -1,13 +1,15 @@
 "use client";
 
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useCallback } from "react";
 
 interface NavigationContextType {
   rfpId?: string;
   currentSection: string;
+  activeSection: string;
   isSubmitted?: boolean;
   isLoggedIn?: boolean;
-  navigateToSection: (section: string) => void;
+  navigateToSection: (section: string, skipValidation?: boolean) => void;
+  canNavigateToSection: (section: string) => boolean;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(
@@ -31,26 +33,43 @@ export const NavigationProvider: React.FC<{
 }) => {
   const [currentSection, setCurrentSection] = useState(initialSection);
   const [prevInitialSection, setPrevInitialSection] = useState(initialSection);
+
   if (initialSection !== prevInitialSection) {
     setPrevInitialSection(initialSection);
     setCurrentSection(initialSection);
   }
 
-  const navigateToSection = (section: string) => {
-    setCurrentSection(section);
-    if (onSectionChange) {
-      onSectionChange(section);
-    }
-  };
+  const canNavigateToSection = useCallback(
+    (section: string) => {
+      if (initialIsSubmitted) {
+        return ["vendorcontacts", "dates", "preview"].includes(section);
+      }
+      return true;
+    },
+    [initialIsSubmitted],
+  );
+
+  const navigateToSection = useCallback(
+    (section: string) => {
+      if (!canNavigateToSection(section)) return;
+      setCurrentSection(section);
+      if (onSectionChange) {
+        onSectionChange(section);
+      }
+    },
+    [canNavigateToSection, onSectionChange],
+  );
 
   return (
     <NavigationContext.Provider
       value={{
         rfpId,
         currentSection,
+        activeSection: currentSection,
         isSubmitted: initialIsSubmitted,
         isLoggedIn,
         navigateToSection,
+        canNavigateToSection,
       }}
     >
       {children}
@@ -64,9 +83,11 @@ export const useNavigation = () => {
     return {
       rfpId: undefined,
       currentSection: "company",
+      activeSection: "company",
       isSubmitted: false,
       isLoggedIn: false,
       navigateToSection: () => {},
+      canNavigateToSection: () => true,
     };
   }
   return context;

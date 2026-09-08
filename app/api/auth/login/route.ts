@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { users, rfqs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { EmailService } from "@/lib/email/email-service";
+import { createAndSetAuthSession } from "@/lib/auth-session";
 
 export async function POST(request: Request) {
   try {
@@ -84,6 +85,8 @@ export async function POST(request: Request) {
     if (user.mobileNumber) response.cookies.set("zopa_user_mobile", user.mobileNumber, { path: "/", maxAge: 86400 });
     if (user.companyName) response.cookies.set("zopa_user_company", user.companyName, { path: "/", maxAge: 86400 });
 
+    await createAndSetAuthSession(user.id, response);
+
     return response;
   } catch (error: any) {
     console.error("Login route error:", error);
@@ -93,4 +96,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

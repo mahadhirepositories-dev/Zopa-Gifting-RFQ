@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createAndSetAuthSession } from "@/lib/auth-session";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -12,11 +13,15 @@ export async function GET(request: Request) {
   const targetUrl = new URL(`/rfp/${rfpId}/requirement`, request.url);
   const response = NextResponse.redirect(targetUrl);
 
-  // Store session cookies for seamless user experience without cluttering the browser URL
+  // Store session cookies for seamless user experience
   if (email) response.cookies.set("zopa_user_email", email, { path: "/", maxAge: 86400 });
   if (name) response.cookies.set("zopa_user_name", name, { path: "/", maxAge: 86400 });
   if (mobile) response.cookies.set("zopa_user_mobile", mobile, { path: "/", maxAge: 86400 });
   if (company) response.cookies.set("zopa_user_company", company, { path: "/", maxAge: 86400 });
+
+  if (email) {
+    await createAndSetAuthSession(email, response);
+  }
 
   return response;
 }

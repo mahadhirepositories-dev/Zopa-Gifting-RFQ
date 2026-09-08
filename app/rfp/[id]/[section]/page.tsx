@@ -217,16 +217,6 @@ export function RfpCreatorPage({
     };
   }, [extractSectionFromURL]);
 
-  // Adjusting state during render (React's recommended pattern for syncing
-  // state to a prop): when `initialSection` changes — e.g. Next.js gives us
-  // a new route param — resync `currentSection` from the URL right now,
-  // during this render, instead of in a useEffect. React detects the
-  // setState call during render, discards the in-progress render, and
-  // re-renders immediately with the corrected value before anything
-  // commits to the screen. This replaces the old
-  // useEffect(() => { if (urlSection !== currentSection) setCurrentSection(urlSection) }, [extractSectionFromURL, currentSection])
-  // which caused an extra commit + effect + re-render cascade on every
-  // section change.
   const [prevInitialSection, setPrevInitialSection] = useState(initialSection);
   if (initialSection !== prevInitialSection) {
     setPrevInitialSection(initialSection);
