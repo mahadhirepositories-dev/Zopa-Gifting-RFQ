@@ -27,9 +27,9 @@ export const NavigationProvider: React.FC<{
   children,
   rfpId,
   initialSection = "company",
-  initialIsSubmitted = false,
+  initialIsSubmitted,
   onSectionChange,
-  isLoggedIn = false,
+  isLoggedIn,
 }) => {
   const [currentSection, setCurrentSection] = useState(initialSection);
   const [prevInitialSection, setPrevInitialSection] = useState(initialSection);
@@ -39,6 +39,7 @@ export const NavigationProvider: React.FC<{
     setCurrentSection(initialSection);
   }
 
+  console.log(isLoggedIn, "dadada");
   const canNavigateToSection = useCallback(
     (section: string) => {
       if (initialIsSubmitted) {

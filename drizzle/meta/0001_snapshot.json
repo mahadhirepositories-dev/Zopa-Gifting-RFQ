@@ -1,6 +1,6 @@
 {
-  "id": "f1dcf0da-8c57-4e4b-b929-ed1efd38c3ba",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "d529418f-a455-4ce9-abac-43b090c59be7",
+  "prevId": "f1dcf0da-8c57-4e4b-b929-ed1efd38c3ba",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -441,6 +441,91 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.rfq_category": {
+      "name": "rfq_category",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "rfp_id": {
+          "name": "rfp_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sub_category": {
+          "name": "sub_category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tags": {
+          "name": "tags",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "service_areas": {
+          "name": "service_areas",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "rfq_category_rfp_id_rfq_id_fk": {
+          "name": "rfq_category_rfp_id_rfq_id_fk",
+          "tableFrom": "rfq_category",
+          "tableTo": "rfq",
+          "columnsFrom": [
+            "rfp_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "rfq_category_rfp_id_unique": {
+          "name": "rfq_category_rfp_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "rfp_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.rfq_company": {
       "name": "rfq_company",
       "schema": "",
@@ -550,6 +635,79 @@
       "uniqueConstraints": {
         "rfq_company_rfp_id_unique": {
           "name": "rfq_company_rfp_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "rfp_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.rfq_requirement": {
+      "name": "rfq_requirement",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "rfp_id": {
+          "name": "rfp_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "project_name": {
+          "name": "project_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "rfq_requirement_rfp_id_rfq_id_fk": {
+          "name": "rfq_requirement_rfp_id_rfq_id_fk",
+          "tableFrom": "rfq_requirement",
+          "tableTo": "rfq",
+          "columnsFrom": [
+            "rfp_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "rfq_requirement_rfp_id_unique": {
+          "name": "rfq_requirement_rfp_id_unique",
           "nullsNotDistinct": false,
           "columns": [
             "rfp_id"

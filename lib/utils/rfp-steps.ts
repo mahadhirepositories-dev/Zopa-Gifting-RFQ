@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export interface RFPStatus {
   isSubmitted: boolean;
   exists: boolean;
@@ -5,7 +6,7 @@ export interface RFPStatus {
 }
 
 export const VALID_SECTIONS = [
-  "company",
+  "category",
   "requirement",
   "scope",
   "boq",
@@ -36,10 +37,13 @@ export function getTargetSection({
   requestedSection?: string;
 }): string {
   if (validateSection(requestedSection)) {
+    if (requestedSection === "company" && isLoggedIn) {
+      return "category";
+    }
     return requestedSection!;
   }
   if (rfpStatus?.isSubmitted) {
     return "vendorcontacts";
   }
-  return "company";
+  return "category";
 }

@@ -6,5 +6,5 @@ export default async function RFPPage({
   params: Promise<{ id: string }>;
 }) {
   const resolvedParams = await params;
-  redirect(`/rfp/${resolvedParams.id}/requirement`);
+  redirect(`/rfp/${resolvedParams.id}/category`);
 }

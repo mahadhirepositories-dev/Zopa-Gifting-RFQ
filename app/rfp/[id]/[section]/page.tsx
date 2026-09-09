@@ -5,7 +5,7 @@ import { use, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { NavigationProvider } from "@/components/navigation-context";
 import { Sidebar } from "@/components/rfp-creator/sidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { MainContent } from "@/components/rfp-creator/main-content";
+import { MainContent } from "@/components/rfp-creator";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import {
@@ -61,7 +61,7 @@ export function RfpCreatorPage({
   );
   const [rfpId] = useState<string | null>(initialRfpId || null);
   const [rfpStatus, setRfpStatus] = useState<RFPStatus | null>(null);
-  const [currentSection, setCurrentSection] = useState<string>("company");
+  const [currentSection, setCurrentSection] = useState<string>("category");
   const [isLoading, setIsLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
   const [storedOrgSlug, setStoredOrgSlug] = useState<string | undefined>(
@@ -178,7 +178,7 @@ export function RfpCreatorPage({
   }, [session?.session, isLoggedIn, authLoading, storedOrgSlug]);
 
   const extractSectionFromURL = useCallback(() => {
-    if (typeof window === "undefined") return initialSection || "company";
+    if (typeof window === "undefined") return initialSection || "category";
 
     const pathParts = window.location.pathname.split("/");
     const urlSection = pathParts[pathParts.length - 1];
@@ -187,13 +187,13 @@ export function RfpCreatorPage({
       return urlSection;
     }
 
-    return initialSection || "company";
+    return initialSection || "category";
   }, [initialSection]);
 
   const updateURL = useCallback(
     (section: string) => {
       if (!rfpId || typeof window === "undefined") return;
-
+      console.log(section, "sectionss");
       const newPath = `/rfp/${rfpId}/${section}`;
       if (window.location.pathname !== newPath) {
         window.history.pushState({}, "", newPath);
@@ -209,6 +209,7 @@ export function RfpCreatorPage({
       const urlSection = extractSectionFromURL();
       setCurrentSection(urlSection);
     };
+    console.log(currentSection, "currentSection1");
 
     window.addEventListener("popstate", handlePopState);
 
@@ -223,6 +224,7 @@ export function RfpCreatorPage({
     setCurrentSection(extractSectionFromURL());
   }
 
+  console.log(currentSection, "currentSection2");
   useEffect(() => {
     let isMounted = true;
 
@@ -246,6 +248,7 @@ export function RfpCreatorPage({
           }
           return;
         }
+        console.log(currentSection, "currentSection2");
 
         if (isLoggedIn) {
           const accessResponse = await fetch(
@@ -261,10 +264,6 @@ export function RfpCreatorPage({
           if (accessResponse.status === 403) {
             router.push("/login");
             return;
-          }
-
-          if (!accessResponse.ok) {
-            console.warn("Check access check skipped for session");
           }
         }
 
@@ -304,10 +303,11 @@ export function RfpCreatorPage({
             updateURL(targetSection);
           }
         } else {
-          // If API isn't active yet, proceed gracefully
+          // If no corresponding data in database, redirect to Home page
           if (isMounted) {
             hasInitializedRef.current = true;
-            setCurrentSection(initialSection || "company");
+            router.push("/");
+            return;
           }
         }
       } catch (error) {
@@ -319,6 +319,7 @@ export function RfpCreatorPage({
       }
     }
 
+    console.log(currentSection, "currentSection4");
     if (!authLoading) {
       initializeApp();
     }
@@ -384,6 +385,7 @@ export function RfpCreatorPage({
     );
   }
 
+  console.log(currentSection, "currentSection5");
   return (
     <NavigationProvider
       rfpId={rfpId || undefined}

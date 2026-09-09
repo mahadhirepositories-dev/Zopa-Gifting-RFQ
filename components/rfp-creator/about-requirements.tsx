@@ -1,31 +1,95 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React from "react";
+import React, {
+  useMemo,
+  useState,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  requirementSchema,
+  type RequirementFieldErrors,
+} from "@/lib/validations/rfq-creator-schema";
 
 interface AboutRequirementProps {
   data: {
     projectName?: string;
     purpose?: string;
   };
-  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onChange: (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => void;
   errors: Record<string, string>;
   values: any;
   disabled?: boolean;
   isLoggedIn?: boolean;
   orgSlug?: string;
 }
+export interface AboutRequirementsHandle {
+  validate: () => boolean;
+}
 
-export const AboutRequirements: React.FC<AboutRequirementProps> = ({
-  data,
-  onChange,
-  errors,
-  values,
-  disabled,
-}) => {
+export const AboutRequirements = forwardRef<
+  AboutRequirementsHandle,
+  AboutRequirementProps
+>(({ data, onChange, errors, values, disabled }, ref) => {
+  const projectName = values?.projectName || data?.projectName || "";
+  const purpose = values?.purpose || data?.purpose || "";
+
+  const validation = useMemo(() => {
+    const result = requirementSchema.safeParse({ projectName, purpose });
+
+    if (result.success) {
+      return { errors: {} as RequirementFieldErrors, isValid: true };
+    }
+
+    const fieldErrors: RequirementFieldErrors = {};
+    for (const issue of result.error.issues) {
+      const field = issue.path[0] as keyof RequirementFieldErrors;
+      if (!fieldErrors[field]) fieldErrors[field] = issue.message;
+    }
+    return { errors: fieldErrors, isValid: false };
+  }, [projectName, purpose]);
+
+  const [touched, setTouched] = useState<{
+    projectName: boolean;
+    purpose: boolean;
+  }>({
+    projectName: false,
+    purpose: false,
+  });
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      validate: () => {
+        setTouched({ projectName: true, purpose: true });
+        return validation.isValid;
+      },
+    }),
+    [validation.isValid],
+  );
+
+  const handleFieldChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const { name } = e.target;
+    if (name === "projectName" || name === "purpose") {
+      setTouched((prev) => ({ ...prev, [name]: true }));
+    }
+    onChange(e);
+  };
+
+  const projectNameError =
+    errors.projectName ||
+    (touched.projectName ? validation.errors.projectName : undefined);
+  const purposeError =
+    errors.purpose || (touched.purpose ? validation.errors.purpose : undefined);
+
   return (
     <div className="space-y-6">
       <div className="space-y-4">
@@ -36,13 +100,15 @@ export const AboutRequirements: React.FC<AboutRequirementProps> = ({
           <Input
             name="projectName"
             placeholder="e.g., Office Network Upgrade Project"
-            value={values?.projectName || data?.projectName || ""}
-            onChange={onChange}
+            value={projectName}
+            onChange={handleFieldChange}
             disabled={disabled}
             className="h-10 text-sm font-mono border-slate-300 rounded-md bg-white shadow-2xs"
           />
-          {errors.projectName && (
-            <p className="text-xs text-rose-600 font-medium">{errors.projectName}</p>
+          {projectNameError && (
+            <p className="text-xs text-rose-600 font-medium">
+              {projectNameError}
+            </p>
           )}
         </div>
 
@@ -53,17 +119,19 @@ export const AboutRequirements: React.FC<AboutRequirementProps> = ({
           <Textarea
             name="purpose"
             placeholder="e.g., Upgrading existing network infrastructure to support remote work capabilities"
-            value={data?.purpose || ""}
-            onChange={onChange}
+            value={purpose}
+            onChange={handleFieldChange}
             rows={4}
             disabled={disabled}
             className="text-sm font-mono border-slate-300 rounded-md bg-white shadow-2xs resize-y"
           />
-          {errors.purpose && (
-            <p className="text-xs text-rose-600 font-medium">{errors.purpose}</p>
+          {purposeError && (
+            <p className="text-xs text-rose-600 font-medium">{purposeError}</p>
           )}
         </div>
       </div>
     </div>
   );
-};
+});
+
+AboutRequirements.displayName = "AboutRequirements";

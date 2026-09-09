@@ -1,23 +1,26 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React from "react";
+import React, { useRef } from "react";
 import { useRouter } from "next/navigation";
-import { CombinedCompanyContact } from "../combined-company-contact";
-import { AboutRequirements } from "../about-requirements";
-import { ScopeOfWork } from "../scope-of-work";
-import { BOQ } from "../boq";
-import { EvaluationCriteria } from "../evaluation-criteria";
-import { Financials } from "../financial";
-import { GeneralTerms } from "../general-terms";
-import { SpecialTerms } from "../special-terms";
-import { DocumentsToShare } from "../document-share";
-import { VendorSelection } from "../vendor-selection";
-import { VendorContacts } from "../add-vendors";
-import { RFPDates } from "../rfp-dates";
-import { Preview } from "../rfp-preview";
+import { CombinedCompanyContact } from "./combined-company";
+import {
+  AboutRequirements,
+  type AboutRequirementsHandle,
+} from "./about-requirements";
+import { ScopeOfWork } from "./scope-of-work";
+import { BOQ } from "./boq";
+import { EvaluationCriteria } from "./evaluation-criteria";
+import { Financials } from "./financial";
+import { GeneralTerms } from "./general-terms";
+import { SpecialTerms } from "./special-terms";
+import { DocumentsToShare } from "./document-share";
+import { VendorSelection } from "./vendor-selection";
+import { VendorContacts } from "./add-vendors";
+import { RFPDates } from "./rfp-dates";
+import { Preview } from "./rfp-preview";
 import { Button } from "@/components/ui/button";
-import { Category } from "./category";
+import { Category, type CategoryHandle } from "./category";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, Lock, X } from "lucide-react";
 import {
@@ -73,17 +76,17 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
   showContactFlowNavigation,
   onCloseContactFlow,
   orgSlug,
-  role,
 }) => {
   const { navigateToSection } = useNavigation();
-  const [isNavigating, setIsNavigating] = React.useState(false);
+  const categoryRef = useRef<CategoryHandle>(null);
+  const requirementRef = useRef<AboutRequirementsHandle>(null);
   const submittedAllowedSections = ["vendorcontacts", "dates", "preview"];
   const isSectionAllowed =
     !isSubmitted || submittedAllowedSections.includes(activeSection);
-  const router = useRouter();
 
   const sectionTitles: Record<string, string> = {
-    company: "1. Company Introduction",
+    category: "1. Category",
+    company: "Company Introduction",
     requirement: "2. About the Requirement",
     scope: "3. Scope of Work",
     boq: "4. BOQ/BOM",
@@ -98,21 +101,37 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
     preview: "13. Preview & Submit",
   };
 
-  const handleBackClick = async () => {
-    if (orgSlug && role) {
-      setIsNavigating(true);
-      const pathRole = role.includes("_") ? role.replace(/_/g, "-") : role;
-      router.push(`/${orgSlug}/${pathRole}/rfq-management`);
-    } else {
-      router.push("/");
+  const shouldShowPrevious = () => {
+    if (activeSection === "category") return false;
+    if (isSubmitted) {
+      const allowedIndex = submittedAllowedSections.indexOf(activeSection);
+      return allowedIndex > 0;
     }
+    return true;
   };
 
   const shouldShowNext = () => {
     if (showContactFlowNavigation && activeSection === "preview") return false;
     if (activeSection === "preview") return false;
-    if (isSubmitted) return submittedAllowedSections.includes(activeSection);
+    if (isSubmitted) {
+      const allowedIndex = submittedAllowedSections.indexOf(activeSection);
+      return (
+        allowedIndex >= 0 && allowedIndex < submittedAllowedSections.length - 1
+      );
+    }
     return true;
+  };
+
+  const handleNextClick = () => {
+    if (activeSection === "category") {
+      const isValid = categoryRef.current?.validate() ?? true;
+      if (!isValid) return;
+    }
+    if (activeSection === "requirement") {
+      const isValid = requirementRef.current?.validate() ?? true;
+      if (!isValid) return;
+    }
+    handleClick("next");
   };
 
   if (!isSectionAllowed) {
@@ -182,6 +201,14 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
         )}
 
         {/* Form Components */}
+        {activeSection === "category" && !isSubmitted && (
+          <Category
+            ref={categoryRef}
+            selection={selection}
+            handleUpdateSelection={handleUpdateSelection}
+            navigateTo={navigateToSection}
+          />
+        )}
         {activeSection === "company" && !isLoggedIn && !isSubmitted && (
           <CombinedCompanyContact
             data={{
@@ -217,6 +244,7 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
 
         {activeSection === "requirement" && !isSubmitted && (
           <AboutRequirements
+            ref={requirementRef}
             data={formData.requirement || {}}
             onChange={handleChange}
             errors={errors}
@@ -371,17 +399,32 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
         )}
       </div>
 
-      {/* NEXT Action button matching screenshot */}
-      {shouldShowNext() && (
-        <div className="flex justify-end pt-4 border-t border-slate-100">
-          <button
-            type="button"
-            onClick={() => handleClick("next")}
-            disabled={isLoading || isAutoFilling}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase px-5 py-2.5 rounded-md shadow-sm transition-colors cursor-pointer"
-          >
-            NEXT
-          </button>
+      {/* Navigation Buttons (Previous / NEXT) */}
+      {(shouldShowPrevious() || shouldShowNext()) && (
+        <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-6">
+          {shouldShowPrevious() ? (
+            <button
+              type="button"
+              onClick={() => handleClick("previous")}
+              disabled={isLoading || isAutoFilling}
+              className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase px-5 py-2.5 rounded-md shadow-xs transition-colors cursor-pointer"
+            >
+              Previous
+            </button>
+          ) : (
+            <div />
+          )}
+
+          {shouldShowNext() && (
+            <button
+              type="button"
+              onClick={handleNextClick}
+              disabled={isLoading || isAutoFilling}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase px-5 py-2.5 rounded-md shadow-sm transition-colors cursor-pointer ml-auto"
+            >
+              NEXT
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -16,7 +16,6 @@ export async function GET(request: NextRequest) {
       request.cookies.get("better-auth.session_token")?.value ||
       request.cookies.get("__Secure-better-auth.session_token")?.value;
 
-    let validSessionInDb = false;
     if (sessionCookie) {
       try {
         const activeSessions = await db
@@ -25,16 +24,51 @@ export async function GET(request: NextRequest) {
           .where(eq(sessions.token, sessionCookie))
           .limit(1);
 
-        if (activeSessions.length > 0 && new Date(activeSessions[0].expiresAt) > new Date()) {
-          validSessionInDb = true;
+        if (
+          activeSessions.length > 0 &&
+          new Date(activeSessions[0].expiresAt) > new Date()
+        ) {
+          const userRows = await db
+            .select()
+            .from(users)
+            .where(eq(users.id, activeSessions[0].userId))
+            .limit(1);
+
+          if (userRows.length > 0) {
+            const user = userRows[0];
+            return NextResponse.json({
+              user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                emailVerified: user.emailVerified,
+                mobileNumber: user.mobileNumber,
+                companyName: user.companyName,
+                addressLine1: user.addressLine1,
+                addressLine2: user.addressLine2,
+                country: user.country,
+                state: user.state,
+                city: user.city,
+                postalCode: user.postalCode,
+                image: user.image,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt,
+              },
+              session: {
+                id: activeSessions[0].id,
+                userId: user.id,
+                expiresAt: activeSessions[0].expiresAt,
+                token: activeSessions[0].token,
+              },
+            });
+          }
         }
       } catch (err) {
         console.warn("Error checking existing session cookie:", err);
       }
     }
 
-    if (!validSessionInDb) {
-      const emailCookie = request.cookies.get("zopa_user_email")?.value;
+    const emailCookie = request.cookies.get("zopa_user_email")?.value;
       if (emailCookie) {
         try {
           const userRows = await db
@@ -104,7 +138,6 @@ export async function GET(request: NextRequest) {
         }
       }
     }
-  }
 
   return authHandler.GET(request);
 }

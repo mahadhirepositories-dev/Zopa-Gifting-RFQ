@@ -89,6 +89,18 @@ export const CombinedCompanyContact: React.FC<CombinedCompanyContactProps> = ({
             className="h-9 text-sm"
           />
         </div>
+
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label className="text-xs font-medium">Client Type</Label>
+          <Input
+            name="businessType"
+            placeholder="e.g. Retail Store, IT Services, Manufacturing"
+            value={data?.businessType ?? ""}
+            onChange={onChange}
+            disabled={disabled}
+            className="h-9 text-sm"
+          />
+        </div>
       </div>
     </div>
   );

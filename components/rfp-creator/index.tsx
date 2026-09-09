@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { MainFormContent } from "./main-content/main-form-content";
+import { MainFormContent } from "./main-form-content";
 import { PreviewDocument } from "./live-preview";
 import Footer from "@/components/Footer";
 import { useNavigation } from "@/components/navigation-context";
@@ -45,6 +45,7 @@ export const MainContent: React.FC<MainContentProps> = ({
   const [isAutoFilling] = useState(false);
 
   const sectionsOrder = [
+    "category",
     "company",
     "requirement",
     "scope",
@@ -60,12 +61,67 @@ export const MainContent: React.FC<MainContentProps> = ({
     "preview",
   ];
 
-  const handleClick = (type: "previous" | "next") => {
+  const submittedAllowedSections = ["vendorcontacts", "dates", "preview"];
+
+  const handleClick = async (type: "previous" | "next") => {
+    if (type === "next" && rfpId) {
+      if (currentSection === "category" && selection) {
+        try {
+          await fetch(`/api/rfps/${rfpId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ categorySelection: selection }),
+          });
+        } catch (err) {
+          console.warn("Failed to save category selection data:", err);
+        }
+      }
+      if (currentSection === "requirement" && formData.requirement) {
+        try {
+          await fetch(`/api/rfps/${rfpId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ requirement: formData.requirement }),
+          });
+        } catch (err) {
+          console.warn("Failed to save requirement data:", err);
+        }
+      }
+    }
+
     const currentIndex = sectionsOrder.indexOf(currentSection);
-    if (type === "next" && currentIndex < sectionsOrder.length - 1) {
-      navigateToSection(sectionsOrder[currentIndex + 1]);
-    } else if (type === "previous" && currentIndex > 0) {
-      navigateToSection(sectionsOrder[currentIndex - 1]);
+    if (type === "next") {
+      let nextIndex = currentIndex + 1;
+      if (sectionsOrder[nextIndex] === "company" && isLoggedIn) {
+        nextIndex++;
+      }
+      if (isSubmitted) {
+        while (
+          nextIndex < sectionsOrder.length &&
+          !submittedAllowedSections.includes(sectionsOrder[nextIndex])
+        ) {
+          nextIndex++;
+        }
+      }
+      if (nextIndex < sectionsOrder.length) {
+        navigateToSection(sectionsOrder[nextIndex]);
+      }
+    } else if (type === "previous") {
+      let prevIndex = currentIndex - 1;
+      if (sectionsOrder[prevIndex] === "company" && isLoggedIn) {
+        prevIndex--;
+      }
+      if (isSubmitted) {
+        while (
+          prevIndex >= 0 &&
+          !submittedAllowedSections.includes(sectionsOrder[prevIndex])
+        ) {
+          prevIndex--;
+        }
+      }
+      if (prevIndex >= 0) {
+        navigateToSection(sectionsOrder[prevIndex]);
+      }
     }
   };
 

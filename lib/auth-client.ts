@@ -16,24 +16,26 @@ export const authClient = createAuthClient({
 
 export const { signIn, signUp, useSession } = authClient;
 export const signOut = async (options?: any) => {
-  // Clear RFP popup localStorage keys before signing out
   if (typeof window !== "undefined") {
-    const keysToRemove: string[] = [];
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
 
-    // Find all RFP popup keys
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith("rfp-popup-shown-")) {
-        keysToRemove.push(key);
-      }
+      const cookiesToClear = [
+        "zopa_user_email",
+        "zopa_user_name",
+        "zopa_user_mobile",
+        "zopa_user_company",
+        "better-auth.session_token",
+        "__Secure-better-auth.session_token",
+      ];
+
+      cookiesToClear.forEach((cookieName) => {
+        document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT`;
+      });
+    } catch (e) {
+      console.warn("Error clearing local storage:", e);
     }
-
-    // Remove all found keys
-    keysToRemove.forEach((key) => {
-      localStorage.removeItem(key);
-    });
-
-    console.log(`Cleared ${keysToRemove.length} RFP popup notifications`);
   }
 
   try {

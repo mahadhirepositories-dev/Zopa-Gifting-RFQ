@@ -47,6 +47,7 @@ export class EmailService {
       process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const fullUrl = url.startsWith("http") ? url : `${baseURL}${url}`;
 
+
     await this.renderAndSend({
       template: MagicLinkEmail,
       props: { url: fullUrl },

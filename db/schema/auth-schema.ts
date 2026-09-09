@@ -1,11 +1,4 @@
-import {
-  pgTable,
-  text,
-  timestamp,
-  varchar,
-  integer,
-  boolean,
-} from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
 
 // Better Auth Users table
 export const users = pgTable("user", {
@@ -80,21 +73,6 @@ export const pendingRegistrations = pgTable("pending_registration", {
   city: text("city").notNull(),
   postalCode: text("postal_code").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-// ZOPA Gifting RFQs table
-export const rfqs = pgTable("rfq", {
-  id: text("id").primaryKey(),
-  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
-  title: varchar("title", { length: 255 }).notNull(),
-  category: varchar("category", { length: 100 }).notNull(),
-  quantity: integer("quantity").notNull(),
-  estimatedBudget: varchar("estimated_budget", { length: 100 }),
-  deliveryLocation: varchar("delivery_location", { length: 255 }),
-  customizationDetails: text("customization_details"),
-  status: varchar("status", { length: 50 }).default("draft").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export type User = typeof users.$inferSelect;

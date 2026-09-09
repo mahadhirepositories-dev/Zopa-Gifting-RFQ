@@ -1,8 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, pendingRegistrations } from "@/db/schema";
+import { users, rfqs, pendingRegistrations } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { EmailService } from "@/lib/email/email-service";
+import { createAndSetAuthSession } from "@/lib/auth-session";
+import { upsertRfpCompany } from "@/lib/rfq-updates";
 
 const formatLocationField = (val: any): string => {
   if (!val) return "";
@@ -29,8 +32,10 @@ export async function POST(request: Request) {
 
     if (!name || !email) {
       return NextResponse.json(
-        { error: "Name and Email are required." },
-        { status: 400 }
+        {
+          error: "Name and Work Email address are required.",
+        },
+        { status: 400 },
       );
     }
 
@@ -38,7 +43,7 @@ export async function POST(request: Request) {
     const nameClean = name.trim();
     const rawMobile = mobileNumber || phoneNumber || "";
     const mobileClean = rawMobile ? String(rawMobile).trim() : null;
-    const companyClean = companyName ? String(companyName).trim() : null;
+    const companyClean = companyName ? String(companyName).trim() : "KG Corp";
     const addressLine1Clean = addressLine1 ? String(addressLine1).trim() : null;
     const addressLine2Clean = addressLine2 ? String(addressLine2).trim() : null;
     const countryClean = formatLocationField(country) || null;
@@ -46,7 +51,6 @@ export async function POST(request: Request) {
     const cityClean = formatLocationField(city) || null;
     const postalCodeClean = postalCode ? String(postalCode).trim() : null;
 
-    // Check if email is already registered in DB before creating a new user
     const existing = await db
       .select()
       .from(users)
@@ -56,15 +60,15 @@ export async function POST(request: Request) {
     if (existing.length > 0) {
       return NextResponse.json(
         {
-          error: "This email address is already registered. Please log in instead.",
+          error:
+            "This email address is already registered. Please log in instead.",
           isAlreadyRegistered: true,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
-
     const userId = crypto.randomUUID();
-
+    const rfpId = crypto.randomUUID();
     try {
       const userValues = {
         name: nameClean,
@@ -83,10 +87,10 @@ export async function POST(request: Request) {
       await db.insert(users).values({
         id: userId,
         ...userValues,
-        emailVerified: false,
+        emailVerified: true,
       });
 
-      // Stage in pendingRegistrations
+      // Also stage in pendingRegistrations table for Better Auth workflow
       const pendingValues = {
         email: emailClean,
         name: nameClean,
@@ -114,26 +118,80 @@ export async function POST(request: Request) {
           .set(pendingValues)
           .where(eq(pendingRegistrations.email, emailClean));
       }
+
+      // Create new RFP entry linked to user
+      await db.insert(rfqs).values({
+        id: rfpId,
+        userId: userId,
+        title: `Gifting Requirement for ${companyClean}`,
+        category: "Corporate Gifting",
+        quantity: 500,
+        status: "draft",
+      });
+
+      // Persist the company details entered during registration into
+      // rfpCompanies right away, so they're available for this RFP from
+      // the start rather than only appearing after a later login.
+      await upsertRfpCompany(rfpId, {
+        companyName: companyClean,
+        addressLine1: addressLine1Clean,
+        addressLine2: addressLine2Clean,
+        city: cityClean,
+        state: stateClean,
+        postalCode: postalCodeClean,
+        country: countryClean,
+      });
     } catch (dbError) {
-      console.warn("DB connection warning, using memory fallback:", dbError);
+      console.warn(
+        "DB connection warning, using session memory fallback:",
+        dbError,
+      );
     }
 
-    const magicLinkUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/auth/verify?email=${encodeURIComponent(emailClean)}`;
+    const verifyUrl = `/auth/verify?token=demo_token_${Date.now()}&email=${encodeURIComponent(emailClean)}&name=${encodeURIComponent(nameClean)}&mobile=${encodeURIComponent(mobileClean || "")}&company=${encodeURIComponent(companyClean)}&rfpId=${rfpId}`;
+    const magicLinkUrl = `/rfp/${rfpId}/category`;
 
-    return NextResponse.json(
-      {
-        message: `Magic link sent to ${emailClean}. Please check your inbox.`,
-        email: emailClean,
-        magicLinkUrl,
-      },
-      { status: 201 }
-    );
+    await EmailService.sendMagicLinkEmail({
+      email: emailClean,
+      url: verifyUrl,
+    });
+
+    const response = NextResponse.json({
+      message: `Magic link sent to ${emailClean}! Please check your inbox.`,
+      email: emailClean,
+      name: nameClean,
+      company: companyClean,
+      magicLinkUrl,
+    });
+
+    // Set HTTP session cookies for instant client access
+    response.cookies.set("zopa_user_email", emailClean, {
+      path: "/",
+      maxAge: 86400,
+    });
+    response.cookies.set("zopa_user_name", nameClean, {
+      path: "/",
+      maxAge: 86400,
+    });
+    if (mobileClean) {
+      response.cookies.set("zopa_user_mobile", mobileClean, {
+        path: "/",
+        maxAge: 86400,
+      });
+    }
+    response.cookies.set("zopa_user_company", companyClean, {
+      path: "/",
+      maxAge: 86400,
+    });
+
+    await createAndSetAuthSession(userId, response);
+
+    return response;
   } catch (error: any) {
-    console.error("Register route error:", error);
+    console.error("Magic link registration error:", error);
     return NextResponse.json(
-      { error: error?.message || "Failed to process registration." },
-      { status: 500 }
+      { error: error?.message || "Failed to process magic link registration." },
+      { status: 500 },
     );
   }
 }
-

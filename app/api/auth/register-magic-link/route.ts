@@ -5,6 +5,7 @@ import { users, rfqs, pendingRegistrations } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { EmailService } from "@/lib/email/email-service";
 import { createAndSetAuthSession } from "@/lib/auth-session";
+import { upsertRfpCompany } from "@/lib/rfq-updates";
 
 const formatLocationField = (val: any): string => {
   if (!val) return "";
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
     const emailClean = email.trim().toLowerCase();
     const nameClean = name.trim();
     const rawMobile = mobileNumber || phoneNumber || "";
-    const mobileClean = rawMobile ? String(rawMobile).trim() : "+91 8521479630";
+    const mobileClean = rawMobile ? String(rawMobile).trim() : null;
     const companyClean = companyName ? String(companyName).trim() : "KG Corp";
     const addressLine1Clean = addressLine1 ? String(addressLine1).trim() : null;
     const addressLine2Clean = addressLine2 ? String(addressLine2).trim() : null;
@@ -50,7 +51,6 @@ export async function POST(request: Request) {
     const cityClean = formatLocationField(city) || null;
     const postalCodeClean = postalCode ? String(postalCode).trim() : null;
 
-    // Check if email is already registered in DB before creating a new user
     const existing = await db
       .select()
       .from(users)
@@ -60,18 +60,15 @@ export async function POST(request: Request) {
     if (existing.length > 0) {
       return NextResponse.json(
         {
-          error: "This email address is already registered. Please log in instead.",
+          error:
+            "This email address is already registered. Please log in instead.",
           isAlreadyRegistered: true,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
-
-    // Generate proper unique IDs for each new user and RFP
     const userId = crypto.randomUUID();
     const rfpId = crypto.randomUUID();
-
-    // Try saving complete user details and creating RFP in Drizzle ORM DB
     try {
       const userValues = {
         name: nameClean,
@@ -131,17 +128,28 @@ export async function POST(request: Request) {
         quantity: 500,
         status: "draft",
       });
+
+      // Persist all details entered during registration/RFP flow into rfqCompanies table
+      await upsertRfpCompany(rfpId, {
+        companyName: companyClean,
+        addressLine1: addressLine1Clean,
+        addressLine2: addressLine2Clean,
+        city: cityClean,
+        state: stateClean,
+        postalCode: postalCodeClean,
+        country: countryClean,
+        businessType: body.businessType || null,
+      });
     } catch (dbError) {
-      console.warn("DB connection warning, using session memory fallback:", dbError);
+      console.warn(
+        "DB connection warning, using session memory fallback:",
+        dbError,
+      );
     }
 
-    // Generate Magic Link URL carrying verification token
-    const verifyUrl = `/auth/verify?token=demo_token_${Date.now()}&email=${encodeURIComponent(emailClean)}&name=${encodeURIComponent(nameClean)}&mobile=${encodeURIComponent(mobileClean)}&company=${encodeURIComponent(companyClean)}&rfpId=${rfpId}`;
-    
-    // Clean workspace URL without cluttering query params in browser bar
-    const magicLinkUrl = `/rfp/${rfpId}/requirement`;
+    const verifyUrl = `/auth/verify?token=demo_token_${Date.now()}&email=${encodeURIComponent(emailClean)}&name=${encodeURIComponent(nameClean)}&mobile=${encodeURIComponent(mobileClean || "")}&company=${encodeURIComponent(companyClean)}&rfpId=${rfpId}`;
+    const magicLinkUrl = `/rfp/${rfpId}/category`;
 
-    // Trigger EmailService using React Email template & Nodemailer matching zopa-rfp!
     await EmailService.sendMagicLinkEmail({
       email: emailClean,
       url: verifyUrl,
@@ -156,10 +164,24 @@ export async function POST(request: Request) {
     });
 
     // Set HTTP session cookies for instant client access
-    response.cookies.set("zopa_user_email", emailClean, { path: "/", maxAge: 86400 });
-    response.cookies.set("zopa_user_name", nameClean, { path: "/", maxAge: 86400 });
-    response.cookies.set("zopa_user_mobile", mobileClean, { path: "/", maxAge: 86400 });
-    response.cookies.set("zopa_user_company", companyClean, { path: "/", maxAge: 86400 });
+    response.cookies.set("zopa_user_email", emailClean, {
+      path: "/",
+      maxAge: 86400,
+    });
+    response.cookies.set("zopa_user_name", nameClean, {
+      path: "/",
+      maxAge: 86400,
+    });
+    if (mobileClean) {
+      response.cookies.set("zopa_user_mobile", mobileClean, {
+        path: "/",
+        maxAge: 86400,
+      });
+    }
+    response.cookies.set("zopa_user_company", companyClean, {
+      path: "/",
+      maxAge: 86400,
+    });
 
     await createAndSetAuthSession(userId, response);
 

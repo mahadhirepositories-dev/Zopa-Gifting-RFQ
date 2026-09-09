@@ -115,7 +115,7 @@ export function NavUser() {
         email: session.user.email || "",
         image: session.user.image || undefined,
       }
-    : localUserData;
+    : null;
 
   if (isPending && !localUserData) {
     return (
