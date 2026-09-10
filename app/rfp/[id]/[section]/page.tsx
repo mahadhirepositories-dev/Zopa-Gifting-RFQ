@@ -43,7 +43,7 @@ export default function RFPSectionPage({
   );
 }
 
-export function RfpCreatorPage({
+function RfpCreatorPage({
   initialRfpId,
   initialSection,
   orgSlug,

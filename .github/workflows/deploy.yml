@@ -1,0 +1,249 @@
+name: Deployment Workflow
+
+on:
+  push:
+    branches: ["staging", "main"]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set deployment environment variables
+        id: deploy-vars
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "DEPLOY_ENV=production" >> $GITHUB_ENV
+            echo "REMOTE_HOST=${{ secrets.PRODUCTION_SERVER_HOST }}" >> $GITHUB_ENV
+            echo "REMOTE_USER=${{ secrets.PRODUCTION_SERVER_USER }}" >> $GITHUB_ENV
+            echo "REMOTE_PATH=${{ secrets.PRODUCTION_DEPLOY_PATH || '/var/www/zopa-gifting-production' }}" >> $GITHUB_ENV
+            echo "APP_NAME=${{ secrets.PRODUCTION_APP_NAME || 'zopa-gifting-production' }}" >> $GITHUB_ENV
+            echo "APP_PORT=${{ secrets.PRODUCTION_APP_PORT || '3000' }}" >> $GITHUB_ENV
+            {
+              echo "REMOTE_KEY<<EOF"
+              echo "${{ secrets.SSH_PRIVATE_KEY }}"
+              echo "EOF"
+            } >> $GITHUB_OUTPUT
+            echo "deploy_env=production" >> $GITHUB_OUTPUT
+          else
+            echo "DEPLOY_ENV=staging" >> $GITHUB_ENV
+            echo "REMOTE_HOST=${{ secrets.STAGING_SERVER_HOST }}" >> $GITHUB_ENV
+            echo "REMOTE_USER=${{ secrets.STAGING_SERVER_USER }}" >> $GITHUB_ENV
+            echo "REMOTE_PATH=${{ secrets.STAGING_DEPLOY_PATH || '/var/www/zopa-gifting-staging' }}" >> $GITHUB_ENV
+            echo "APP_NAME=${{ secrets.STAGING_APP_NAME || 'zopa-gifting-staging' }}" >> $GITHUB_ENV
+            echo "APP_PORT=${{ secrets.STAGING_APP_PORT || '3001' }}" >> $GITHUB_ENV
+            {
+              echo "REMOTE_KEY<<EOF"
+              echo "${{ secrets.SSH_PRIVATE_KEY }}"
+              echo "EOF"
+            } >> $GITHUB_OUTPUT
+            echo "deploy_env=staging" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy files via rsync
+        uses: burnett01/rsync-deployments@7.0.2
+        with:
+          switches: -avzr --delete --exclude 'node_modules/' --exclude '.next/' --exclude '.env*' --exclude '.deployment_completed' --exclude 'uploads/'
+          path: ./
+          remote_host: ${{ env.REMOTE_HOST }}
+          remote_user: ${{ env.REMOTE_USER }}
+          remote_key: ${{ steps.deploy-vars.outputs.REMOTE_KEY }}
+          remote_path: ${{ env.REMOTE_PATH }}
+
+      - name: Deploy and restart application
+        uses: appleboy/ssh-action@master
+        env:
+          REMOTE_PATH: ${{ env.REMOTE_PATH }}
+          APP_NAME: ${{ env.APP_NAME }}
+          APP_PORT: ${{ env.APP_PORT }}
+          DEPLOY_ENV: ${{ env.DEPLOY_ENV }}
+          DATABASE_URL: ${{ env.DEPLOY_ENV == 'production' && secrets.PRODUCTION_DATABASE_URL || secrets.STAGING_DATABASE_URL }}
+          DB_HOST: ${{ env.DEPLOY_ENV == 'production' && secrets.PRODUCTION_DB_HOST || secrets.STAGING_DB_HOST }}
+          DB_PORT: ${{ env.DEPLOY_ENV == 'production' && secrets.PRODUCTION_DB_PORT || secrets.STAGING_DB_PORT }}
+          DB_USER: ${{ env.DEPLOY_ENV == 'production' && secrets.PRODUCTION_DB_USER || secrets.STAGING_DB_USER }}
+          DB_PASSWORD: ${{ env.DEPLOY_ENV == 'production' && secrets.PRODUCTION_DB_PASSWORD || secrets.STAGING_DB_PASSWORD }}
+          DB_NAME: ${{ env.DEPLOY_ENV == 'production' && secrets.PRODUCTION_DB_NAME || secrets.STAGING_DB_NAME }}
+          DB_SSL: ${{ env.DEPLOY_ENV == 'production' && secrets.PRODUCTION_DB_SSL || secrets.STAGING_DB_SSL }}
+          BETTER_AUTH_SECRET: ${{ env.DEPLOY_ENV == 'production' && secrets.PRODUCTION_BETTER_AUTH_SECRET || secrets.STAGING_BETTER_AUTH_SECRET }}
+          BETTER_AUTH_URL: ${{ env.DEPLOY_ENV == 'production' && secrets.PRODUCTION_BETTER_AUTH_URL || secrets.STAGING_BETTER_AUTH_URL }}
+          APP_URL: ${{ env.DEPLOY_ENV == 'production' && secrets.PRODUCTION_APP_URL || secrets.STAGING_APP_URL }}
+          NEXT_PUBLIC_RECAPTCHA_SITE_KEY: ${{ secrets.NEXT_PUBLIC_RECAPTCHA_SITE_KEY }}
+          RECAPTCHA_SECRET_KEY: ${{ secrets.RECAPTCHA_SECRET_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          LINKEDIN_CLIENT_ID: ${{ secrets.LINKEDIN_CLIENT_ID }}
+          LINKEDIN_CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          ADMIN_EMAIL_TO: ${{ secrets.ADMIN_EMAIL_TO }}
+          SUPER_ADMIN_EMAIL: ${{ secrets.SUPER_ADMIN_EMAIL }}
+          ENABLE_CRON: ${{ secrets.ENABLE_CRON || 'true' }}
+        with:
+          host: ${{ env.REMOTE_HOST }}
+          username: ${{ env.REMOTE_USER }}
+          key: ${{ steps.deploy-vars.outputs.REMOTE_KEY }}
+          port: 22
+          envs: REMOTE_PATH,APP_NAME,APP_PORT,DEPLOY_ENV,DATABASE_URL,DB_HOST,DB_PORT,DB_USER,DB_PASSWORD,DB_NAME,DB_SSL,BETTER_AUTH_SECRET,BETTER_AUTH_URL,APP_URL,NEXT_PUBLIC_RECAPTCHA_SITE_KEY,RECAPTCHA_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,LINKEDIN_CLIENT_ID,LINKEDIN_CLIENT_SECRET,SMTP_HOST,SMTP_PORT,SMTP_FROM,SMTP_USER,SMTP_PASSWORD,ADMIN_EMAIL_TO,SUPER_ADMIN_EMAIL,ENABLE_CRON
+          script: |
+            set -euo pipefail
+
+            echo "🚀 Starting deployment for ${APP_NAME} at ${REMOTE_PATH}"
+            echo "📍 Deploy user: $(whoami)"
+            echo "📄 Environment: ${DEPLOY_ENV}"
+
+            # Critical command wrapper
+            run_critical() {
+              echo "🔄 Running: $@"
+              "$@" || {
+                echo "❌ Command failed: $@"
+                exit 1
+              }
+            }
+
+            # Early exit checks
+            PARENT_DIR=$(dirname "${REMOTE_PATH}")
+            if [ ! -w "${PARENT_DIR}" ]; then
+              echo "❌ No write permission to ${PARENT_DIR}"
+              echo "Run: sudo chown -R $(whoami):$(whoami) ${PARENT_DIR}"
+              exit 1
+            fi
+
+            cd "${REMOTE_PATH}"
+
+            # Make start.sh executable if it exists
+            [ -f start.sh ] && chmod +x start.sh
+
+            # Create .env file on the server with all necessary variables
+            cat > .env << 'ENVEOF'
+            NODE_ENV=production
+            NEXT_PUBLIC_APP_URL=${APP_URL}
+            NEXT_PUBLIC_RECAPTCHA_SITE_KEY=${NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+            RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY}
+            DATABASE_URL=${DATABASE_URL}
+            DB_HOST=${DB_HOST}
+            DB_PORT=${DB_PORT}
+            DB_USER=${DB_USER}
+            DB_PASSWORD=${DB_PASSWORD}
+            DB_NAME=${DB_NAME}
+            DB_SSL=${DB_SSL}
+            PORT=${APP_PORT}
+            BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+            BETTER_AUTH_URL=${BETTER_AUTH_URL}
+            GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+            GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+            LINKEDIN_CLIENT_ID=${LINKEDIN_CLIENT_ID}
+            LINKEDIN_CLIENT_SECRET=${LINKEDIN_CLIENT_SECRET}
+            SMTP_HOST=${SMTP_HOST}
+            SMTP_PORT=${SMTP_PORT}
+            SMTP_FROM=${SMTP_FROM}
+            SMTP_USER=${SMTP_USER}
+            SMTP_PASSWORD=${SMTP_PASSWORD}
+            ADMIN_EMAIL_TO=${ADMIN_EMAIL_TO}
+            SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL}
+            ENABLE_CRON=${ENABLE_CRON}
+            ENVEOF
+
+            # Replace variables in .env
+            sed -i "s|\${APP_URL}|${APP_URL}|g" .env
+            sed -i "s|\${NEXT_PUBLIC_RECAPTCHA_SITE_KEY}|${NEXT_PUBLIC_RECAPTCHA_SITE_KEY}|g" .env
+            sed -i "s|\${RECAPTCHA_SECRET_KEY}|${RECAPTCHA_SECRET_KEY}|g" .env
+            sed -i "s|\${DATABASE_URL}|${DATABASE_URL}|g" .env
+            sed -i "s|\${DB_HOST}|${DB_HOST}|g" .env
+            sed -i "s|\${DB_PORT}|${DB_PORT}|g" .env
+            sed -i "s|\${DB_USER}|${DB_USER}|g" .env
+            sed -i "s|\${DB_PASSWORD}|${DB_PASSWORD}|g" .env
+            sed -i "s|\${DB_NAME}|${DB_NAME}|g" .env
+            sed -i "s|\${DB_SSL}|${DB_SSL}|g" .env
+            sed -i "s|\${APP_PORT}|${APP_PORT}|g" .env
+            sed -i "s|\${BETTER_AUTH_SECRET}|${BETTER_AUTH_SECRET}|g" .env
+            sed -i "s|\${BETTER_AUTH_URL}|${BETTER_AUTH_URL}|g" .env
+            sed -i "s|\${GOOGLE_CLIENT_ID}|${GOOGLE_CLIENT_ID}|g" .env
+            sed -i "s|\${GOOGLE_CLIENT_SECRET}|${GOOGLE_CLIENT_SECRET}|g" .env
+            sed -i "s|\${LINKEDIN_CLIENT_ID}|${LINKEDIN_CLIENT_ID}|g" .env
+            sed -i "s|\${LINKEDIN_CLIENT_SECRET}|${LINKEDIN_CLIENT_SECRET}|g" .env
+            sed -i "s|\${SMTP_HOST}|${SMTP_HOST}|g" .env
+            sed -i "s|\${SMTP_PORT}|${SMTP_PORT}|g" .env
+            sed -i "s|\${SMTP_FROM}|${SMTP_FROM}|g" .env
+            sed -i "s|\${SMTP_USER}|${SMTP_USER}|g" .env
+            sed -i "s|\${SMTP_PASSWORD}|${SMTP_PASSWORD}|g" .env
+            sed -i "s|\${ADMIN_EMAIL_TO}|${ADMIN_EMAIL_TO}|g" .env
+            sed -i "s|\${SUPER_ADMIN_EMAIL}|${SUPER_ADMIN_EMAIL}|g" .env
+            sed -i "s|\${ENABLE_CRON}|${ENABLE_CRON}|g" .env
+            chmod 600 .env
+
+            # Setup Node.js environment
+            export PATH="$HOME/.npm-global/bin:/usr/local/bin:$HOME/.nvm/versions/node/v*/bin:$PATH"
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" || true
+
+            # Install pm2 if not present
+            if ! command -v pm2 >/dev/null 2>&1; then
+              echo "📦 Installing pm2..."
+              npm install -g pm2
+            fi
+
+            # Verify tools are available
+            run_critical command -v node >/dev/null
+            run_critical command -v npm >/dev/null
+            run_critical command -v pm2 >/dev/null
+            echo "✅ Node $(node -v), npm $(npm -v), pm2 $(pm2 -v)"
+
+            # Install dependencies with npm
+            echo "📦 Installing dependencies..."
+            run_critical npm ci
+
+            # Build application
+            echo "🏗️ Building application..."
+            export NODE_OPTIONS="--max-old-space-size=2048"
+            run_critical npm run build
+
+            # Run database migrations
+            echo "🗄️ Running database migrations..."
+            if [ "${DEPLOY_ENV}" = "production" ]; then
+              echo "⚠️ Production environment detected"
+              echo "Checking for pending migrations..."
+              if npx drizzle-kit check 2>&1 | grep -q "No schema changes detected"; then
+                echo "✅ No pending migrations"
+              else
+                echo "⚠️ Pending migrations detected!"
+                echo "Run manually: cd ${REMOTE_PATH} && npm run db:migrate"
+              fi
+            else
+              echo "Running migrations automatically for ${DEPLOY_ENV}..."
+              if npm run db:migrate; then
+                echo "✅ Migrations completed successfully"
+              else
+                echo "⚠️ Migration failed, but continuing deployment"
+                echo "You may need to run migrations manually"
+              fi
+            fi
+
+            # Deploy with PM2
+            echo "🚀 Deploying with PM2..."
+            if pm2 describe "${APP_NAME}" >/dev/null 2>&1; then
+              echo "♻️ Stopping ${APP_NAME}..."
+              pm2 stop "${APP_NAME}"
+              pm2 delete "${APP_NAME}"
+            fi
+
+            echo "▶️ Starting ${APP_NAME} with ecosystem config..."
+            APP_NAME="${APP_NAME}" PORT="${APP_PORT}" pm2 start ecosystem.config.js
+
+            # Health checks
+            sleep 5
+            if ! pm2 describe "${APP_NAME}" | grep -q "online"; then
+              echo "❌ PM2 health check failed"
+              pm2 logs "${APP_NAME}" --lines 20
+              exit 1
+            fi
+
+            run_critical pm2 save
+
+            echo "✅ Deployment completed successfully!"
+            echo "📍 ${APP_NAME} running on port ${APP_PORT}"
