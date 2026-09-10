@@ -7,7 +7,7 @@ if (!process.env.DB_HOST || !process.env.DB_NAME || !process.env.DB_USER) {
 
 export default defineConfig({
   schema: "./db/schema",
-  out: "./db/migrations",
+  out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
     host: process.env.DB_HOST,
