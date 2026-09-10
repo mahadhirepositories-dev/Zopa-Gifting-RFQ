@@ -196,7 +196,7 @@ jobs:
 
             # Install dependencies with npm
             echo "📦 Installing dependencies..."
-            run_critical npm ci
+            run_critical npm install
 
             # Build application
             echo "🏗️ Building application..."
