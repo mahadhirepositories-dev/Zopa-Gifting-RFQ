@@ -19,7 +19,7 @@ jobs:
             echo "DEPLOY_ENV=production" >> $GITHUB_ENV
             echo "REMOTE_HOST=${{ secrets.PRODUCTION_SERVER_HOST }}" >> $GITHUB_ENV
             echo "REMOTE_USER=${{ secrets.PRODUCTION_SERVER_USER }}" >> $GITHUB_ENV
-            echo "REMOTE_PATH=${{ secrets.PRODUCTION_DEPLOY_PATH || '/var/www/zopa-gifting-production' }}" >> $GITHUB_ENV
+            echo "REMOTE_PATH=${{ secrets.PRODUCTION_DEPLOY_PATH || '/var/www/production' }}" >> $GITHUB_ENV
             echo "APP_NAME=${{ secrets.PRODUCTION_APP_NAME || 'zopa-gifting-production' }}" >> $GITHUB_ENV
             echo "APP_PORT=${{ secrets.PRODUCTION_APP_PORT || '3000' }}" >> $GITHUB_ENV
             {
@@ -32,7 +32,7 @@ jobs:
             echo "DEPLOY_ENV=staging" >> $GITHUB_ENV
             echo "REMOTE_HOST=${{ secrets.STAGING_SERVER_HOST }}" >> $GITHUB_ENV
             echo "REMOTE_USER=${{ secrets.STAGING_SERVER_USER }}" >> $GITHUB_ENV
-            echo "REMOTE_PATH=${{ secrets.STAGING_DEPLOY_PATH || '/var/www/zopa-gifting-staging' }}" >> $GITHUB_ENV
+            echo "REMOTE_PATH=${{ secrets.STAGING_DEPLOY_PATH || '/var/www/staging' }}" >> $GITHUB_ENV
             echo "APP_NAME=${{ secrets.STAGING_APP_NAME || 'zopa-gifting-staging' }}" >> $GITHUB_ENV
             echo "APP_PORT=${{ secrets.STAGING_APP_PORT || '3001' }}" >> $GITHUB_ENV
             {
