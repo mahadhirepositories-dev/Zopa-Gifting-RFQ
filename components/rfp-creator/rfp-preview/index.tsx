@@ -22,6 +22,7 @@ import {
   AlertTriangle,
   Users,
   MessageCircle,
+  Plus,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { WhatsAppShareModal } from "./whatsapp-share";
@@ -301,11 +302,12 @@ export const Preview: React.FC<PreviewProps> = ({
     scopeOfWork: data?.scope?.deliverables || [],
     boq: data?.boq || [],
     evaluationCriteria:
-      (Array.isArray(data?.evaluation) && data.evaluation.length > 0
+      Array.isArray(data?.evaluation) && data.evaluation.length > 0
         ? data.evaluation
-        : Array.isArray(data?.evaluationCriteria) && data.evaluationCriteria.length > 0
+        : Array.isArray(data?.evaluationCriteria) &&
+            data.evaluationCriteria.length > 0
           ? data.evaluationCriteria
-          : data?.evaluation || data?.evaluationCriteria || []),
+          : data?.evaluation || data?.evaluationCriteria || [],
     financials: data?.financials || {},
     generalTerms:
       data?.generalTerms?.generalTerms || data?.generalTerms?.selectedTerms,
@@ -448,40 +450,6 @@ export const Preview: React.FC<PreviewProps> = ({
               throw new Error(`Contact not found for email: ${email}`);
             }
 
-            const vendorRes = await fetch(
-              `/api/vendors?email=${encodeURIComponent(email)}`,
-            );
-
-            if (vendorRes.ok) {
-              vendorData = await vendorRes.json();
-              vendorId = vendorData.id;
-
-              isFromMaster = contact?.isFromMaster || false;
-              masterVendorId = contact?.masterVendorId || null;
-            } else if (vendorRes.status === 404) {
-              const createRes = await fetch("/api/vendors", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  name: contact.name || email.split("@")[0],
-                  email: email,
-                  companyName: contact.companyName || "Unknown",
-                  mobileNo: contact.mobileNo || "",
-                }),
-              });
-
-              if (!createRes.ok) {
-                const err = await createRes.json();
-                throw new Error(err?.error || "Failed to create vendor");
-              }
-
-              vendorData = await createRes.json();
-              vendorId = vendorData.id;
-            } else {
-              const errText = await vendorRes.text();
-              throw new Error(`Error checking vendor for ${email}: ${errText}`);
-            }
-
             // Step 2: Create vendor response
             const responseRes = await fetch("/api/vendor-response", {
               method: "POST",
@@ -505,7 +473,7 @@ export const Preview: React.FC<PreviewProps> = ({
             setVendorResponseID(vendorResponseId);
 
             // Step 3: Send RFP email to vendor
-            const vendorUrl = `${baseUrl}/rfp/preview/${rfpId}?response=${vendorResponseId}`;
+            const vendorUrl = `${baseUrl}/rfq/preview/${rfpId}?response=${vendorResponseId}`;
 
             const emailRes = await fetch("/api/email", {
               method: "POST",
@@ -531,26 +499,26 @@ export const Preview: React.FC<PreviewProps> = ({
               throw new Error(err?.error || "Failed to send RFP email");
             }
 
-            // Step 4: Update email sent status
-            await fetch("/api/update-vendor-email-status", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                email,
-                rfpId,
-                emailSent: true,
-              }),
-            });
+            // ************Step 4: Update email sent status
+            // await fetch("/api/update-vendor-email-status", {
+            //   method: "POST",
+            //   headers: { "Content-Type": "application/json" },
+            //   body: JSON.stringify({
+            //     email,
+            //     rfpId,
+            //     emailSent: true,
+            //   }),
+            // });
 
-            // Update local state
-            const updatedContacts = data.vendorContacts.map(
-              (vc: VendorContact) =>
-                vc.email === email ? { ...vc, emailSent: true } : vc,
-            );
+            // // Update local state
+            // const updatedContacts = data.vendorContacts.map(
+            //   (vc: VendorContact) =>
+            //     vc.email === email ? { ...vc, emailSent: true } : vc,
+            // );
 
-            if (onChange) {
-              onChange({ ...data, vendorContacts: updatedContacts });
-            }
+            // if (onChange) {
+            //   onChange({ ...data, vendorContacts: updatedContacts });
+            // }
 
             return { email, success: true };
           } catch (error) {
@@ -560,22 +528,23 @@ export const Preview: React.FC<PreviewProps> = ({
         });
       } // End of if (vendorsToEmail.length > 0)
 
-      // Send buyer thank-you email (should always be sent on successful submission)
+      //*********** */ Send buyer thank-you email (should always be sent on successful submission)
       // let buyerThankYouPromise: Promise<any> | null = null;
-      // const vendorsForEmail = vendorsToEmail.length > 0
-      //   ? selectedEmailAddresses.map((email) => {
-      //       const contact = data.vendorContacts.find(
-      //         (vc: VendorContact) => vc.email === email
-      //       );
-      //       return {
-      //         email,
-      //         companyName: contact?.companyName || "Unknown Company",
-      //       };
-      //     })
-      //   : data.vendorContacts.map((vc: VendorContact) => ({
-      //       email: vc.email,
-      //       companyName: vc.companyName || "Unknown Company",
-      //     }));
+      // const vendorsForEmail =
+      //   vendorsToEmail.length > 0
+      //     ? selectedEmailAddresses.map((email) => {
+      //         const contact = data.vendorContacts.find(
+      //           (vc: VendorContact) => vc.email === email,
+      //         );
+      //         return {
+      //           email,
+      //           companyName: contact?.companyName || "Unknown Company",
+      //         };
+      //       })
+      //     : (data.vendorContacts || []).map((vc: VendorContact) => ({
+      //         email: vc.email,
+      //         companyName: vc.companyName || "Unknown Company",
+      //       }));
 
       // buyerThankYouPromise = fetch("/api/email", {
       //   method: "POST",
@@ -583,42 +552,48 @@ export const Preview: React.FC<PreviewProps> = ({
       //   body: JSON.stringify({
       //     type: "buyer-thank-you",
       //     data: {
-      //       companyName: "ZOPA",
+      //       companyName: data?.company?.name || "ZOPA",
       //       projectName: data?.requirement?.projectName,
       //       vendors: vendorsForEmail,
       //       buyerEmail: data?.contact?.contactEmail,
-      //       url: `${baseUrl}/rfp/${rfpId}`,
+      //       url: `${baseUrl}/rfq/${rfpId}`,
       //     },
       //   }),
       // });
+
       // const allPromises = [...vendorProcessingPromises];
-      // allPromises.push(buyerThankYouPromise.then((res) => ({
-      //   type: "buyer",
-      //   success: res.ok,
-      // })));
+      // if (buyerThankYouPromise) {
+      //   allPromises.push(
+      //     buyerThankYouPromise.then((res) => ({
+      //       type: "buyer",
+      //       success: res.ok,
+      //     })),
+      //   );
+      // }
 
       // const results = await Promise.all(allPromises);
       // const failedVendors = results
-      //   .filter((result) => !("type" in result) && !result.success)
+      //   .filter((result) => result && !("type" in result) && !result.success)
       //   .map((result) => (result as any).email);
 
       // const buyerEmailResult = results.find(
-      //   (result) => "type" in result && result.type === "buyer"
+      //   (result) => result && "type" in result && result.type === "buyer",
       // );
 
       // if (!buyerEmailResult?.success) {
       //   console.error("Failed to send buyer thank-you email");
-      //   toast.warning("RFP submitted successfully, but confirmation email failed to send");
+      //   toast.warning(
+      //     "RFP submitted successfully, but confirmation email failed to send",
+      //   );
       // }
 
       // if (failedVendors.length > 0) {
       //   throw new Error(
-      //     `Failed to process ${failedVendors.length} vendors: ${failedVendors.join(", ")}`
+      //     `Failed to process ${failedVendors.length} vendors: ${failedVendors.join(", ")}`,
       //   );
       // }
 
       // NEW: Send CC emails automatically if Admin Configured
-      // We use the 'ccEmails' variable we fetched at the start of the function
       if (ccEmails.length > 0 && vendorsToEmail.length > 0) {
         try {
           await fetch("/api/email", {
@@ -648,7 +623,6 @@ export const Preview: React.FC<PreviewProps> = ({
           });
         } catch (ccError) {
           console.error("Failed to send CC emails:", ccError);
-          // Don't fail the entire submission if CC emails fail
           toast.warning("RFP sent successfully, but CC notifications failed");
         }
       }
@@ -664,7 +638,7 @@ export const Preview: React.FC<PreviewProps> = ({
       }
 
       setTimeout(() => {
-        route.push(`/rfp/confirmation/${rfpId}`);
+        route.push(`/rfq/confirmation/${rfpId}`);
       }, 2000);
     } catch (error: any) {
       setSubmissionStatus("error");
@@ -684,9 +658,7 @@ export const Preview: React.FC<PreviewProps> = ({
     organizationId,
   ]);
 
-  const loggedIn = Boolean(
-    isLoggedIn || session?.user || session?.user?.email,
-  );
+  const loggedIn = Boolean(isLoggedIn || session?.user || session?.user?.email);
 
   interface SectionStatus {
     name: string;
@@ -698,25 +670,46 @@ export const Preview: React.FC<PreviewProps> = ({
     const sData = {
       company: data?.company || safeDataRef.current?.company || {},
       requirement: data?.requirement || safeDataRef.current?.requirement || {},
-      scopeOfWork: data?.scope?.deliverables || data?.scope || safeDataRef.current?.scopeOfWork || [],
+      scopeOfWork:
+        data?.scope?.deliverables ||
+        data?.scope ||
+        safeDataRef.current?.scopeOfWork ||
+        [],
       boq: data?.boq || safeDataRef.current?.boq || [],
       evaluationCriteria:
-        (Array.isArray(data?.evaluation) && data.evaluation.length > 0
+        Array.isArray(data?.evaluation) && data.evaluation.length > 0
           ? data.evaluation
-          : Array.isArray(data?.evaluationCriteria) && data.evaluationCriteria.length > 0
+          : Array.isArray(data?.evaluationCriteria) &&
+              data.evaluationCriteria.length > 0
             ? data.evaluationCriteria
-            : (Array.isArray(safeDataRef.current?.evaluationCriteria) && safeDataRef.current.evaluationCriteria.length > 0
-                ? safeDataRef.current.evaluationCriteria
-                : data?.evaluation || data?.evaluationCriteria || safeDataRef.current?.evaluationCriteria || [])),
+            : Array.isArray(safeDataRef.current?.evaluationCriteria) &&
+                safeDataRef.current.evaluationCriteria.length > 0
+              ? safeDataRef.current.evaluationCriteria
+              : data?.evaluation ||
+                data?.evaluationCriteria ||
+                safeDataRef.current?.evaluationCriteria ||
+                [],
       financials: data?.financials || safeDataRef.current?.financials || {},
       generalTerms:
-        data?.generalTerms?.selectedTerms || data?.generalTerms || safeDataRef.current?.generalTerms || [],
+        data?.generalTerms?.selectedTerms ||
+        data?.generalTerms ||
+        safeDataRef.current?.generalTerms ||
+        [],
       specialTerms: data?.specialTerms || safeDataRef.current?.specialTerms,
-      documents: data?.documentsToShare || data?.documents || safeDataRef.current?.documents || [],
+      documents:
+        data?.documentsToShare ||
+        data?.documents ||
+        safeDataRef.current?.documents ||
+        [],
       contact: data?.contact || safeDataRef.current?.contact || {},
       vendors: data?.vendors || safeDataRef.current?.vendors || {},
-      vendorContacts: data?.vendorContacts || data?.vendorcontacts || safeDataRef.current?.vendorContacts || [],
-      rfpDates: data?.rfpDates || data?.dates || safeDataRef.current?.rfpDates || {},
+      vendorContacts:
+        data?.vendorContacts ||
+        data?.vendorcontacts ||
+        safeDataRef.current?.vendorContacts ||
+        [],
+      rfpDates:
+        data?.rfpDates || data?.dates || safeDataRef.current?.rfpDates || {},
     };
 
     const sections: SectionStatus[] = [];
@@ -733,15 +726,19 @@ export const Preview: React.FC<PreviewProps> = ({
       {
         name: "2. ABOUT THE REQUIREMENT",
         id: "requirement",
-        isComplete: Boolean(sData.requirement?.projectName || sData.requirement?.purpose),
+        isComplete: Boolean(
+          sData.requirement?.projectName || sData.requirement?.purpose,
+        ),
       },
       {
         name: "3. SCOPE OF WORK",
         id: "scope",
         isComplete:
           (Array.isArray(sData.scopeOfWork) && sData.scopeOfWork.length > 0) ||
-          (typeof sData.scopeOfWork === "object" && sData.scopeOfWork?.deliverables?.length > 0) ||
-          (typeof sData.scopeOfWork === "string" && sData.scopeOfWork.length > 0),
+          (typeof sData.scopeOfWork === "object" &&
+            sData.scopeOfWork?.deliverables?.length > 0) ||
+          (typeof sData.scopeOfWork === "string" &&
+            sData.scopeOfWork.length > 0),
       },
       {
         name: "4. BOQ/BOM",
@@ -753,13 +750,15 @@ export const Preview: React.FC<PreviewProps> = ({
         id: "evaluation",
         isComplete: (() => {
           const evalList =
-            (Array.isArray(sData.evaluationCriteria) && sData.evaluationCriteria.length > 0
+            Array.isArray(sData.evaluationCriteria) &&
+            sData.evaluationCriteria.length > 0
               ? sData.evaluationCriteria
               : Array.isArray(data?.evaluation) && data.evaluation.length > 0
                 ? data.evaluation
-                : Array.isArray(data?.evaluationCriteria) && data.evaluationCriteria.length > 0
+                : Array.isArray(data?.evaluationCriteria) &&
+                    data.evaluationCriteria.length > 0
                   ? data.evaluationCriteria
-                  : []);
+                  : [];
           return evalList.length > 0;
         })(),
       },
@@ -768,11 +767,12 @@ export const Preview: React.FC<PreviewProps> = ({
         id: "financials",
         isComplete: Boolean(
           sData.financials &&
-            (sData.financials.budgetType ||
-              sData.financials.priceModel ||
-              sData.financials.currency ||
-              sData.financials.paymentTerm ||
-              (Array.isArray(sData.financials.paymentMilestones) && sData.financials.paymentMilestones.length > 0)),
+          (sData.financials.budgetType ||
+            sData.financials.priceModel ||
+            sData.financials.currency ||
+            sData.financials.paymentTerm ||
+            (Array.isArray(sData.financials.paymentMilestones) &&
+              sData.financials.paymentMilestones.length > 0)),
         ),
       },
       {
@@ -780,9 +780,10 @@ export const Preview: React.FC<PreviewProps> = ({
         id: "generalTerms",
         isComplete: Boolean(
           sData.generalTerms &&
-            (sData.generalTerms.selectedTerms?.length > 0 ||
-              (Array.isArray(sData.generalTerms) && sData.generalTerms.length > 0) ||
-              sData.generalTerms.deliveryTimeValue),
+          (sData.generalTerms.selectedTerms?.length > 0 ||
+            (Array.isArray(sData.generalTerms) &&
+              sData.generalTerms.length > 0) ||
+            sData.generalTerms.deliveryTimeValue),
         ),
       },
       {
@@ -797,13 +798,24 @@ export const Preview: React.FC<PreviewProps> = ({
           const checkDocs = (docData: any): boolean => {
             if (!docData) return false;
             let raw = docData;
-            if (typeof raw === "object" && !Array.isArray(raw) && raw !== null) {
-              if (raw.documentsToShare !== undefined) raw = raw.documentsToShare;
+            if (
+              typeof raw === "object" &&
+              !Array.isArray(raw) &&
+              raw !== null
+            ) {
+              if (raw.documentsToShare !== undefined)
+                raw = raw.documentsToShare;
               else if (raw.documents !== undefined) raw = raw.documents;
             }
             if (typeof raw === "string") {
               const trimmed = raw.trim();
-              if (!trimmed || trimmed === "[]" || trimmed === "{}" || trimmed === "null") return false;
+              if (
+                !trimmed ||
+                trimmed === "[]" ||
+                trimmed === "{}" ||
+                trimmed === "null"
+              )
+                return false;
               try {
                 const parsed = JSON.parse(trimmed);
                 return checkDocs(parsed);
@@ -822,12 +834,17 @@ export const Preview: React.FC<PreviewProps> = ({
       {
         name: "10. ADD VENDORS",
         id: "vendorcontacts",
-        isComplete: Array.isArray(sData.vendorContacts) && sData.vendorContacts.length > 0,
+        isComplete:
+          Array.isArray(sData.vendorContacts) &&
+          sData.vendorContacts.length > 0,
       },
       {
         name: "11. RFQ START AND END DATE",
         id: "dates",
-        isComplete: Boolean(sData.rfpDates && (sData.rfpDates.startDate || sData.rfpDates.endDate)),
+        isComplete: Boolean(
+          sData.rfpDates &&
+          (sData.rfpDates.startDate || sData.rfpDates.endDate),
+        ),
       },
     );
 
@@ -903,7 +920,7 @@ export const Preview: React.FC<PreviewProps> = ({
 
       const { vendorResponseId } = await responseRes.json();
 
-      const vendorUrl = `${baseUrl}/rfp/preview/${rfpId}?response=${vendorResponseId}`;
+      const vendorUrl = `${baseUrl}/rfq/preview/${rfpId}?response=${vendorResponseId}`;
       const emailRes = await fetch("/api/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -967,7 +984,8 @@ export const Preview: React.FC<PreviewProps> = ({
   return (
     <div className="space-y-6">
       <p className="text-xs font-mono text-gray-500 mb-6">
-        Review your RFQ before submitting it. You can download a PDF copy, send it via email.
+        Review your RFQ before submitting it. You can download a PDF copy, send
+        it via email.
       </p>
 
       {!rfpId && (
@@ -989,7 +1007,8 @@ export const Preview: React.FC<PreviewProps> = ({
             </h4>
           </div>
           <p className="text-xs font-mono text-red-600">
-            The following sections are incomplete. Please provide the required information.
+            The following sections are incomplete. Please provide the required
+            information.
           </p>
           <div className="flex gap-2.5 flex-wrap pt-1">
             {currentIncompleteSections.map((sec) => (
@@ -1023,7 +1042,7 @@ export const Preview: React.FC<PreviewProps> = ({
               </span>
             </div>
 
-             <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300">
+            <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300">
               <table className="w-full text-xs font-mono">
                 <thead className="bg-slate-50 border-b border-gray-200 text-slate-600">
                   <tr>
@@ -1038,52 +1057,67 @@ export const Preview: React.FC<PreviewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
-                  {safeData.vendorContacts.map((contact: any, index: number) => (
-                    <tr
-                      key={contact.email || index}
-                      className="hover:bg-slate-50/80 transition-colors"
-                    >
-                      <td className="p-3">
-                        <Checkbox
-                          id={`contact-table-${index}`}
-                          checked={selectedEmailAddresses.includes(contact.email)}
-                          onCheckedChange={(checked) =>
-                            handleEmailCheckboxChange(contact.email, checked as boolean)
-                          }
-                          disabled={(disabled && !contact.isNew) || contact.email_sent}
-                          className="h-4 w-4 rounded border-gray-300 data-[state=checked]:bg-[#1E6BFF]"
-                        />
-                      </td>
-                      <td className="p-3 font-sans font-medium text-slate-900">
-                        {contact.name}
-                      </td>
-                      <td className="p-3 text-slate-800">{contact.companyName}</td>
-                      <td className="p-3 text-slate-600">{contact.email}</td>
-                      <td className="p-3 text-slate-500">{contact.mobileNo || "-"}</td>
-                      <td className="p-3 text-center">
-                        {contact.email_sent || contact.emailSent ? (
-                          <div className="flex flex-col items-center gap-1.5 py-0.5">
-                            <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-800">
-                              Email Sent
+                  {safeData.vendorContacts.map(
+                    (contact: any, index: number) => (
+                      <tr
+                        key={contact.email || index}
+                        className="hover:bg-slate-50/80 transition-colors"
+                      >
+                        <td className="p-3">
+                          <Checkbox
+                            id={`contact-table-${index}`}
+                            checked={selectedEmailAddresses.includes(
+                              contact.email,
+                            )}
+                            onCheckedChange={(checked) =>
+                              handleEmailCheckboxChange(
+                                contact.email,
+                                checked as boolean,
+                              )
+                            }
+                            disabled={
+                              (disabled && !contact.isNew) || contact.email_sent
+                            }
+                            className="h-4 w-4 rounded border-gray-300 data-[state=checked]:bg-[#1E6BFF]"
+                          />
+                        </td>
+                        <td className="p-3 font-sans font-medium text-slate-900">
+                          {contact.name}
+                        </td>
+                        <td className="p-3 text-slate-800">
+                          {contact.companyName}
+                        </td>
+                        <td className="p-3 text-slate-600">{contact.email}</td>
+                        <td className="p-3 text-slate-500">
+                          {contact.mobileNo || "-"}
+                        </td>
+                        <td className="p-3 text-center">
+                          {contact.email_sent || contact.emailSent ? (
+                            <div className="flex flex-col items-center gap-1.5 py-0.5">
+                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-800">
+                                Email Sent
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-6 text-[11px] px-2 font-mono"
+                                disabled={resendingEmail === contact.email}
+                                onClick={() => handleResendEmail(contact.email)}
+                              >
+                                {resendingEmail === contact.email
+                                  ? "Sending..."
+                                  : "Resend"}
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800">
+                              Pending
                             </span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-6 text-[11px] px-2 font-mono"
-                              disabled={resendingEmail === contact.email}
-                              onClick={() => handleResendEmail(contact.email)}
-                            >
-                              {resendingEmail === contact.email ? "Sending..." : "Resend"}
-                            </Button>
-                          </div>
-                        ) : (
-                          <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800">
-                            Pending
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                          )}
+                        </td>
+                      </tr>
+                    ),
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1106,7 +1140,9 @@ export const Preview: React.FC<PreviewProps> = ({
                 Vendor Contacts
               </span>
             </div>
-            <p className="text-xs font-mono text-gray-500">No vendor contacts found.</p>
+            <p className="text-xs font-mono text-gray-500">
+              No vendor contacts found.
+            </p>
             <div>
               <button
                 type="button"
@@ -1151,7 +1187,10 @@ export const Preview: React.FC<PreviewProps> = ({
             }}
             className="h-4 w-4 rounded border-gray-300 data-[state=checked]:bg-[#1E6BFF]"
           />
-          <label htmlFor="terms-acceptance" className="text-xs font-normal text-slate-800 cursor-pointer">
+          <label
+            htmlFor="terms-acceptance"
+            className="text-xs font-normal text-slate-800 cursor-pointer"
+          >
             I accept the{" "}
             <button
               type="button"
@@ -1188,7 +1227,9 @@ export const Preview: React.FC<PreviewProps> = ({
             type="button"
             onClick={() => setShowWhatsAppModal(true)}
             disabled={
-              !rfpId || !safeData.vendorContacts || safeData.vendorContacts.length === 0
+              !rfpId ||
+              !safeData.vendorContacts ||
+              safeData.vendorContacts.length === 0
             }
             variant="outline"
             className="border border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-semibold text-xs uppercase px-4 h-10 rounded-lg flex items-center gap-2"
@@ -1200,7 +1241,9 @@ export const Preview: React.FC<PreviewProps> = ({
           <Button
             type="button"
             onClick={handleSendClick}
-            disabled={isSubmitting || submissionStatus === "submitting" || !rfpId}
+            disabled={
+              isSubmitting || submissionStatus === "submitting" || !rfpId
+            }
             className="bg-[#1D61E7] hover:bg-blue-700 text-white font-bold text-xs uppercase px-6 h-10 rounded-lg shadow-2xs flex items-center gap-2"
           >
             {submissionStatus === "submitting" ? (

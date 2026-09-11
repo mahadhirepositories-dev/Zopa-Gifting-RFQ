@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     }
 
     const verifyUrl = `/auth/verify?token=demo_token_${Date.now()}&email=${encodeURIComponent(emailClean)}&name=${encodeURIComponent(user.name)}&mobile=${encodeURIComponent(user.mobileNumber || "")}&company=${encodeURIComponent(user.companyName || "")}&rfpId=${rfpId}`;
-    const magicLinkUrl = `/rfp/${rfpId}/category`;
+    const magicLinkUrl = `/rfq/${rfpId}/requirement`;
 
     try {
       await EmailService.sendMagicLinkEmail({

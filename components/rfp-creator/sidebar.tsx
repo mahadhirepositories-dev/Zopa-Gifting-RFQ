@@ -18,7 +18,9 @@ import {
   CalendarDays,
   Eye,
   Lock,
+  Plus,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Sidebar as ShadcnSidebar,
   SidebarContent,
@@ -44,6 +46,11 @@ export const Sidebar: React.FC<SidebarProps> = memo(({ isSubmitted }) => {
     navigateToSection,
     canNavigateToSection,
   } = useNavigation();
+
+  const handleCreateNewRfp = () => {
+    const newRfpId = window.crypto.randomUUID();
+    window.location.href = `/rfq/${newRfpId}/requirement`;
+  };
 
   const currentActive = activeSection || currentSection;
 
@@ -83,20 +90,15 @@ export const Sidebar: React.FC<SidebarProps> = memo(({ isSubmitted }) => {
   );
 
   const visibleSections = useMemo(() => {
-    if (isSubmitted) {
-      return allRfpSections.filter((sec) =>
-        ["vendorcontacts", "dates", "preview"].includes(sec.section),
-      );
-    }
     return allRfpSections;
-  }, [isSubmitted, allRfpSections]);
+  }, [allRfpSections]);
 
   return (
     <ShadcnSidebar
       collapsible="icon"
       className="h-screen border-r border-slate-200 bg-gray-100/90 text-slate-800 flex flex-col justify-between shrink-0 select-none font-sans"
     >
-      <SidebarHeader className="p-3 flex items-center justify-center border-b border-slate-200/80 bg-white/60 shrink-0">
+      <SidebarHeader className="p-3 flex flex-col items-center justify-center border-b border-slate-200/80 bg-white/60 shrink-0 gap-2">
         <Image
           src="/zopa-logo.svg"
           alt="ZOPA FLUX Logo"
@@ -105,6 +107,13 @@ export const Sidebar: React.FC<SidebarProps> = memo(({ isSubmitted }) => {
           className="w-4/5 h-auto max-h-10 object-contain"
           priority
         />
+        <Button
+          onClick={handleCreateNewRfp}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2 px-3 rounded-lg shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Create New RFQ</span>
+        </Button>
       </SidebarHeader>
 
       <SidebarContent className="p-2 space-y-1 overflow-y-auto min-h-0 flex-1">

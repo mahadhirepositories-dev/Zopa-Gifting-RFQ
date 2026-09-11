@@ -189,7 +189,7 @@ Thank you!`;
       const { sessionId } = await tokenRes.json();
 
       // Step 4: Generate unique URL with both response and sid parameters
-      const vendorUrl = `${baseUrl}/rfp/preview/${rfpId}?response=${vendorResponseId}&sid=${sessionId}`;
+      const vendorUrl = `${baseUrl}/rfq/preview/${rfpId}?response=${vendorResponseId}&sid=${sessionId}`;
 
       return { success: true, url: vendorUrl, vendorResponseId };
     } catch (error) {

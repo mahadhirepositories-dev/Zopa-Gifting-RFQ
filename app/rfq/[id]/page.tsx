@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 
-export default async function RFPPage({
+export default async function RFQPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const resolvedParams = await params;
-  redirect(`/rfp/${resolvedParams.id}/category`);
+  redirect(`/rfq/${resolvedParams.id}/requirement`);
 }

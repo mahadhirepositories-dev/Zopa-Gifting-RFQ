@@ -89,7 +89,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/public/");
 
   const isProtectedPage =
-    pathname.startsWith("/rfp") ||
+    pathname.startsWith("/rfq") ||
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/select-organization");
@@ -137,7 +137,7 @@ export async function proxy(request: NextRequest) {
     }
     const defaultRfpId = "09ed3409-08c3-4af6-96e8-3ea87eb451cf";
     return NextResponse.redirect(
-      new URL(`/rfp/${defaultRfpId}/category`, request.url),
+      new URL(`/rfq/${defaultRfpId}/requirement`, request.url),
     );
   }
 

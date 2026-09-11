@@ -194,7 +194,7 @@ function RfpCreatorPage({
     (section: string) => {
       if (!rfpId || typeof window === "undefined") return;
       console.log(section, "sectionss");
-      const newPath = `/rfp/${rfpId}/${section}`;
+      const newPath = `/rfq/${rfpId}/${section}`;
       if (window.location.pathname !== newPath) {
         window.history.pushState({}, "", newPath);
       }
@@ -322,7 +322,7 @@ function RfpCreatorPage({
           setCurrentSection(targetSection);
           const activeRfpId = rfpData.rfpId || rfpId;
           if (activeRfpId && (urlSection !== targetSection || activeRfpId !== rfpId)) {
-            const newPath = `/rfp/${activeRfpId}/${targetSection}`;
+            const newPath = `/rfq/${activeRfpId}/${targetSection}`;
             if (typeof window !== "undefined" && window.location.pathname !== newPath) {
               window.history.pushState({}, "", newPath);
             }
