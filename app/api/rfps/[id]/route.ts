@@ -6,6 +6,16 @@ import {
   rfqCompanies,
   rfqRequirements,
   rfqCategories,
+  rfqScope,
+  rfqBoqItems,
+  rfqEvaluationCriteria,
+  rfqFinancials,
+  rfqGeneralTerms,
+  rfqSpecialTerms,
+  rfqDocuments,
+  rfqVendors,
+  rfqVendorContacts,
+  rfqDates,
   users,
   sessions,
 } from "@/db/schema";
@@ -15,7 +25,20 @@ import {
   upsertRfpRequirement,
   upsertRfpCompany,
   upsertRfpCategory,
+  upsertRfpScope,
+  upsertRfpBoq,
+  upsertRfpEvaluationCriteria,
+  upsertRfpFinancials,
+  upsertRfpGeneralTerms,
+  upsertRfpSpecialTerms,
+  upsertRfpDocuments,
+  upsertRfpVendors,
+  upsertRfpVendorContacts,
+  upsertRfpDates,
 } from "@/lib/rfq-updates";
+import {
+  scopeSchema
+} from "@/lib/validations/rfq-creator-schema";
 
 async function getSessionUser(request: NextRequest) {
   const sessionToken =
@@ -72,6 +95,8 @@ export async function GET(
     }
 
     const { id } = await params;
+    let targetRfpId = id;
+    let targetRfq: typeof rfqs.$inferSelect | undefined;
 
     // Check if RFQ exists for user in DB
     const [rfq] = await db
@@ -80,40 +105,94 @@ export async function GET(
       .where(and(eq(rfqs.id, id), eq(rfqs.userId, user.id)))
       .limit(1);
 
-    if (!rfq) {
-      // Check if user has ANY rfq
+    if (rfq) {
+      targetRfq = rfq;
+    } else {
       const [anyUserRfq] = await db
         .select()
         .from(rfqs)
         .where(eq(rfqs.userId, user.id))
         .limit(1);
 
-      if (!anyUserRfq) {
-        return NextResponse.json(
-          { error: "No RFQ found for user.", exists: false },
-          { status: 404 },
-        );
+      if (anyUserRfq) {
+        targetRfpId = anyUserRfq.id;
+        targetRfq = anyUserRfq;
+      } else {
+        await ensureRfqExists(id, user);
+        targetRfpId = id;
+        const [createdRfq] = await db
+          .select()
+          .from(rfqs)
+          .where(eq(rfqs.id, id))
+          .limit(1);
+        targetRfq = createdRfq;
       }
     }
 
-    // Fetch Category, Requirement and Company details
-    const [categoryRow] = await db
-      .select()
-      .from(rfqCategories)
-      .where(eq(rfqCategories.rfpId, id))
-      .limit(1);
+    const safeSelect = async (queryFn: () => Promise<any[]>) => {
+      try {
+        const rows = await queryFn();
+        return rows[0] || null;
+      } catch {
+        return null;
+      }
+    };
 
-    const [requirement] = await db
-      .select()
-      .from(rfqRequirements)
-      .where(eq(rfqRequirements.rfpId, id))
-      .limit(1);
+    const categoryRow = await safeSelect(() =>
+      db
+        .select()
+        .from(rfqCategories)
+        .where(eq(rfqCategories.rfqId, targetRfpId))
+        .limit(1),
+    );
 
-    const [company] = await db
-      .select()
-      .from(rfqCompanies)
-      .where(eq(rfqCompanies.rfpId, id))
-      .limit(1);
+    const requirement = await safeSelect(() =>
+      db
+        .select()
+        .from(rfqRequirements)
+        .where(eq(rfqRequirements.rfqId, targetRfpId))
+        .limit(1),
+    );
+
+    const scopeRow = await safeSelect(() =>
+      db
+        .select()
+        .from(rfqScope)
+        .where(eq(rfqScope.rfqId, targetRfpId))
+        .limit(1),
+    );
+
+    const company = await safeSelect(() =>
+      db
+        .select()
+        .from(rfqCompanies)
+        .where(eq(rfqCompanies.rfqId, targetRfpId))
+        .limit(1),
+    );
+
+    let boqRows: (typeof rfqBoqItems.$inferSelect)[] = [];
+    try {
+      boqRows = await db
+        .select()
+        .from(rfqBoqItems)
+        .where(eq(rfqBoqItems.rfqId, targetRfpId));
+    } catch (err) {
+      console.warn("DB boq items lookup warning:", err);
+    }
+
+    let evaluationRows: (typeof rfqEvaluationCriteria.$inferSelect)[] = [];
+    try {
+      evaluationRows = await db
+        .select()
+        .from(rfqEvaluationCriteria)
+        .where(eq(rfqEvaluationCriteria.rfqId, targetRfpId));
+    } catch (err) {
+      console.warn("DB evaluation criteria lookup warning:", err);
+    }
+
+    const evaluationList = evaluationRows
+      .map((row) => row.evaluation)
+      .filter((e): e is string => Boolean(e));
 
     const parseField = (val: string | null) => {
       if (!val) return null;
@@ -125,8 +204,8 @@ export async function GET(
     };
 
     return NextResponse.json({
-      rfpId: id,
-      rfpsData: rfq || { status: "draft" },
+      rfpId: targetRfpId,
+      rfpsData: targetRfq || { status: "draft" },
       categorySelection: categoryRow
         ? {
             category: parseField(categoryRow.category),
@@ -141,6 +220,126 @@ export async function GET(
           `Gifting Requirement for ${user.companyName || user.name}`,
         purpose: "Annual employee & client gift hampers",
       },
+      scope: {
+        deliverables: scopeRow ? parseField(scopeRow.deliverables) || [] : [],
+      },
+      boq: boqRows.map((row) => ({
+        id: row.id,
+        category: row.category || "",
+        description: row.description || "",
+        uom: row.uom || "",
+        qty: row.qty != null ? String(row.qty) : "",
+        targetPrice: row.targetPrice != null ? String(row.targetPrice) : "",
+        specification:
+          row.specification && typeof row.specification === "object"
+            ? ((row.specification as any).text ?? "")
+            : ((row.specification as any) ?? ""),
+        remarks: row.remarks || "",
+        isVisible: row.isVisible ?? false,
+        itemRef: row.itemRef ?? undefined,
+      })),
+      evaluation: evaluationList,
+      evaluationCriteria: evaluationList,
+      financials: await safeSelect(() =>
+        db
+          .select()
+          .from(rfqFinancials)
+          .where(eq(rfqFinancials.rfqId, targetRfpId))
+          .limit(1),
+      ).then((fin) =>
+        fin
+          ? {
+              budgetType: fin.priceModel || fin.budgetType || "",
+              priceModel: fin.priceModel || fin.budgetType || "",
+              currency: fin.currency || "",
+              paymentTerm: fin.paymentTerm || "",
+              paymentMilestones: fin.paymentTerms || [],
+              pbgAmount: fin.pbgAmount || "",
+              pbgNotes: fin.pbgNotes || "",
+              financialNotes: fin.financialNotes || "",
+            }
+          : {
+              budgetType: "",
+              currency: "",
+              paymentTerm: "",
+              paymentMilestones: [],
+              pbgAmount: "",
+              pbgNotes: "",
+              financialNotes: "",
+            },
+      ),
+      generalTerms: await safeSelect(() =>
+        db
+          .select()
+          .from(rfqGeneralTerms)
+          .where(eq(rfqGeneralTerms.rfqId, targetRfpId))
+          .limit(1),
+      ).then((gt) =>
+        gt
+          ? {
+              selectedTerms: gt.selectedTerms || [],
+              customTerms: gt.customTerms || [],
+              deliveryTimeValue: gt.deliveryTimeValue || "",
+              deliveryTimeUnit: gt.deliveryTimeUnit || "",
+              deliveryLocations: gt.deliveryLocations || [],
+            }
+          : null,
+      ),
+      specialTerms: await safeSelect(() =>
+        db
+          .select()
+          .from(rfqSpecialTerms)
+          .where(eq(rfqSpecialTerms.rfqId, targetRfpId))
+          .limit(1),
+      ).then((st) =>
+        st
+          ? {
+              selectedTerms: st.selectedTerms || [],
+              customTerms: st.customTerms || [],
+            }
+          : null,
+      ),
+      documents: await safeSelect(() =>
+        db
+          .select()
+          .from(rfqDocuments)
+          .where(eq(rfqDocuments.rfqId, targetRfpId))
+          .limit(1),
+      ).then((doc) => (doc ? doc.documentsToShare : null)),
+      vendors: await safeSelect(() =>
+        db
+          .select()
+          .from(rfqVendors)
+          .where(eq(rfqVendors.rfqId, targetRfpId))
+          .limit(1),
+      ).then((v) =>
+        v
+          ? {
+              selectionMethod: v.selectionMethod || "",
+              vendorRequirements: parseField(v.vendorRequirements) || [],
+              vendorSelectionProcess: v.vendorSelectionProcess || "",
+            }
+          : null,
+      ),
+      vendorcontacts: await db
+        .select()
+        .from(rfqVendorContacts)
+        .where(eq(rfqVendorContacts.rfqId, targetRfpId))
+        .catch(() => []),
+      rfpDates: await safeSelect(() =>
+        db
+          .select()
+          .from(rfqDates)
+          .where(eq(rfqDates.rfqId, targetRfpId))
+          .limit(1),
+      ).then((d) =>
+        d
+          ? {
+              startDate: d.startDate || "",
+              endDate: d.endDate || "",
+            }
+          : null,
+      ),
       company: company || {
         name: user.companyName || user.name,
         addressLine1: user.addressLine1 || "",
@@ -166,11 +365,7 @@ export async function GET(
   }
 }
 
-// Ensures a parent `rfqs` row exists for this id before any child table
-// (category/requirement/company) tries to insert against it as a foreign
-// key. Without this, saving any section for an RFP whose parent row was
-// never created (e.g. a client-generated id that never went through a
-// creation endpoint) fails with a 23503 FK violation on first save.
+
 async function ensureRfqExists(id: string, user: typeof users.$inferSelect) {
   const [existing] = await db
     .select({ id: rfqs.id, userId: rfqs.userId })
@@ -180,18 +375,12 @@ async function ensureRfqExists(id: string, user: typeof users.$inferSelect) {
 
   if (existing) {
     if (existing.userId !== user.id) {
-      // Row exists but belongs to someone else — don't silently create a
-      // duplicate or let this user write into it.
       throw Object.assign(new Error("RFQ belongs to a different user."), {
         statusCode: 403,
       });
     }
-    return; // already exists and owned by this user — nothing to do
+    return; 
   }
-
-  // No parent row yet — create a minimal draft so child inserts have
-  // something to reference. Section data (requirement/company/category)
-  // will fill in the real details via the upserts below.
   await db.insert(rfqs).values({
     id,
     userId: user.id,
@@ -235,8 +424,71 @@ export async function POST(
       await upsertRfpRequirement(id, body.requirement);
     }
 
+    if (body.scope) {
+      const parsed = scopeSchema.safeParse(body.scope);
+      if (!parsed.success) {
+        return NextResponse.json(
+          {
+            error: "Invalid scope of work data.",
+            issues: parsed.error.flatten().fieldErrors,
+          },
+          { status: 400 },
+        );
+      }
+      await upsertRfpScope(id, parsed.data);
+    }
+
+    if (body.boq) {
+      await upsertRfpBoq(id, Array.isArray(body.boq) ? body.boq : []);
+    }
+
+    if (body.evaluationCriteria || body.evaluation) {
+      await upsertRfpEvaluationCriteria(
+        id,
+        body.evaluationCriteria || body.evaluation,
+      );
+    }
+
+    if (body.financials) {
+      await upsertRfpFinancials(id, body.financials);
+    }
+
     if (body.company) {
       await upsertRfpCompany(id, body.company);
+    }
+
+    if (body.generalTerms) {
+      await upsertRfpGeneralTerms(id, body.generalTerms);
+    }
+
+    if (body.specialTerms) {
+      await upsertRfpSpecialTerms(id, body.specialTerms);
+    }
+
+    if (body.documents) {
+      await upsertRfpDocuments(id, body.documents);
+    }
+
+    if (body.vendors) {
+      await upsertRfpVendors(id, body.vendors);
+    }
+
+    if (body.vendorcontacts || body.vendorContacts) {
+      await upsertRfpVendorContacts(
+        id,
+        body.vendorcontacts || body.vendorContacts,
+      );
+    }
+
+    if (body.dates || body.rfpDates) {
+      await upsertRfpDates(id, body.dates || body.rfpDates);
+    }
+
+    if (body.status) {
+      await db
+        .update(rfqs)
+        .set({ status: String(body.status), updatedAt: new Date() })
+        .where(eq(rfqs.id, id));
     }
 
     return NextResponse.json({

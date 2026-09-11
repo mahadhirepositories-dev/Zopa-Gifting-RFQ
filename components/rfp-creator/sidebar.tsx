@@ -49,7 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = memo(({ isSubmitted }) => {
 
   const allRfpSections = useMemo(
     () => [
-      { section: "category", title: "Category", icon: FileText },
+      // { section: "category", title: "Category", icon: FileText },
       {
         section: "requirement",
         title: "About the Requirement",

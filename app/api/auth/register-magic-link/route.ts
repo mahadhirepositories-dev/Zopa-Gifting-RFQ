@@ -90,7 +90,7 @@ export async function POST(request: Request) {
         emailVerified: true,
       });
 
-      // Also stage in pendingRegistrations table for Better Auth workflow
+
       const pendingValues = {
         email: emailClean,
         name: nameClean,
@@ -118,18 +118,15 @@ export async function POST(request: Request) {
           .set(pendingValues)
           .where(eq(pendingRegistrations.email, emailClean));
       }
-
-      // Create new RFP entry linked to user
       await db.insert(rfqs).values({
         id: rfpId,
         userId: userId,
-        title: `Gifting Requirement for ${companyClean}`,
+        title: "",
         category: "Corporate Gifting",
         quantity: 500,
         status: "draft",
       });
 
-      // Persist all details entered during registration/RFP flow into rfqCompanies table
       await upsertRfpCompany(rfpId, {
         companyName: companyClean,
         addressLine1: addressLine1Clean,
@@ -163,7 +160,6 @@ export async function POST(request: Request) {
       magicLinkUrl,
     });
 
-    // Set HTTP session cookies for instant client access
     response.cookies.set("zopa_user_email", emailClean, {
       path: "/",
       maxAge: 86400,

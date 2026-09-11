@@ -65,26 +65,62 @@ export const MainContent: React.FC<MainContentProps> = ({
 
   const handleClick = async (type: "previous" | "next") => {
     if (type === "next" && rfpId) {
+      const payload: Record<string, any> = {};
+
       if (currentSection === "category" && selection) {
-        try {
-          await fetch(`/api/rfps/${rfpId}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ categorySelection: selection }),
-          });
-        } catch (err) {
-          console.warn("Failed to save category selection data:", err);
-        }
+        payload.categorySelection = selection;
+      } else if (currentSection === "company" && formData.company) {
+        payload.company = formData.company;
+      } else if (currentSection === "requirement" && formData.requirement) {
+        payload.requirement = formData.requirement;
+      } else if (currentSection === "scope" && formData.scope) {
+        payload.scope = formData.scope;
+      } else if (currentSection === "boq" && formData.boq) {
+        payload.boq = formData.boq;
+      } else if (
+        currentSection === "evaluation" &&
+        (formData.evaluation || (formData as any).evaluationCriteria)
+      ) {
+        payload.evaluationCriteria =
+          (Array.isArray(formData.evaluation) && formData.evaluation.length > 0)
+            ? formData.evaluation
+            : (Array.isArray((formData as any).evaluationCriteria) && (formData as any).evaluationCriteria.length > 0)
+              ? (formData as any).evaluationCriteria
+              : formData.evaluation || (formData as any).evaluationCriteria;
+      } else if (currentSection === "financials" && formData.financials) {
+        payload.financials = formData.financials;
+      } else if (currentSection === "generalTerms" && formData.generalTerms) {
+        payload.generalTerms = formData.generalTerms;
+      } else if (currentSection === "specialTerms" && formData.specialTerms) {
+        payload.specialTerms = formData.specialTerms;
+      } else if (
+        currentSection === "documents" &&
+        (formData.documentsToShare || formData.documents)
+      ) {
+        payload.documents = formData.documentsToShare || formData.documents;
+      } else if (
+        currentSection === "vendors" &&
+        (formData.vendors || (formData as any).vendorSelection)
+      ) {
+        payload.vendors = formData.vendors || (formData as any).vendorSelection;
+      } else if (
+        currentSection === "vendorcontacts" &&
+        formData.vendorcontacts
+      ) {
+        payload.vendorcontacts = formData.vendorcontacts;
+      } else if (currentSection === "dates" && (formData as any).rfpDates) {
+        payload.dates = (formData as any).rfpDates;
       }
-      if (currentSection === "requirement" && formData.requirement) {
+
+      if (Object.keys(payload).length > 0) {
         try {
           await fetch(`/api/rfps/${rfpId}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ requirement: formData.requirement }),
+            body: JSON.stringify(payload),
           });
         } catch (err) {
-          console.warn("Failed to save requirement data:", err);
+          console.warn(`Failed to save ${currentSection} data:`, err);
         }
       }
     }

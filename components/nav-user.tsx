@@ -133,52 +133,14 @@ export function NavUser() {
     );
   }
 
+  React.useEffect(() => {
+    if (!isPending && !activeUser) {
+      router.push("/");
+    }
+  }, [isPending, activeUser, router]);
+
   if (!activeUser) {
-    return (
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <SidebarMenuButton
-                size="lg"
-                className="w-full justify-between p-2 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <Avatar className="h-8 w-8 rounded-full shrink-0 bg-slate-200 border border-slate-300">
-                    <AvatarFallback className="bg-slate-300 text-slate-700 font-bold text-xs">
-                      Z
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col text-left min-w-0 overflow-hidden">
-                    <span className="truncate text-xs sm:text-sm font-semibold text-slate-800">
-                      Zopa Workspace
-                    </span>
-                    <span className="truncate text-[11px] text-slate-500">
-                      Guest / Demo User
-                    </span>
-                  </div>
-                </div>
-                <ChevronsUpDown className="w-4 h-4 text-slate-400 shrink-0 ml-1" />
-              </SidebarMenuButton>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              side="top"
-              align="start"
-              sideOffset={8}
-              className="w-56 rounded-lg bg-white border border-slate-200 shadow-md p-1"
-            >
-              <DropdownMenuItem
-                onClick={() => router.push("/")}
-                className="flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-md cursor-pointer"
-              >
-                <LogIn className="w-4 h-4 text-slate-500" />
-                <span>Log in / Sign up</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </SidebarMenuItem>
-      </SidebarMenu>
-    );
+    return null;
   }
 
   const initialLetter = getSingleInitial(activeUser.name, activeUser.email);

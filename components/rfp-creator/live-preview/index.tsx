@@ -25,10 +25,32 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
   const evaluation = data.evaluation || [];
   const financials = data.financials || {};
   const generalTerms = data.generalTerms || {};
-  const specialTerms = data.specialTerms || {};
-  const documentsToShare = data.documentsToShare || {};
-  const vendors = data.vendors || {};
-  const rfpDates = data.rfpDates || {};
+  const rawDocuments = data.documentsToShare || data.documents;
+
+  const documentsList = React.useMemo(() => {
+    if (!rawDocuments) return [];
+    let raw = rawDocuments;
+    if (typeof raw === "object" && !Array.isArray(raw) && raw !== null) {
+      if (raw.documentsToShare !== undefined) raw = raw.documentsToShare;
+      else if (raw.documents !== undefined) raw = raw.documents;
+    }
+    if (typeof raw === "string") {
+      const trimmed = raw.trim();
+      if (!trimmed || trimmed === "[]" || trimmed === "{}") return [];
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item) => (typeof item === "string" ? item : item?.name || item?.label || "")).filter(Boolean);
+        }
+      } catch {
+        return trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+    }
+    if (Array.isArray(raw)) {
+      return raw.map((item) => (typeof item === "string" ? item : item?.name || item?.label || "")).filter(Boolean);
+    }
+    return [];
+  }, [rawDocuments]);
 
   useEffect(() => {
     if (contact?.logoPreview) {
@@ -265,7 +287,7 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
         financials?.financialNotes) && (
         <div className="space-y-1 font-mono text-xs sm:text-sm text-slate-700">
           <h3 className="text-base font-bold text-slate-900 font-sans mb-2">
-            6. Financials
+            6. Financial Information
           </h3>
           {financials.budgetType && (
             <p>
@@ -299,6 +321,20 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
               Delivery Lead Time: {generalTerms.deliveryTimeValue}{" "}
               {generalTerms.deliveryTimeUnit || "days"}
             </li>
+          </ul>
+        </div>
+      )}
+
+      {/* 9. Documents to Share */}
+      {documentsList.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-base font-bold text-slate-900">
+            9. Documents to Share
+          </h3>
+          <ul className="list-disc pl-5 text-slate-700 space-y-1 font-mono text-xs sm:text-sm">
+            {documentsList.map((docName: string, index: number) => (
+              <li key={index}>{docName}</li>
+            ))}
           </ul>
         </div>
       )}

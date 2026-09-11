@@ -89,8 +89,6 @@ export async function POST(request: Request) {
         ...userValues,
         emailVerified: true,
       });
-
-      // Also stage in pendingRegistrations table for Better Auth workflow
       const pendingValues = {
         email: emailClean,
         name: nameClean,
@@ -123,15 +121,12 @@ export async function POST(request: Request) {
       await db.insert(rfqs).values({
         id: rfpId,
         userId: userId,
-        title: `Gifting Requirement for ${companyClean}`,
+        title: "",
         category: "Corporate Gifting",
         quantity: 500,
         status: "draft",
       });
 
-      // Persist the company details entered during registration into
-      // rfpCompanies right away, so they're available for this RFP from
-      // the start rather than only appearing after a later login.
       await upsertRfpCompany(rfpId, {
         companyName: companyClean,
         addressLine1: addressLine1Clean,

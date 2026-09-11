@@ -122,7 +122,15 @@ export async function proxy(request: NextRequest) {
   }
 
   // 7. Redirect Authenticated Users visiting homepage or login page directly to Category step
-  if (isAuthenticated && (pathname === "/" || pathname === "/login")) {
+  const forceClear =
+    request.nextUrl.searchParams.has("clear") ||
+    request.nextUrl.searchParams.has("logout");
+
+  if (
+    !forceClear &&
+    isAuthenticated &&
+    (pathname === "/" || pathname === "/login")
+  ) {
     const callbackUrl = request.nextUrl.searchParams.get("callbackUrl");
     if (callbackUrl && callbackUrl.startsWith("/") && callbackUrl !== "/") {
       return NextResponse.redirect(new URL(callbackUrl, request.url));

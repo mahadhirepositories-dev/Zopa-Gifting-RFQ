@@ -54,16 +54,12 @@ export async function POST(request: Request) {
         await db.insert(rfqs).values({
           id: rfpId,
           userId: user.id,
-          title: `Gifting Requirement for ${user.companyName || user.name}`,
+          title: "",
           category: "Corporate Gifting",
           quantity: 500,
           status: "draft",
         });
       }
-
-      // Sync the user's stored company details into rfpCompanies for this
-      // RFP, so the RFP wizard's company section is populated from a
-      // proper normalized row rather than only living on `users`.
       await upsertRfpCompany(rfpId, {
         companyName: user.companyName,
         addressLine1: user.addressLine1,

@@ -226,6 +226,20 @@ function RfpCreatorPage({
 
   console.log(currentSection, "currentSection2");
   useEffect(() => {
+    if (!authLoading && !isLoggedIn) {
+      document.cookie =
+        "better-auth.session_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+      document.cookie =
+        "__Secure-better-auth.session_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+      document.cookie =
+        "zopa_user_email=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+      document.cookie =
+        "zopa_user_name=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+      window.location.href = "/?clear=1";
+    }
+  }, [authLoading, isLoggedIn]);
+
+  useEffect(() => {
     let isMounted = true;
 
     async function initializeApp() {
@@ -234,6 +248,20 @@ function RfpCreatorPage({
       setAccessDenied(false);
 
       try {
+        if (!isLoggedIn) {
+          if (isMounted) {
+            hasInitializedRef.current = true;
+            document.cookie =
+              "better-auth.session_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+            document.cookie =
+              "__Secure-better-auth.session_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+            document.cookie =
+              "zopa_user_email=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+            window.location.href = "/?clear=1";
+          }
+          return;
+        }
+
         if (!rfpId) {
           const targetSection = getTargetSection({
             isLoggedIn,
@@ -247,24 +275,6 @@ function RfpCreatorPage({
             hasInitializedRef.current = true;
           }
           return;
-        }
-        console.log(currentSection, "currentSection2");
-
-        if (isLoggedIn) {
-          const accessResponse = await fetch(
-            `/api/rfps/${rfpId}/check-access`,
-            {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-              },
-            },
-          );
-
-          if (accessResponse.status === 403) {
-            router.push("/login");
-            return;
-          }
         }
 
         const response = await fetch(`/api/rfps/${rfpId}`, {
@@ -286,7 +296,18 @@ function RfpCreatorPage({
 
           hasInitializedRef.current = true;
           setRfpStatus(status);
-          setFormData((prev: any) => ({ ...prev, ...rfpData }));
+          const rawDocs = rfpData.documents || rfpData.documentsToShare;
+          let docsValue = rawDocs;
+          if (typeof rawDocs === "object" && rawDocs !== null && !Array.isArray(rawDocs) && rawDocs.documentsToShare !== undefined) {
+            docsValue = rawDocs.documentsToShare;
+          }
+          setFormData((prev: any) => ({
+            ...prev,
+            ...rfpData,
+            documentsToShare: docsValue
+              ? { documentsToShare: docsValue }
+              : prev.documentsToShare,
+          }));
           if (rfpData.organization?.slug && !storedOrgSlug) {
             setStoredOrgSlug(rfpData.organization.slug);
           }
@@ -299,15 +320,17 @@ function RfpCreatorPage({
           });
 
           setCurrentSection(targetSection);
-          if (urlSection !== targetSection) {
-            updateURL(targetSection);
+          const activeRfpId = rfpData.rfpId || rfpId;
+          if (activeRfpId && (urlSection !== targetSection || activeRfpId !== rfpId)) {
+            const newPath = `/rfp/${activeRfpId}/${targetSection}`;
+            if (typeof window !== "undefined" && window.location.pathname !== newPath) {
+              window.history.pushState({}, "", newPath);
+            }
           }
         } else {
-          // If no corresponding data in database, redirect to Home page
+          console.warn("Failed to fetch RFP data:", response.status);
           if (isMounted) {
             hasInitializedRef.current = true;
-            router.push("/");
-            return;
           }
         }
       } catch (error) {
@@ -319,7 +342,6 @@ function RfpCreatorPage({
       }
     }
 
-    console.log(currentSection, "currentSection4");
     if (!authLoading) {
       initializeApp();
     }
@@ -374,12 +396,19 @@ function RfpCreatorPage({
     );
   }
 
-  if (authLoading || isLoading) {
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted || authLoading || isLoading || !isLoggedIn) {
     return (
-      <div className="flex items-center justify-center h-screen w-full">
+      <div className="flex items-center justify-center h-screen w-full bg-slate-50">
         <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-          <span className="text-gray-600">Loading RFP...</span>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div>
+          <span className="text-sm font-medium text-slate-600">
+            {!isLoggedIn && isMounted ? "Redirecting to Home..." : "Loading RFP..."}
+          </span>
         </div>
       </div>
     );

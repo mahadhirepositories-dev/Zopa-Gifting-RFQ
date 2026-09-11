@@ -1,11 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, AlertCircle } from "lucide-react";
+import {
+  scopeSchema,
+  type ScopeFieldErrors,
+} from "@/lib/validations/rfq-creator-schema";
 
 interface ScopeOfWorkProps {
   data: any;
@@ -17,64 +26,131 @@ interface ScopeOfWorkProps {
   disabled?: boolean;
 }
 
-export const ScopeOfWork: React.FC<ScopeOfWorkProps> = ({
-  data,
-  onChange,
-  disabled,
-}) => {
-  const [deliverables, setDeliverables] = useState<string[]>(
-    data?.deliverables || ["Custom logo printing on boxes", "Individual doorstep shipping to employee addresses"]
-  );
-  const [newItem, setNewItem] = useState("");
+export interface ScopeOfWorkHandle {
+  /** Marks the deliverables list as touched and returns whether it's valid. */
+  validate: () => boolean;
+}
 
-  const addDeliverable = () => {
-    if (!newItem.trim()) return;
-    const updated = [...deliverables, newItem.trim()];
-    setDeliverables(updated);
-    setNewItem("");
-    onChange({ deliverables: updated });
-  };
+export const ScopeOfWork = forwardRef<ScopeOfWorkHandle, ScopeOfWorkProps>(
+  ({ data, onChange, onError, disabled }, ref) => {
+    const [deliverables, setDeliverables] = useState<string[]>(
+      data?.deliverables || [],
+    );
 
-  const removeDeliverable = (index: number) => {
-    const updated = deliverables.filter((_, i) => i !== index);
-    setDeliverables(updated);
-    onChange({ deliverables: updated });
-  };
+    useEffect(() => {
+      setDeliverables(data?.deliverables || []);
+    }, [data?.deliverables]);
+    const [newItem, setNewItem] = useState("");
+    const [touched, setTouched] = useState(false);
 
-  return (
-    <div className="space-y-6">
-      <div className="border-b border-slate-100 pb-3">
-        <h2 className="text-xl font-bold text-slate-900">Scope of Work & Deliverables</h2>
-        <p className="text-xs text-slate-500 mt-0.5">Specify expected deliverables from the selected vendor.</p>
-      </div>
+    const validation = useMemo(() => {
+      const result = scopeSchema.safeParse({ deliverables });
 
-      <div className="space-y-3">
-        <div className="flex gap-2">
-          <Input
-            placeholder="Add deliverable (e.g. Custom ribbon branding)"
-            value={newItem}
-            onChange={(e) => setNewItem(e.target.value)}
-            disabled={disabled}
-            className="h-9 text-sm"
-          />
-          <Button type="button" onClick={addDeliverable} disabled={disabled} size="sm">
-            <Plus className="w-4 h-4 mr-1" /> Add
-          </Button>
+      if (result.success) {
+        return { errors: {} as ScopeFieldErrors, isValid: true };
+      }
+
+      const fieldErrors: ScopeFieldErrors = {};
+      for (const issue of result.error.issues) {
+        const field = issue.path[0] as keyof ScopeFieldErrors;
+        if (!fieldErrors[field]) fieldErrors[field] = issue.message;
+      }
+      return { errors: fieldErrors, isValid: false };
+    }, [deliverables]);
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        validate: () => {
+          setTouched(true);
+          if (!validation.isValid) {
+            onError?.(
+              validation.errors.deliverables || "Scope of work is invalid",
+            );
+          } else {
+            onError?.("");
+          }
+          return validation.isValid;
+        },
+      }),
+      [validation, onError],
+    );
+
+    const addDeliverable = () => {
+      if (!newItem.trim()) return;
+      // Split by new lines and filter out empty lines
+      const items = newItem.split("\n").filter((item) => item.trim() !== "");
+      const updated = [...deliverables, ...items.map((item) => item.trim())];
+      setDeliverables(updated);
+      setNewItem("");
+      setTouched(true);
+      onChange({ deliverables: updated });
+    };
+
+    const removeDeliverable = (index: number) => {
+      const updated = deliverables.filter((_, i) => i !== index);
+      setDeliverables(updated);
+      setTouched(true);
+      onChange({ deliverables: updated });
+    };
+
+    const deliverablesError = touched
+      ? validation.errors.deliverables
+      : undefined;
+
+    return (
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <div className="flex flex-col gap-2 ">
+            <Textarea
+              placeholder="Add deliverables"
+              value={newItem}
+              onChange={(e) => setNewItem(e.target.value)}
+              disabled={disabled}
+              className="min-h-[50px] text-sm resize-y border-slate-300 rounded-md bg-white shadow-2xs"
+              rows={4}
+            />
+            <Button
+              type="button"
+              onClick={addDeliverable}
+              disabled={!newItem.trim() || disabled}
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase px-5 py-2.5 rounded-md shadow-sm transition-colors cursor-pointer ml-auto"
+            >
+              <Plus className="w-4 h-4 mr-1" /> Add
+            </Button>
+          </div>
+
+          <ul className="space-y-2 mt-4">
+            {deliverables.map((item, idx) => (
+              <li
+                key={idx}
+                className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800"
+              >
+                <span>{item}</span>
+                {!disabled && (
+                  <button
+                    type="button"
+                    onClick={() => removeDeliverable(idx)}
+                    className="text-rose-500 hover:text-rose-700"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+
+          {deliverablesError && (
+            <p className="flex items-center gap-1 text-[11px] text-red-500 mt-1">
+              <AlertCircle className="w-3 h-3" />
+              {deliverablesError}
+            </p>
+          )}
         </div>
-
-        <ul className="space-y-2">
-          {deliverables.map((item, idx) => (
-            <li key={idx} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800">
-              <span>{item}</span>
-              {!disabled && (
-                <button type="button" onClick={() => removeDeliverable(idx)} className="text-rose-500 hover:text-rose-700">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
       </div>
-    </div>
-  );
-};
+    );
+  },
+);
+
+ScopeOfWork.displayName = "ScopeOfWork";

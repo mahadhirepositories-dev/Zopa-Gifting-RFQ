@@ -2,16 +2,18 @@
 "use client";
 
 import React, { useRef } from "react";
-import { useRouter } from "next/navigation";
 import { CombinedCompanyContact } from "./combined-company";
 import {
   AboutRequirements,
   type AboutRequirementsHandle,
 } from "./about-requirements";
-import { ScopeOfWork } from "./scope-of-work";
-import { BOQ } from "./boq";
-import { EvaluationCriteria } from "./evaluation-criteria";
-import { Financials } from "./financial";
+import { ScopeOfWork, type ScopeOfWorkHandle } from "./scope-of-work";
+import { BOQ, type BOQHandle } from "./boq/index";
+import {
+  EvaluationCriteria,
+  type EvaluationCriteriaHandle,
+} from "./evaluation-criteria";
+import { Financials, type FinancialsHandle } from "./financial";
 import { GeneralTerms } from "./general-terms";
 import { SpecialTerms } from "./special-terms";
 import { DocumentsToShare } from "./document-share";
@@ -80,6 +82,10 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
   const { navigateToSection } = useNavigation();
   const categoryRef = useRef<CategoryHandle>(null);
   const requirementRef = useRef<AboutRequirementsHandle>(null);
+  const scopeRef = useRef<ScopeOfWorkHandle>(null);
+  const boqRef = useRef<BOQHandle>(null);
+  const evaluationRef = useRef<EvaluationCriteriaHandle>(null);
+  const financialsRef = useRef<FinancialsHandle>(null);
   const submittedAllowedSections = ["vendorcontacts", "dates", "preview"];
   const isSectionAllowed =
     !isSubmitted || submittedAllowedSections.includes(activeSection);
@@ -91,18 +97,19 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
     scope: "3. Scope of Work",
     boq: "4. BOQ/BOM",
     evaluation: "5. Evaluation Criteria",
-    financials: "6. Financials",
+    financials: "6. Financial Information",
     generalTerms: "7. General Terms & Conditions",
     specialTerms: "8. Special Terms & Conditions",
     documents: "9. Documents to Share",
-    vendors: "10. Vendor Selection",
-    vendorcontacts: "11. Add Vendors",
-    dates: "12. RFQ Start and End Date",
+    vendors: "10. Vendor Selection Process",
+    vendorcontacts: "11. Add Vendor Contacts",
+    dates: "12. RFQ Dates",
     preview: "13. Preview & Submit",
   };
 
   const shouldShowPrevious = () => {
     if (activeSection === "category") return false;
+    if (activeSection === "preview") return false;
     if (isSubmitted) {
       const allowedIndex = submittedAllowedSections.indexOf(activeSection);
       return allowedIndex > 0;
@@ -129,6 +136,22 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
     }
     if (activeSection === "requirement") {
       const isValid = requirementRef.current?.validate() ?? true;
+      if (!isValid) return;
+    }
+    if (activeSection === "scope") {
+      const isValid = scopeRef.current?.validate() ?? true;
+      if (!isValid) return;
+    }
+    if (activeSection === "boq") {
+      const isValid = boqRef.current?.validate() ?? true;
+      if (!isValid) return;
+    }
+    if (activeSection === "evaluation") {
+      const isValid = evaluationRef.current?.validate() ?? true;
+      if (!isValid) return;
+    }
+    if (activeSection === "financials") {
+      const isValid = financialsRef.current?.validate() ?? true;
       if (!isValid) return;
     }
     handleClick("next");
@@ -169,7 +192,6 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
   return (
     <div className="bg-white rounded-xl border border-slate-200/80 p-6 shadow-sm flex flex-col justify-between min-h-[480px]">
       <div className="space-y-5">
-        {/* Close button for contact flow */}
         {showContactFlowNavigation && (
           <div className="flex justify-end">
             <Button
@@ -184,7 +206,6 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
           </div>
         )}
 
-        {/* Title Header */}
         {sectionTitles[activeSection] && (
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
             {sectionTitles[activeSection]}
@@ -200,7 +221,6 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
           </div>
         )}
 
-        {/* Form Components */}
         {activeSection === "category" && !isSubmitted && (
           <Category
             ref={categoryRef}
@@ -257,6 +277,7 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
 
         {activeSection === "scope" && !isSubmitted && (
           <ScopeOfWork
+            ref={scopeRef}
             data={formData?.scope}
             onChange={handleScopeChange}
             selectedSubCategory={selectedSubCategory ?? undefined}
@@ -279,6 +300,7 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
 
         {activeSection === "boq" && !isSubmitted && (
           <BOQ
+            ref={boqRef}
             data={formData.boq || []}
             onChange={handleBOQChange}
             errors={errors}
@@ -289,6 +311,7 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
 
         {activeSection === "evaluation" && !isSubmitted && (
           <EvaluationCriteria
+            ref={evaluationRef}
             data={formData?.evaluation}
             onChange={(data) => handleInputChange("evaluation", data)}
             errors={errors}
@@ -298,10 +321,11 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
 
         {activeSection === "financials" && !isSubmitted && (
           <Financials
+            ref={financialsRef}
             data={formData?.financials || {}}
             onChange={(data) => handleInputChange("financials", data)}
             errors={errors}
-            setErrors={() => {}}
+            setErrors={setErrors}
             disabled={isFormDisabled}
           />
         )}
@@ -399,7 +423,6 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
         )}
       </div>
 
-      {/* Navigation Buttons (Previous / NEXT) */}
       {(shouldShowPrevious() || shouldShowNext()) && (
         <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-6">
           {shouldShowPrevious() ? (
