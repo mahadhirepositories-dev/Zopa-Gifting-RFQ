@@ -25,6 +25,10 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
   const evaluation = data.evaluation || [];
   const financials = data.financials || {};
   const generalTerms = data.generalTerms || {};
+  const specialTerms = data.specialTerms || {};
+  const vendors = data.vendors || {};
+  const vendorContacts = data.vendorContacts || data.vendorcontacts || [];
+  const rfpDates = data.rfpDates || data.dates || {};
   const rawDocuments = data.documentsToShare || data.documents;
 
   const documentsList = React.useMemo(() => {
@@ -245,20 +249,52 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
                   <th className="p-2 text-left">UOM</th>
                   <th className="p-2 text-left">Qty</th>
                   <th className="p-2 text-left">Target Price</th>
+                  <th className="p-2 text-left">Logo Req.</th>
                   <th className="p-2 text-left">Specification</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-mono">
-                {boq.map((item: any, index: number) => (
-                  <tr key={index}>
-                    <td className="p-2">{item.category}</td>
-                    <td className="p-2">{item.description}</td>
-                    <td className="p-2">{item.uom}</td>
-                    <td className="p-2">{item.qty}</td>
-                    <td className="p-2">{item.targetPrice}</td>
-                    <td className="p-2">{item.specification}</td>
-                  </tr>
-                ))}
+                {boq.map((item: any, index: number) => {
+                  const hasLogo = item.logoRequirement === "with_logo";
+                  const attachment =
+                    Array.isArray(item.attachments) && item.attachments.length > 0
+                      ? item.attachments[0]
+                      : null;
+
+                  return (
+                    <tr key={index}>
+                      <td className="p-2">{item.category}</td>
+                      <td className="p-2">{item.description}</td>
+                      <td className="p-2">{item.uom}</td>
+                      <td className="p-2">{item.qty}</td>
+                      <td className="p-2">₹{item.targetPrice}</td>
+                      <td className="p-2">
+                        <span
+                          className={
+                            hasLogo
+                              ? "text-emerald-700 font-bold"
+                              : "text-slate-500"
+                          }
+                        >
+                          {hasLogo ? "With Logo" : "Without Logo"}
+                        </span>
+                        {hasLogo && attachment?.fileUrl && (
+                          <div className="text-[10px] mt-0.5">
+                            <a
+                              href={attachment.fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 underline font-bold"
+                            >
+                              📎 {attachment.fileName || "View Logo"}
+                            </a>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-2">{item.specification}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -311,16 +347,69 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
       )}
 
       {/* 7. General Terms */}
-      {generalTerms?.deliveryTimeValue && (
+      {(generalTerms?.deliveryTimeValue ||
+        (Array.isArray(generalTerms?.selectedTerms) && generalTerms.selectedTerms.length > 0) ||
+        (Array.isArray(generalTerms?.customTerms) && generalTerms.customTerms.length > 0) ||
+        (Array.isArray(generalTerms?.deliveryLocations) && generalTerms.deliveryLocations.length > 0)) && (
         <div className="space-y-2">
           <h3 className="text-base font-bold text-slate-900">
             7. General Terms & Conditions
           </h3>
           <ul className="list-disc pl-5 text-slate-700 space-y-1 font-mono text-xs sm:text-sm">
-            <li>
-              Delivery Lead Time: {generalTerms.deliveryTimeValue}{" "}
-              {generalTerms.deliveryTimeUnit || "days"}
-            </li>
+            {generalTerms.deliveryTimeValue && (
+              <li>
+                Delivery Lead Time: {generalTerms.deliveryTimeValue}{" "}
+                {generalTerms.deliveryTimeUnit || "days"}
+              </li>
+            )}
+            {Array.isArray(generalTerms.deliveryLocations) &&
+              generalTerms.deliveryLocations.length > 0 && (
+                <li>
+                  Delivery Locations:{" "}
+                  {generalTerms.deliveryLocations
+                    .map((loc: any) =>
+                      typeof loc === "string"
+                        ? loc
+                        : loc?.name && loc?.state
+                        ? `${loc.name}, ${loc.state}`
+                        : loc?.name || String(loc),
+                    )
+                    .join("; ")}
+                </li>
+              )}
+            {Array.isArray(generalTerms.selectedTerms) &&
+              generalTerms.selectedTerms.map((term: string, idx: number) => (
+                <li key={`gt-${idx}`}>{term}</li>
+              ))}
+            {Array.isArray(generalTerms.customTerms) &&
+              generalTerms.customTerms.map((term: string, idx: number) => (
+                <li key={`gtc-${idx}`}>{term}</li>
+              ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 8. Special Terms */}
+      {((Array.isArray(specialTerms?.selectedTerms) && specialTerms.selectedTerms.length > 0) ||
+        (Array.isArray(specialTerms?.customTerms) && specialTerms.customTerms.length > 0) ||
+        (Array.isArray(specialTerms) && specialTerms.length > 0)) && (
+        <div className="space-y-2">
+          <h3 className="text-base font-bold text-slate-900">
+            8. Special Terms & Conditions
+          </h3>
+          <ul className="list-disc pl-5 text-slate-700 space-y-1 font-mono text-xs sm:text-sm">
+            {Array.isArray(specialTerms.selectedTerms) &&
+              specialTerms.selectedTerms.map((term: string, idx: number) => (
+                <li key={`st-${idx}`}>{term}</li>
+              ))}
+            {Array.isArray(specialTerms.customTerms) &&
+              specialTerms.customTerms.map((term: string, idx: number) => (
+                <li key={`stc-${idx}`}>{term}</li>
+              ))}
+            {Array.isArray(specialTerms) &&
+              specialTerms.map((term: any, idx: number) => (
+                <li key={`starr-${idx}`}>{typeof term === "string" ? term : term.text || String(term)}</li>
+              ))}
           </ul>
         </div>
       )}
@@ -339,30 +428,94 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
         </div>
       )}
 
-      {/* 10. Buyer Contacts */}
+      {/* 10. Vendor Selection Criteria */}
+      {(vendors?.selectionMethod || vendors?.vendorRequirements || vendors?.vendorSelectionProcess) && (
+        <div className="space-y-2">
+          <h3 className="text-base font-bold text-slate-900">
+            10. Vendor Selection Criteria
+          </h3>
+          <div className="space-y-1 font-mono text-xs sm:text-sm text-slate-700">
+            {vendors.selectionMethod && (
+              <p>
+                <strong className="font-sans text-slate-900">Selection Method:</strong>{" "}
+                {vendors.selectionMethod}
+              </p>
+            )}
+            {vendors.vendorRequirements && (
+              <p>
+                <strong className="font-sans text-slate-900">Requirements:</strong>{" "}
+                {typeof vendors.vendorRequirements === "string"
+                  ? vendors.vendorRequirements
+                  : JSON.stringify(vendors.vendorRequirements)}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 11. Vendor Contacts */}
+      {vendorContacts.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-base font-bold text-slate-900">
+            11. Vendor Contacts ({vendorContacts.length})
+          </h3>
+          <ul className="list-disc pl-5 text-slate-700 space-y-1 font-mono text-xs sm:text-sm">
+            {vendorContacts.map((vc: any, idx: number) => (
+              <li key={idx}>
+                <span className="font-bold text-slate-900">{vc.name || vc.companyName}</span> ({vc.email})
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 12. RFQ Timeline */}
+      {(rfpDates?.startDate || rfpDates?.endDate) && (
+        <div className="space-y-2">
+          <h3 className="text-base font-bold text-slate-900">
+            12. RFQ Timeline
+          </h3>
+          <div className="space-y-1 font-mono text-xs sm:text-sm text-slate-700">
+            {rfpDates.startDate && (
+              <p>
+                <strong className="font-sans text-slate-900">Release Date:</strong>{" "}
+                {rfpDates.startDate}
+              </p>
+            )}
+            {rfpDates.endDate && (
+              <p>
+                <strong className="font-sans text-slate-900">Submission Deadline:</strong>{" "}
+                {rfpDates.endDate}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 13. Buyer Contacts */}
       <div className="space-y-2 pt-2">
         <h3 className="text-base font-bold text-slate-900">
-          10. Buyer Contacts
+          13. Buyer Contacts
         </h3>
         <div className="space-y-1.5 font-mono text-xs sm:text-sm text-slate-700">
           <p>
             <strong className="font-sans text-slate-900">Contact Name:</strong>{" "}
-            {contact.contactName || "Devipriya Venkatesan"}
+            {contact.contactName || "Devipriya"}
           </p>
           <p>
             <strong className="font-sans text-slate-900">Email:</strong>{" "}
-            {contact.contactEmail || "devipriyavenkatesan.v@gmail.com"}
+            {contact.contactEmail || "priya@gmail.com"}
           </p>
           <p>
             <strong className="font-sans text-slate-900">Phone:</strong>{" "}
-            {contact.contactPhone || "+91 8521479630"}
+            {contact.contactPhone || "+91 8909876545"}
           </p>
           <p>
             <strong className="font-sans text-slate-900">Address:</strong>{" "}
-            {contact.contactAddressLine1 || "894, Sri Ram Colony"}
-            {contact.contactAddressLine2 ? `, ${contact.contactAddressLine2}` : " , Jai Ram Puram"}
-            , {contact.contactCity || "Chennai"}, {contact.contactState || "Tamil Nadu"}
-            , {contact.contactPostalCode || "600014"}, {contact.contactCountry || "India"}
+            {contact.contactAddressLine1 || company.addressLine1 || "894, Sri Ram Colony"}
+            {contact.contactAddressLine2 || company.addressLine2 ? `, ${contact.contactAddressLine2 || company.addressLine2}` : " , Jai Ram Puram"}
+            , {contact.contactCity || company.city || "Chennai"}, {contact.contactState || company.state || "Tamil Nadu"}
+            , {contact.contactPostalCode || company.postalCode || "600014"}, {contact.contactCountry || company.country || "India"}
           </p>
         </div>
       </div>

@@ -16,6 +16,8 @@ import {
   rfqVendors,
   rfqVendorContacts,
   rfqDates,
+  rfqContacts,
+  rfqContactsMembers,
   users,
   sessions,
 } from "@/db/schema";
@@ -108,25 +110,14 @@ export async function GET(
     if (rfq) {
       targetRfq = rfq;
     } else {
-      const [anyUserRfq] = await db
+      await ensureRfqExists(id, user);
+      targetRfpId = id;
+      const [createdRfq] = await db
         .select()
         .from(rfqs)
-        .where(eq(rfqs.userId, user.id))
+        .where(eq(rfqs.id, id))
         .limit(1);
-
-      if (anyUserRfq) {
-        targetRfpId = anyUserRfq.id;
-        targetRfq = anyUserRfq;
-      } else {
-        await ensureRfqExists(id, user);
-        targetRfpId = id;
-        const [createdRfq] = await db
-          .select()
-          .from(rfqs)
-          .where(eq(rfqs.id, id))
-          .limit(1);
-        targetRfq = createdRfq;
-      }
+      targetRfq = createdRfq;
     }
 
     const safeSelect = async (queryFn: () => Promise<any[]>) => {
@@ -170,6 +161,35 @@ export async function GET(
         .limit(1),
     );
 
+    const contactMember = await safeSelect(() =>
+      db
+        .select()
+        .from(rfqContactsMembers)
+        .where(eq(rfqContactsMembers.rfqId, targetRfpId))
+        .limit(1),
+    );
+
+    let contactDetails: typeof rfqContacts.$inferSelect | null = null;
+    if (contactMember?.rfqContactId) {
+      contactDetails = await safeSelect(() =>
+        db
+          .select()
+          .from(rfqContacts)
+          .where(eq(rfqContacts.id, contactMember.rfqContactId))
+          .limit(1),
+      );
+    }
+
+    if (!contactDetails && user.email) {
+      contactDetails = await safeSelect(() =>
+        db
+          .select()
+          .from(rfqContacts)
+          .where(eq(rfqContacts.contactEmail, user.email))
+          .limit(1),
+      );
+    }
+
     let boqRows: (typeof rfqBoqItems.$inferSelect)[] = [];
     try {
       boqRows = await db
@@ -203,8 +223,14 @@ export async function GET(
       }
     };
 
+    const formattedRfpUniqueId = targetRfpId.startsWith("RFP-")
+      ? targetRfpId
+      : `RFP-${targetRfpId.substring(0, 8).toUpperCase()}`;
+
     return NextResponse.json({
       rfpId: targetRfpId,
+      rfpUniqueId: formattedRfpUniqueId,
+      rfpuniqId: formattedRfpUniqueId,
       rfpsData: targetRfq || { status: "draft" },
       categorySelection: categoryRow
         ? {
@@ -214,12 +240,14 @@ export async function GET(
             serviceAreas: parseField(categoryRow.serviceAreas),
           }
         : null,
-      requirement: requirement || {
-        projectName:
-          rfq?.title ||
-          `Gifting Requirement for ${user.companyName || user.name}`,
-        purpose: "Annual employee & client gift hampers",
-      },
+      requirement: requirement
+        ? {
+            projectName: requirement.projectName || "",
+            purpose: requirement.purpose || "",
+            rfpTitle: requirement.rfpTitle || "",
+            briefRfp: requirement.briefRfp || "",
+          }
+        : null,
       scope: {
         deliverables: scopeRow ? parseField(scopeRow.deliverables) || [] : [],
       },
@@ -230,6 +258,7 @@ export async function GET(
         uom: row.uom || "",
         qty: row.qty != null ? String(row.qty) : "",
         targetPrice: row.targetPrice != null ? String(row.targetPrice) : "",
+        logoRequirement: row.logoRequirement || "without_logo",
         specification:
           row.specification && typeof row.specification === "object"
             ? ((row.specification as any).text ?? "")
@@ -237,6 +266,18 @@ export async function GET(
         remarks: row.remarks || "",
         isVisible: row.isVisible ?? false,
         itemRef: row.itemRef ?? undefined,
+        attachmentUrl: row.attachmentUrl || null,
+        attachmentName: row.attachmentName || null,
+        attachments: row.attachmentUrl
+          ? [
+              {
+                fileName: row.attachmentName || "Attachment",
+                fileType: row.attachmentType || "application/octet-stream",
+                fileSize: row.attachmentSize || 0,
+                fileUrl: row.attachmentUrl,
+              },
+            ]
+          : [],
       })),
       evaluation: evaluationList,
       evaluationCriteria: evaluationList,
@@ -249,8 +290,8 @@ export async function GET(
       ).then((fin) =>
         fin
           ? {
-              budgetType: fin.priceModel || fin.budgetType || "",
-              priceModel: fin.priceModel || fin.budgetType || "",
+              budgetType: fin.pricingModel || fin.budgetType || "",
+              priceModel: fin.pricingModel || fin.budgetType || "",
               currency: fin.currency || "",
               paymentTerm: fin.paymentTerm || "",
               paymentMilestones: fin.paymentTerms || [],
@@ -305,7 +346,14 @@ export async function GET(
           .from(rfqDocuments)
           .where(eq(rfqDocuments.rfqId, targetRfpId))
           .limit(1),
-      ).then((doc) => (doc ? doc.documentsToShare : null)),
+      ).then((doc) => (doc ? parseField(doc.documentsToShare) || doc.documentsToShare : null)),
+      documentsToShare: await safeSelect(() =>
+        db
+          .select()
+          .from(rfqDocuments)
+          .where(eq(rfqDocuments.rfqId, targetRfpId))
+          .limit(1),
+      ).then((doc) => (doc ? parseField(doc.documentsToShare) || doc.documentsToShare : null)),
       vendors: await safeSelect(() =>
         db
           .select()
@@ -321,12 +369,31 @@ export async function GET(
             }
           : null,
       ),
+      vendorContacts: await db
+        .select()
+        .from(rfqVendorContacts)
+        .where(eq(rfqVendorContacts.rfqId, targetRfpId))
+        .catch(() => []),
       vendorcontacts: await db
         .select()
         .from(rfqVendorContacts)
         .where(eq(rfqVendorContacts.rfqId, targetRfpId))
         .catch(() => []),
       rfpDates: await safeSelect(() =>
+        db
+          .select()
+          .from(rfqDates)
+          .where(eq(rfqDates.rfqId, targetRfpId))
+          .limit(1),
+      ).then((d) =>
+        d
+          ? {
+              startDate: d.startDate || "",
+              endDate: d.endDate || "",
+            }
+          : null,
+      ),
+      dates: await safeSelect(() =>
         db
           .select()
           .from(rfqDates)
@@ -351,9 +418,16 @@ export async function GET(
         businessType: "",
       },
       contact: {
-        contactName: user.name,
-        contactEmail: user.email,
-        contactPhone: user.mobileNumber || "",
+        contactName: contactDetails?.contactName || user.name,
+        contactEmail: contactDetails?.contactEmail || user.email,
+        contactPhone: contactDetails?.contactPhone || user.mobileNumber || "",
+        contactTitle: contactDetails?.contactTitle || "",
+        contactDepartment: contactDetails?.contactDepartment || "",
+        logoUrl: contactDetails?.logoUrl || null,
+        logoPath: contactDetails?.logoPath || null,
+        logoPreview: contactDetails?.logoData
+          ? `data:${contactDetails.logoMimeType || "image/png"};base64,${contactDetails.logoData}`
+          : null,
       },
     });
   } catch (error) {
@@ -384,7 +458,7 @@ async function ensureRfqExists(id: string, user: typeof users.$inferSelect) {
   await db.insert(rfqs).values({
     id,
     userId: user.id,
-    title: `Gifting Requirement for ${user.companyName || user.name}`,
+    title: "",
     category: "Corporate Gifting",
     quantity: 500,
     status: "draft",

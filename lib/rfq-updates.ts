@@ -15,7 +15,7 @@ import {
   rfqVendorContacts,
   rfqDates,
 } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 interface CompanySourceData {
   companyName?: string | null;
@@ -83,7 +83,7 @@ export async function upsertRfpRequirement(
 
   const values = {
     rfqId: rfpId,
-    projectName: projectName || "Untitled Project",
+    projectName: projectName || "Gifting Project",
     purpose: purpose || "Gifting Requirement",
   };
 
@@ -166,6 +166,14 @@ export async function upsertRfpScope(
 
 export async function upsertRfpBoq(rfpId: string, boqItems: any[]) {
   if (!Array.isArray(boqItems)) return;
+  try {
+    await db.execute(
+      sql`ALTER TABLE rfq_boq_items ADD COLUMN IF NOT EXISTS logo_requirement VARCHAR(50) DEFAULT 'without_logo';`
+    );
+  } catch (err) {
+    console.error("Error executing auto-migration for rfq_boq_items.logo_requirement:", err);
+  }
+
   await db.delete(rfqBoqItems).where(eq(rfqBoqItems.rfqId, rfpId));
 
   for (const item of boqItems) {
@@ -197,6 +205,7 @@ export async function upsertRfpBoq(rfpId: string, boqItems: any[]) {
           ? item.specification
           : { text: item.specification || "" },
       targetPrice: targetPriceVal,
+      logoRequirement: item.logoRequirement || "without_logo",
       remarks: item.remarks || null,
       isVisible: item.isVisible !== false,
       attachmentUrl: att?.fileUrl || att?.url || null,

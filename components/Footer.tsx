@@ -9,7 +9,7 @@ export default function Footer({ className }: { className?: string }) {
         className,
       )}
     >
-      <div className="max-w-7xl mx-auto text-center">
+      <div className="p-4text-center">
         <p className="text-gray-700 mb-2">
           Need Assistance? Contact us for support:{" "}
           <a

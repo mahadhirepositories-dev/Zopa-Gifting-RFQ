@@ -276,8 +276,8 @@ export const LoginForm = ({
               </CardTitle>
               <CardDescription className="text-sm">
                 {authMode === "register"
-                  ? "Register your details to receive a Better Auth Magic Link."
-                  : "Enter your work email address to receive your sign-in Magic Link."}
+                  ? "Register your details to create your RFQ account."
+                  : "Enter your work email address to sign in to your RFQ account."}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -352,7 +352,7 @@ export const LoginForm = ({
                   {/* Feedback Banner */}
                   {feedback && (
                     <div
-                      className={`mb-4 p-3 rounded-2xl text-xs sm:text-sm flex items-start space-x-2 border ${
+                      className={`mb-4 p-3 rounded-2xl text-xs sm:text-sm flex flex-col space-y-2 border ${
                         feedback.type === "success"
                           ? "bg-green-50 border-green-200 text-green-800"
                           : "bg-rose-50 border-rose-200 text-rose-800"
@@ -361,6 +361,39 @@ export const LoginForm = ({
                       <span className="font-medium leading-snug">
                         {feedback.message}
                       </span>
+                      {feedback.message.toLowerCase().includes("already registered") && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            if (regForm.email) setLoginEmail(regForm.email);
+                            setAuthMode("login");
+                            setFeedback(null);
+                          }}
+                          className="mt-1 self-start h-8 px-3 text-xs font-bold text-blue-700 bg-white border-blue-200 hover:bg-blue-50"
+                        >
+                          Go to Log In &rarr;
+                        </Button>
+                      )}
+                      {feedback.message.toLowerCase().includes("not registered") && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            if (loginEmail) {
+                              setRegForm((prev: any) => ({
+                                ...prev,
+                                email: loginEmail,
+                              }));
+                            }
+                            setAuthMode("register");
+                            setFeedback(null);
+                          }}
+                          className="mt-1 self-start h-8 px-3 text-xs font-bold text-blue-700 bg-white border-blue-200 hover:bg-blue-50"
+                        >
+                          Go to Register &rarr;
+                        </Button>
+                      )}
                     </div>
                   )}
 
@@ -460,7 +493,7 @@ export const LoginForm = ({
 
                       {/* Address Section */}
                       <div className="space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
+                        {/* <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1.5">
                             <Label className="text-xs font-medium">
                               Address Line 1{" "}
@@ -500,7 +533,7 @@ export const LoginForm = ({
                               className="h-9 text-sm"
                             />
                           </div>
-                        </div>
+                        </div> */}
 
                         {/* Country, State, City, Postal Code */}
                         <div className="grid grid-cols-2 gap-3">
@@ -514,7 +547,6 @@ export const LoginForm = ({
                                   city: [],
                                 });
                               }}
-                              required
                             />
                             {fieldErrors.country && (
                               <p className="text-xs text-rose-600">
@@ -530,7 +562,6 @@ export const LoginForm = ({
                               onChange={(vals) => {
                                 updateRegForm({ state: vals, city: [] });
                               }}
-                              required
                             />
                             {fieldErrors.state && (
                               <p className="text-xs text-rose-600">
@@ -547,7 +578,6 @@ export const LoginForm = ({
                               onChange={(vals) => {
                                 updateRegForm({ city: vals });
                               }}
-                              required
                             />
                             {fieldErrors.city && (
                               <p className="text-xs text-rose-600">
@@ -558,8 +588,7 @@ export const LoginForm = ({
 
                           <div className="space-y-1.5">
                             <Label className="text-xs font-medium">
-                              Postal Code{" "}
-                              <span className="text-rose-500">*</span>
+                              Postal Code
                             </Label>
                             <Input
                               type="text"
@@ -629,13 +658,13 @@ export const LoginForm = ({
                         {isSubmitting ? (
                           <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            <span>Generating Magic Link...</span>
+                            <span>Registering...</span>
                           </>
                         ) : (
                           <>
                             <Mail className="w-4 h-4 mr-2" />
 
-                            <span>Send Magic Link to Register</span>
+                            <span>Register</span>
                           </>
                         )}
                       </Button>
@@ -676,12 +705,12 @@ export const LoginForm = ({
                         {isSubmitting ? (
                           <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            <span>Generating Magic Link...</span>
+                            <span>Logging in...</span>
                           </>
                         ) : (
                           <>
                             <Mail className="w-4 h-4 mr-2" />
-                            <span>Send Magic Link to Log In</span>
+                            <span>Log In</span>
                           </>
                         )}
                       </Button>

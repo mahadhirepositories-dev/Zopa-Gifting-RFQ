@@ -84,12 +84,7 @@ export default function ZopaGiftingRFQPage() {
       !regForm.name ||
       !regForm.email ||
       !regForm.phoneNumber ||
-      !regForm.companyName ||
-      !regForm.addressLine1 ||
-      !regForm.country.length ||
-      !regForm.state.length ||
-      !regForm.city.length ||
-      !regForm.postalCode
+      !regForm.companyName
     ) {
       setFeedback({
         type: "error",
@@ -118,20 +113,26 @@ export default function ZopaGiftingRFQPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to send magic link.");
+        if (data.isAlreadyRegistered) {
+          setLoginEmail(regForm.email);
+        }
+        throw new Error(
+          data.error ||
+            "This email is already registered. Please log in to continue.",
+        );
       }
 
-      setMagicLinkState({
-        sent: true,
-        email: regForm.email,
-        demoUrl: data.magicLinkUrl,
-      });
+      const targetUrl =
+        data.redirectUrl ||
+        data.magicLinkUrl ||
+        "http://localhost:3000/rfq/074db83b-2fe4-4978-874c-a2d34e269a7c/requirement";
+
+      window.location.href = targetUrl;
     } catch (err: any) {
       setFeedback({
         type: "error",
         message: err.message || "An unexpected error occurred.",
       });
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -162,20 +163,26 @@ export default function ZopaGiftingRFQPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to send magic link.");
+        if (data.isNotRegistered) {
+          setRegForm((prev) => ({ ...prev, email: loginEmail }));
+        }
+        throw new Error(
+          data.error ||
+            "This email is not registered. Please register first to continue.",
+        );
       }
 
-      setMagicLinkState({
-        sent: true,
-        email: loginEmail,
-        demoUrl: data.magicLinkUrl,
-      });
+      const targetUrl =
+        data.redirectUrl ||
+        data.magicLinkUrl ||
+        "http://localhost:3000/rfq/074db83b-2fe4-4978-874c-a2d34e269a7c/requirement";
+
+      window.location.href = targetUrl;
     } catch (err: any) {
       setFeedback({
         type: "error",
         message: err.message || "An unexpected error occurred.",
       });
-    } finally {
       setIsSubmitting(false);
     }
   };

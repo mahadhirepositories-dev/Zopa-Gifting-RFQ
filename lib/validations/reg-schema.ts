@@ -27,23 +27,22 @@ export const registerSchema = z
     addressLine1: z
       .string()
       .trim()
-      .min(3, "Address line 1 must be at least 3 characters")
-      .max(200, "Address line 1 is too long"),
+      .optional()
+      .or(z.literal("")),
     addressLine2: z
       .string()
       .trim()
       .max(200, "Address line 2 is too long")
       .optional()
       .or(z.literal("")),
-    country: z.array(z.string()).min(1, "Please select a country"),
-    state: z.array(z.string()).min(1, "Please select a state"),
-    city: z.array(z.string()).min(1, "Please select a city"),
+    country: z.array(z.string()).optional().default([]),
+    state: z.array(z.string()).optional().default([]),
+    city: z.array(z.string()).optional().default([]),
     postalCode: z
       .string()
       .trim()
-      .min(3, "Postal code must be at least 3 characters")
-      .max(12, "Postal code is too long")
-      .regex(/^[A-Za-z0-9\s-]+$/, "Postal code contains invalid characters"),
+      .optional()
+      .or(z.literal("")),
     agreeTerms: z.boolean().refine((val) => val === true, {
       message: "You must accept the Terms of Service and Privacy Policy",
     }),

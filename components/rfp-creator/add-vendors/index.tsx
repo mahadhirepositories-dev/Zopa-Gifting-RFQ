@@ -839,11 +839,11 @@ export const VendorContacts: React.FC<VendorContactsProps> = ({
         const newData = [...currentData];
         const existingContact = currentData[editingIndex];
         const updatedContact = { ...contact };
-        
+
         if (existingContact.email !== contact.email) {
           updatedContact.email_sent = false;
         }
-        
+
         newData[editingIndex] = updatedContact;
         onChange(newData);
         resetForm();
@@ -1441,6 +1441,7 @@ export const VendorContacts: React.FC<VendorContactsProps> = ({
 
         <div className="flex items-center gap-3 mt-6">
           <Button
+            className="rounded-md bg-blue-600 text-white hover:bg-blue-700"
             onClick={editingIndex !== null ? updateContact : addContact}
             disabled={
               editingIndex !== null
@@ -1569,7 +1570,7 @@ export const VendorContacts: React.FC<VendorContactsProps> = ({
               </div>
             )}
           </div>
-         <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300">
+          <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="bg-gray-100 text-left text-gray-600">

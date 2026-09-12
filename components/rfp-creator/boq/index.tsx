@@ -22,13 +22,144 @@ import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SpecificationModal } from "./specification-modal";
-import { Sparkles } from "lucide-react";
+import {
+  Sparkles,
+  FileSpreadsheet,
+  ListFilter,
+  Plus,
+  Trash2,
+  Edit3,
+  Download,
+  Upload,
+  CheckCircle2,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  FolderPlus,
+  PlusCircle,
+  AlertCircle,
+} from "lucide-react";
 import { BOQAttachments, Attachment } from "./boq-attachments";
 import { v4 as uuidv4 } from "uuid";
 
+// ─── Default Category Master List (as specified by user) ─────────────────────
+
+const DEFAULT_CATEGORY_LIST: string[] = [
+  "Indoor Plants",
+  "Ceramic plant pot",
+  "Plastic Plant pot",
+  "Coffee Mug",
+  "Candle",
+  "Mobile stand",
+  "Water bottle",
+  "Diya",
+  "Smart Watches",
+  "Audio Speakers",
+  "Mini Projectors",
+  "Power Banks",
+  "Lunch Box",
+  "Juicer",
+  "Gym Bags",
+  "Personalised Pen Stand",
+  "Diary",
+  "Plantable Pen",
+  "Gourmet Snacks",
+  "Coffee Kit",
+  "Tea Kit",
+  "Jackets",
+  "Hoodies",
+  "Caps",
+  "Sling bags",
+  "Backpacks",
+  "Mobile accessory",
+  "Desktop Accessory",
+  "Healthy Snack",
+  "Chocolate box",
+  "Dry Fruits",
+  "Sweets",
+  "Honey",
+  "Mini Game",
+  "Magnetic Badges",
+  "Coasters",
+  "KeyChains",
+  "Umbrella",
+  "Earpods",
+  "Headphones",
+  "MultiPurpose Data cable kit",
+  "Brass Coffee Filter",
+  "Gift packaging - Jute Bag",
+  "Gift packaging - Hamper Box",
+  "Gift packaging - Cloath bag",
+  "Gift packaging - Other bag",
+  "Perfumes",
+  "Shades - Spectacles",
+  "Saree",
+  "Imported Chocolates",
+  "Water Bottle",
+  "Books",
+];
+
+// Initial subcategory/description suggestions map
+const INITIAL_CATEGORY_ITEMS: Record<string, string[]> = {
+  Books: [
+    "Kids Books",
+    "Fantasy Book",
+    "Story Book",
+    "Novel",
+    "Comics",
+    "Illustrated",
+  ],
+  "Indoor Plants": [
+    "Desk Plant",
+    "Succulent",
+    "Money Plant",
+    "Snake Plant",
+    "Bonsai",
+  ],
+  "Coffee Mug": [
+    "Ceramic Mug",
+    "Travel Tumbler",
+    "Insulated Mug",
+    "Custom Printed Mug",
+  ],
+  "Water bottle": [
+    "Stainless Steel Flask",
+    "BPA-Free Plastic Bottle",
+    "Copper Bottle",
+  ],
+  Jackets: [
+    "Windcheater",
+    "Puffer Jacket",
+    "Fleece Jacket",
+    "Custom Branded Jacket",
+  ],
+  Hoodies: ["Zipper Hoodie", "Pullover Hoodie", "Fleece Hoodie"],
+  "Gourmet Snacks": ["Assorted Nuts", "Artisanal Cookies", "Healthy Trail Mix"],
+  "Chocolate box": [
+    "Handcrafted Truffles",
+    "Dark Chocolate Box",
+    "Belgian Chocolates",
+  ],
+  "Dry Fruits": [
+    "Almonds & Cashews Set",
+    "Roasted Pistachios",
+    "Premium Dates",
+  ],
+  "Smart Watches": [
+    "Fitness Tracker",
+    "AMOLED Smartwatch",
+    "Bluetooth Calling Watch",
+  ],
+  "Power Banks": [
+    "10000mAh Power Bank",
+    "20000mAh Fast Charge",
+    "Wireless Power Bank",
+  ],
+};
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface BOQItem {
+export interface BOQItem {
   id?: number;
   category: string;
   description: string;
@@ -36,6 +167,7 @@ interface BOQItem {
   qty: string;
   targetPrice: string;
   specification: string;
+  logoRequirement?: string; // 'with_logo' | 'without_logo'
   remarks: string;
   isVisible?: boolean;
   itemRef?: string;
@@ -45,6 +177,67 @@ interface BOQItem {
 export interface BOQHandle {
   validate: () => boolean;
 }
+
+const RowLogoUploader: React.FC<{
+  row: BOQItem;
+  rowIndex: number;
+  onUpload: (rowIndex: number, file: File) => void;
+  onRemove: (rowIndex: number, attIndex: number) => void;
+  disabled?: boolean;
+}> = ({ row, rowIndex, onUpload, onRemove, disabled }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const attachments = row.attachments || [];
+
+  return (
+    <div className="mt-1 flex flex-col items-center gap-1">
+      {attachments.length > 0 ? (
+        <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-300 rounded px-1.5 py-0.5 max-w-[140px]">
+          <a
+            href={attachments[0].fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] text-emerald-800 font-extrabold truncate hover:underline"
+            title={attachments[0].fileName}
+          >
+            📎 {attachments[0].fileName}
+          </a>
+          <button
+            type="button"
+            onClick={() => onRemove(rowIndex, 0)}
+            disabled={disabled}
+            className="text-rose-500 hover:text-rose-700 font-bold text-[11px] ml-0.5"
+            title="Remove Logo Attachment"
+          >
+            ×
+          </button>
+        </div>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={disabled}
+            className="text-[10px] font-extrabold text-blue-700 hover:text-blue-900 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded px-2 py-0.5 flex items-center gap-1 transition-colors shadow-2xs"
+          >
+            <Upload className="w-2.5 h-2.5" /> Upload Logo
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*,.pdf,.doc,.docx"
+            className="hidden"
+            disabled={disabled}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onUpload(rowIndex, file);
+              if (e.target) e.target.value = "";
+            }}
+          />
+        </>
+      )}
+    </div>
+  );
+};
 
 interface BOQProps {
   data: BOQItem[];
@@ -71,10 +264,11 @@ interface ProcessedCategory {
 const defaultItemState: BOQItem = {
   category: "",
   description: "",
-  uom: "",
-  qty: "",
+  uom: "Nos",
+  qty: "1",
   targetPrice: "",
   specification: "",
+  logoRequirement: "without_logo",
   remarks: "",
   isVisible: false,
   itemRef: uuidv4(),
@@ -115,7 +309,7 @@ export const boqSchema = z.object({
           "Target price must be a valid number (0 or positive, e.g., 0, 10.99)",
       },
     ),
-  specification: z.string().min(1, "Specification is required"),
+  specification: z.string().optional(),
   remarks: z.string().optional(),
   isVisible: z.boolean().optional(),
   itemRef: z.string().optional(),
@@ -135,16 +329,29 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
     }, [data]);
 
     useImperativeHandle(ref, () => ({ validate }), [validate]);
+
+    // View modes: 'description' (grouped category view) | 'excel' (in-page interactive spreadsheet) | 'form' (single/new item form)
+    const [viewMode, setViewMode] = useState<"description" | "excel" | "form">(
+      "description",
+    );
+
     const [uploadedFile, setUploadedFile] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [rawCategoryItems, setRawCategoryItems] = useState<RawDBItem[]>([]);
     const [processedCategories, setProcessedCategories] = useState<
       ProcessedCategory[]
     >([]);
-    const [localCategories, setLocalCategories] = useState<string[]>([]);
+
+    // Category options list (Master list + custom additions)
+    const [localCategories, setLocalCategories] = useState<string[]>(
+      () => DEFAULT_CATEGORY_LIST,
+    );
+
+    // Description suggestions map per category
     const [localDescriptions, setLocalDescriptions] = useState<
       Record<string, string[]>
-    >({});
+    >(() => ({ ...INITIAL_CATEGORY_ITEMS }));
+
     const [isLoading, setIsLoading] = useState(true);
     const [item, setItem] = useState<BOQItem>({
       ...defaultItemState,
@@ -159,16 +366,40 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
     const [showSpecModal, setShowSpecModal] = useState(false);
     const descriptionRef = useRef<HTMLDivElement>(null);
 
-    // ─── Stable ref so the attachment effect never has onChange in its deps ──
+    // ─── Group Data by Category ───
+    const groupedBOQItems = useMemo(() => {
+      const groups: Record<
+        string,
+        { items: BOQItem[]; originalIndices: number[] }
+      > = {};
+      data.forEach((item, index) => {
+        const cat = item.category || "General";
+        if (!groups[cat]) {
+          groups[cat] = { items: [], originalIndices: [] };
+        }
+        groups[cat].items.push(item);
+        groups[cat].originalIndices.push(index);
+      });
+      return groups;
+    }, [data]);
+
+    // Items belonging to currently selected form category
+    const currentCategoryItems = useMemo(() => {
+      if (!item.category) return [];
+      const selectedCat = item.category.trim().toLowerCase();
+      return data
+        .map((d, index) => ({ ...d, originalIndex: index }))
+        .filter((d) => (d.category || "").trim().toLowerCase() === selectedCat);
+    }, [data, item.category]);
+
+    // Stable ref for attachment loading
     const onChangeRef = useRef(onChange);
     useEffect(() => {
       onChangeRef.current = onChange;
     }, [onChange]);
 
-    // Track which itemRefs we've already loaded attachments for
     const fetchedRefsRef = useRef<Set<string>>(new Set());
 
-    // Fetch attachments for existing items when data loads / itemRefs change
     useEffect(() => {
       const fetchAttachmentsForItems = async () => {
         if (!data || data.length === 0) return;
@@ -182,7 +413,6 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
 
         if (itemsNeedingFetch.length === 0) return;
 
-        // Mark as "being fetched" immediately to prevent double-fetch
         itemsNeedingFetch.forEach((item) => {
           if (item.itemRef) fetchedRefsRef.current.add(item.itemRef);
         });
@@ -221,11 +451,7 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
       };
 
       fetchAttachmentsForItems();
-      // Only re-run when the set of itemRefs changes (items added/removed)
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data.map((d) => d.itemRef).join(",")]);
-
-    const handleCategoryTabOut = () => descriptionRef.current?.focus();
 
     const processRawData = useCallback(
       (rawData: RawDBItem[]): ProcessedCategory[] => {
@@ -250,141 +476,123 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
     );
 
     useEffect(() => {
-      const fetchCategoryItems = async () => {
-        setIsLoading(true);
+      const fetchData = async () => {
         try {
-          const response = await fetch("/api/boq-items-frontend");
-          if (!response.ok)
-            throw new Error(
-              `Failed to fetch BOQ items: ${response.statusText}`,
-            );
-          const fetchedData: RawDBItem[] = await response.json();
-          setRawCategoryItems(fetchedData);
-          setProcessedCategories(processRawData(fetchedData));
+          setIsLoading(true);
+          const response = await fetch("/api/boq-items");
+          if (response.ok) {
+            const result: RawDBItem[] = await response.json();
+            setRawCategoryItems(result);
+            const processed = processRawData(result);
+            setProcessedCategories(processed);
+
+            setLocalCategories((prev) => {
+              const dbCats = processed.map((p) => p.category);
+              return Array.from(new Set([...prev, ...dbCats]));
+            });
+
+            setLocalDescriptions((prev) => {
+              const nextState = { ...prev };
+              processed.forEach((p) => {
+                const existing = nextState[p.category] || [];
+                nextState[p.category] = Array.from(
+                  new Set([...existing, ...p.descriptions]),
+                );
+              });
+              return nextState;
+            });
+          }
         } catch (error) {
-          console.error("Error fetching BOQ items:", error);
+          console.error("Error fetching BOQ category data:", error);
         } finally {
           setIsLoading(false);
         }
       };
-      fetchCategoryItems();
+
+      fetchData();
     }, [processRawData]);
 
-    const uniqueCategories = useMemo(
-      () => processedCategories.map((i) => i.category),
-      [processedCategories],
-    );
+    // Auto-add 1 default BOQ row if data is completely empty on initial load
+    const initialDefaultAddedRef = useRef(false);
+    useEffect(() => {
+      if (
+        !isLoading &&
+        data &&
+        data.length === 0 &&
+        !initialDefaultAddedRef.current
+      ) {
+        initialDefaultAddedRef.current = true;
+        const defaultRow: BOQItem = {
+          category: localCategories[0] || "Indoor Plants",
+          description: "Desk Plant",
+          uom: "Nos",
+          qty: "1",
+          targetPrice: "200",
+          logoRequirement: "without_logo",
+          specification: "Standard specification",
+          remarks: "",
+          isVisible: true,
+          itemRef: uuidv4(),
+          attachments: [],
+        };
+        onChange([defaultRow]);
+      }
+    }, [data, isLoading, localCategories, onChange]);
 
-    const allCategories = useMemo(() => {
-      const combined = Array.from(
-        new Set([...uniqueCategories, ...localCategories]),
-      );
-      combined.sort((a, b) => a.localeCompare(b));
-      return combined;
-    }, [uniqueCategories, localCategories]);
+    const availableCategories = useMemo(() => {
+      return localCategories;
+    }, [localCategories]);
 
     const availableDescriptions = useMemo(() => {
       if (!item.category) return [];
-      const selectedCategoryData = processedCategories.find(
-        (cat) => cat.category === item.category,
-      );
-      const dbDescriptions = selectedCategoryData?.descriptions || [];
-      const userAddedDescriptions = localDescriptions[item.category] || [];
-      const combined = Array.from(
-        new Set([...dbDescriptions, ...userAddedDescriptions]),
-      );
-      combined.sort((a, b) => a.localeCompare(b));
-      return combined;
-    }, [item.category, processedCategories, localDescriptions]);
+      return localDescriptions[item.category] || [];
+    }, [item.category, localDescriptions]);
+
+    // Search and Add Handlers
+    const handleAddNewCategory = (newCat: string) => {
+      const trimmed = newCat.trim();
+      if (!trimmed) return;
+      if (!localCategories.includes(trimmed)) {
+        setLocalCategories((prev) => [...prev, trimmed]);
+        setLocalDescriptions((prev) => ({
+          ...prev,
+          [trimmed]: prev[trimmed] || [],
+        }));
+        setItem((prev) => ({ ...prev, category: trimmed, description: "" }));
+        toast.success(`Custom category "${trimmed}" added!`);
+      }
+    };
+
+    const handleAddNewDescription = (newDesc: string) => {
+      const trimmed = newDesc.trim();
+      if (!trimmed || !item.category) return;
+      setLocalDescriptions((prev) => {
+        const currentList = prev[item.category] || [];
+        if (!currentList.includes(trimmed)) {
+          return {
+            ...prev,
+            [item.category]: [...currentList, trimmed],
+          };
+        }
+        return prev;
+      });
+      setItem((prev) => ({ ...prev, description: trimmed }));
+      toast.success(`Custom item "${trimmed}" added under "${item.category}"!`);
+    };
 
     const uomOptions = useMemo(
       () => [
-        "Nos",
-        "Each",
-        "Pair",
-        "Dozen",
-        "Box",
-        "Pack",
-        "Set",
-        "Kit",
-        "Unit",
-        "Meter",
-        "Foot",
-        "Inch",
-        "Kilogram",
-        "Gram",
-        "Liter",
-        "Gallon",
-        "Hour",
-        "Day",
-        "Week",
-        "Month",
-        "Year",
+        { label: "Nos (Numbers)", value: "Nos" },
+        { label: "Set", value: "Set" },
+        { label: "Box", value: "Box" },
+        { label: "Kg (Kilogram)", value: "Kg" },
+        { label: "Meter", value: "Meter" },
+        { label: "Pack", value: "Pack" },
+        { label: "Pair", value: "Pair" },
+        { label: "Kit", value: "Kit" },
       ],
       [],
     );
-
-    const handleAddNewCategory = (newCategory: string) => {
-      if (newCategory && !allCategories.includes(newCategory)) {
-        setLocalCategories((prev) =>
-          [...prev, newCategory].sort((a, b) => a.localeCompare(b)),
-        );
-      }
-    };
-
-    const handleRemoveCategory = (categoryToRemove: string) => {
-      setLocalCategories((prev) => prev.filter((c) => c !== categoryToRemove));
-      setLocalDescriptions((prev) => {
-        const updated = { ...prev };
-        delete updated[categoryToRemove];
-        return updated;
-      });
-      if (item.category === categoryToRemove)
-        setItem((prev) => ({ ...prev, category: "", description: "" }));
-    };
-
-    const handleAddNewDescription = (newDescription: string) => {
-      if (
-        item.category &&
-        newDescription &&
-        !availableDescriptions.includes(newDescription)
-      ) {
-        setLocalDescriptions((prev) => {
-          const currentDescs = prev[item.category] || [];
-          return {
-            ...prev,
-            [item.category]: [...currentDescs, newDescription].sort((a, b) =>
-              a.localeCompare(b),
-            ),
-          };
-        });
-      }
-    };
-
-    const handleRemoveDescription = (descriptionToRemove: string) => {
-      if (item.category) {
-        setLocalDescriptions((prev) => {
-          const updated = { ...prev };
-          if (updated[item.category]) {
-            updated[item.category] = updated[item.category].filter(
-              (d) => d !== descriptionToRemove,
-            );
-            if (updated[item.category].length === 0)
-              delete updated[item.category];
-          }
-          return updated;
-        });
-        if (item.description === descriptionToRemove)
-          setItem((prev) => ({ ...prev, description: "" }));
-      }
-    };
-
-    const isCustomCategory = (category: string) =>
-      localCategories.includes(category);
-    const isCustomDescription = (description: string) => {
-      if (!item.category) return false;
-      return (localDescriptions[item.category] || []).includes(description);
-    };
 
     const handleItemChange = (
       e: React.ChangeEvent<
@@ -392,59 +600,140 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
       >,
     ) => {
       const { name, value, type } = e.target;
-      const checked =
-        "checked" in e.target ? (e.target as HTMLInputElement).checked : false;
+      const val =
+        type === "checkbox" ? (e.target as HTMLInputElement).checked : value;
+
       setItem((prev) => {
-        const newItem = {
-          ...prev,
-          [name]: type === "checkbox" ? checked : value,
-        };
-        if (name === "category" && value !== prev.category)
-          newItem.description = "";
-        return newItem;
+        const updated = { ...prev, [name]: val };
+        if (name === "category") {
+          updated.description = "";
+        }
+        return updated;
       });
-      if (itemErrors[name as keyof typeof itemErrors]) {
+
+      if (name in itemErrors) {
         setItemErrors((prev) => ({ ...prev, [name]: "" }));
       }
+    };
+
+    // Direct Cell Edit inside Category Table or In-Page Excel Spreadsheet
+    const handleSpreadsheetCellChange = (
+      index: number,
+      field: keyof BOQItem,
+      value: any,
+    ) => {
+      const updated = [...data];
+      updated[index] = {
+        ...updated[index],
+        [field]: value,
+      };
+      onChange(updated);
+    };
+
+    // Action: Add a new Description row directly under a specific Category
+    const handleAddDescriptionUnderCategory = (categoryName: string) => {
+      const newRow: BOQItem = {
+        category: categoryName,
+        description: "",
+        uom: "Nos",
+        qty: "10",
+        targetPrice: "200",
+        logoRequirement: "without_logo",
+        specification: "",
+        remarks: "",
+        isVisible: true,
+        itemRef: uuidv4(),
+        attachments: [],
+      };
+      onChange([...data, newRow]);
+      toast.success(`Added new description row under "${categoryName}"`);
+    };
+
+    const handleAddSpreadsheetRow = () => {
+      const newRow: BOQItem = {
+        category: availableCategories[0] || "General",
+        description: "New Description Item",
+        uom: "Nos",
+        qty: "10",
+        targetPrice: "200",
+        logoRequirement: "without_logo",
+        specification: "Standard specification",
+        remarks: "",
+        isVisible: true,
+        itemRef: uuidv4(),
+        attachments: [],
+      };
+      onChange([...data, newRow]);
+      toast.success("New description row added.");
     };
 
     const handleAttachmentsChange = (attachments: Attachment[]) => {
       setItem((prev) => ({ ...prev, attachments }));
     };
 
-    const validateItem = (): boolean => {
+    const handleRowLogoUpload = async (rowIndex: number, file: File) => {
+      const targetRow = data[rowIndex];
+      if (!targetRow) return;
+      const itemRef = targetRow.itemRef || uuidv4();
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("boqItemRef", itemRef);
+
+        const res = await fetch("/api/boq-attachments", {
+          method: "POST",
+          body: fd,
+        });
+
+        if (res.ok) {
+          const saved = await res.json();
+          const existingAtts = targetRow.attachments || [];
+          const updatedAtts = [
+            ...existingAtts,
+            {
+              id: saved.id,
+              fileName: saved.fileName,
+              fileType: saved.fileType,
+              fileSize: saved.fileSize,
+              fileUrl: saved.fileUrl,
+            },
+          ];
+          handleSpreadsheetCellChange(rowIndex, "attachments", updatedAtts);
+          toast.success(
+            `Logo uploaded for "${targetRow.description || targetRow.category}": ${saved.fileName}`,
+          );
+        } else {
+          toast.error("Failed to upload logo file.");
+        }
+      } catch {
+        toast.error("Error uploading logo file.");
+      }
+    };
+
+    const handleRowLogoRemove = (rowIndex: number, attIndex: number) => {
+      const targetRow = data[rowIndex];
+      if (!targetRow) return;
+      const existingAtts = targetRow.attachments || [];
+      const updatedAtts = existingAtts.filter((_, i) => i !== attIndex);
+      handleSpreadsheetCellChange(rowIndex, "attachments", updatedAtts);
+      toast.info("Logo attachment removed.");
+    };
+
+    const handleSpecificationGenerated = (spec: string) => {
+      setItem((prev) => ({ ...prev, specification: spec }));
+      setItemErrors((prev) => ({ ...prev, specification: "" }));
+    };
+
+    const validateItem = () => {
       try {
         boqSchema.parse(item);
-        const errors = { ...defaultItemErrorsState };
-        let hasErrors = false;
-        if (!allCategories.includes(item.category.trim())) {
-          errors.category = "Please select a valid category or add a new one";
-          hasErrors = true;
-        }
-        if (
-          item.category &&
-          availableDescriptions.length > 0 &&
-          !availableDescriptions.includes(item.description.trim())
-        ) {
-          errors.description =
-            "Please select a valid description or add a new one";
-          hasErrors = true;
-        }
-        if (!uomOptions.includes(item.uom.trim())) {
-          errors.uom = "Please select a valid Unit of Measure";
-          hasErrors = true;
-        }
-        if (hasErrors) {
-          setItemErrors(errors);
-          return false;
-        }
         setItemErrors(defaultItemErrorsState);
         return true;
       } catch (error) {
         if (error instanceof z.ZodError) {
           const newErrors = { ...defaultItemErrorsState };
-          (error.issues || (error as any).errors || []).forEach((err: any) => {
-            const path = err.path?.[0] as keyof typeof defaultItemErrorsState;
+          error.issues.forEach((err) => {
+            const path = err.path[0] as keyof typeof defaultItemErrorsState;
             if (path && path in newErrors) newErrors[path] = err.message;
           });
           setItemErrors(newErrors);
@@ -453,16 +742,32 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
       }
     };
 
-    const resetForm = () => {
-      setItem({ ...defaultItemState, itemRef: uuidv4() });
+    const resetForm = (keepCategory = false) => {
+      const currentCategory = item.category;
+      setItem({
+        ...defaultItemState,
+        category: keepCategory ? currentCategory : "",
+        itemRef: uuidv4(),
+      });
       setItemErrors(defaultItemErrorsState);
       setEditingIndex(null);
     };
 
     const addItem = () => {
       if (validateItem()) {
-        onChange([...data, { ...item }]);
-        resetForm();
+        const addedCategory = item.category.trim();
+        const addedDesc = item.description.trim();
+        const newItem: BOQItem = {
+          ...item,
+          category: addedCategory,
+          description: addedDesc,
+        };
+        onChange([...data, newItem]);
+        // Keep category selected so user can immediately add another description under the SAME category!
+        resetForm(true);
+        toast.success(
+          `Added "${addedDesc}" under "${addedCategory}"! Ready for next description.`,
+        );
       }
     };
 
@@ -472,6 +777,8 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
         newData[editingIndex] = { ...item };
         onChange(newData);
         resetForm();
+        setViewMode("description");
+        toast.success("Description updated!");
       }
     };
 
@@ -479,9 +786,8 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
       setEditingIndex(index);
       setItem({ ...data[index] });
       setItemErrors(defaultItemErrorsState);
+      setViewMode("form");
     };
-
-    const cancelEditing = () => resetForm();
 
     const removeItem = (index: number) => {
       if (index === editingIndex) resetForm();
@@ -489,8 +795,10 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
       onChange(newData);
       if (editingIndex !== null && index < editingIndex)
         setEditingIndex(editingIndex - 1);
+      toast.info("Description removed.");
     };
 
+    // Excel File Upload Handler
     const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
@@ -512,37 +820,10 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
               if (fileInputRef.current) fileInputRef.current.value = "";
               return;
             }
-            const headers = (jsonData[0] || []).map((h) =>
-              String(h).trim().toLowerCase(),
-            );
-            const expectedHeaders = [
-              "category",
-              "description",
-              "uom",
-              "qty",
-              "target price",
-              "visible target price",
-              "specification",
-              "remarks",
-            ];
-            const missingHeaders = expectedHeaders.filter(
-              (h) => !headers.includes(h),
-            );
-            if (missingHeaders.length > 0) {
-              alert(
-                `Missing required columns: ${missingHeaders.join(", ")}. Please check your template.`,
-              );
-              if (fileInputRef.current) fileInputRef.current.value = "";
-              return;
-            }
 
-            const rowValidationErrors: Array<{
-              row: number;
-              errors: string[];
-            }> = [];
             const validItems: BOQItem[] = [];
 
-            jsonData.slice(1).forEach((row: any[], rowIndex) => {
+            jsonData.slice(1).forEach((row: any[]) => {
               if (
                 row.every(
                   (cell) =>
@@ -553,21 +834,25 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
               )
                 return;
 
-              const category = row[0] != null ? String(row[0]).trim() : "";
-              const description = row[1] != null ? String(row[1]).trim() : "";
-              const uom = row[2] != null ? String(row[2]).trim() : "";
-              const qty = row[3] != null ? String(row[3]).trim() : "";
-              let targetPrice = "";
+              const category =
+                row[0] != null ? String(row[0]).trim() : "General";
+              const description =
+                row[1] != null ? String(row[1]).trim() : "Item";
+              const uom = row[2] != null ? String(row[2]).trim() : "Nos";
+              const qty = row[3] != null ? String(row[3]).trim() : "1";
+              let targetPrice = "0";
               if (row[4] != null)
                 targetPrice =
                   typeof row[4] === "number"
                     ? row[4].toString()
                     : String(row[4]).trim();
-              const isVisible =
-                row[5] != null
-                  ? String(row[5]).trim().toLowerCase() === "yes"
-                  : false;
-              const specification = row[6] != null ? String(row[6]).trim() : "";
+
+              const specification = row[5] != null ? String(row[5]).trim() : "";
+              const logoRequirementRaw =
+                row[6] != null ? String(row[6]).trim().toLowerCase() : "";
+              const logoRequirement = logoRequirementRaw.includes("with")
+                ? "with_logo"
+                : "without_logo";
               const remarks = row[7] != null ? String(row[7]).trim() : "";
 
               const rowItem: BOQItem = {
@@ -576,44 +861,25 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
                 uom,
                 qty,
                 targetPrice,
-                isVisible,
                 specification,
+                logoRequirement,
                 remarks,
+                isVisible: true,
                 itemRef: uuidv4(),
                 attachments: [],
               };
 
-              try {
-                boqSchema.parse(rowItem);
-                validItems.push(rowItem);
-              } catch (error) {
-                if (error instanceof z.ZodError) {
-                  rowValidationErrors.push({
-                    row: rowIndex + 2,
-                    errors: (error.issues || (error as any).errors || []).map(
-                      (e: { message: any }) => e.message,
-                    ),
-                  });
-                }
-              }
+              validItems.push(rowItem);
             });
 
-            if (rowValidationErrors.length > 0) {
-              setValidationErrors(rowValidationErrors);
-              setShowValidationModal(true);
-              if (fileInputRef.current) fileInputRef.current.value = "";
-              return;
-            }
-
             if (validItems.length === 0) {
-              alert(
-                "No valid items found in the uploaded file after validation.",
-              );
+              alert("No valid items found in the uploaded file.");
             } else {
               onChange([...data, ...validItems]);
               setUploadedFile(file.name);
+              setViewMode("excel");
               toast.success(
-                `Successfully added ${validItems.length} items from ${file.name}.`,
+                `Successfully loaded ${validItems.length} items from ${file.name}!`,
               );
             }
           } catch (error) {
@@ -625,500 +891,1166 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
             if (fileInputRef.current) fileInputRef.current.value = "";
           }
         };
-        reader.onerror = () => {
-          alert("Error reading the selected file.");
-          if (fileInputRef.current) fileInputRef.current.value = "";
-        };
         reader.readAsBinaryString(file);
       }
-    };
-
-    const removeUploadedFile = () => {
-      setUploadedFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     };
 
     const downloadSampleExcel = () => {
       const wb = XLSX.utils.book_new();
       const headers = [
-        "category",
-        "description",
-        "uom",
-        "qty",
-        "target price",
-        "visible target price",
-        "specification",
-        "remarks",
+        "Category",
+        "Description",
+        "UOM",
+        "Qty",
+        "Target Price",
+        "Specification",
+        "Logo Requirement",
+        "Remarks",
       ];
-      const ws = XLSX.utils.aoa_to_sheet([headers]);
-      ws["!cols"] = [15, 25, 10, 10, 12, 25, 20].map((width) => ({ width }));
-      XLSX.utils.book_append_sheet(wb, ws, "BOQ Items");
-      XLSX.writeFile(wb, "boq-template.xlsx", {
-        bookType: "xlsx",
-        type: "binary",
-      });
+      const exportRows =
+        data.length > 0
+          ? data.map((d) => [
+              d.category,
+              d.description,
+              d.uom,
+              d.qty,
+              d.targetPrice,
+              d.specification,
+              d.logoRequirement === "with_logo" ? "With Logo" : "Without Logo",
+              d.remarks,
+            ])
+          : [
+              [
+                "Books",
+                "Kids Books",
+                "Nos",
+                "10",
+                "200",
+                "Comics",
+                "Without Logo",
+                "",
+              ],
+              [
+                "Books",
+                "Fantasy Book",
+                "Nos",
+                "2",
+                "250",
+                "Kids Fantasy",
+                "Without Logo",
+                "",
+              ],
+              [
+                "Books",
+                "Story Book",
+                "Nos",
+                "5",
+                "180",
+                "Illustrated",
+                "Without Logo",
+                "",
+              ],
+            ];
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...exportRows]);
+      XLSX.utils.book_append_sheet(wb, ws, "RFQ_BOQ_Items");
+      XLSX.writeFile(wb, "RFQ_BOQ_Items_Spreadsheet.xlsx");
     };
 
-    const handleSpecificationGenerated = (spec: string) => {
-      setItem((prev) => ({ ...prev, specification: spec }));
-      if (itemErrors.specification)
-        setItemErrors((prev) => ({ ...prev, specification: "" }));
-    };
-
-    if (isLoading) return <BOQFormSkeleton />;
+    if (isLoading) {
+      return <BOQFormSkeleton />;
+    }
 
     return (
-      <div>
-        {/* <h2 className="text-2xl font-bold mb-2">4. BOQ/BOM</h2> */}
-        <p className="text-gray-600 mb-4">
-          Add items or services required for this RFQ. You can add items
-          individually or upload a bulk list using the template provided.
-        </p>
-
-        <div
-          id="boq-form"
-          className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-200/90"
-        >
-          <h3 className="text-lg font-extrabold mb-5 text-gray-900">
-            {editingIndex !== null ? "Edit Item" : "Add New Item"}
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-            {/* Row 1: Category & Description */}
-            <SearchableSelect
-              id="category"
-              name="category"
-              label="Category"
-              value={item.category}
-              options={allCategories}
-              onChange={handleItemChange}
-              hasError={!!itemErrors.category}
-              errorMessage={itemErrors.category}
-              placeholder="Select or add category..."
-              onAddNewOption={handleAddNewCategory}
-              onRemoveOption={handleRemoveCategory}
-              isOptionRemovable={isCustomCategory}
-              onTabOut={handleCategoryTabOut}
-              disabled={disabled}
-            />
-
-            <SearchableSelect
-              ref={descriptionRef}
-              id="description"
-              name="description"
-              label="Description"
-              value={item.description}
-              options={availableDescriptions}
-              onChange={handleItemChange}
-              hasError={!!itemErrors.description}
-              errorMessage={itemErrors.description}
-              disabled={!item.category || isLoading || disabled}
-              placeholder={
-                !item.category
-                  ? "Select category first"
-                  : "Select or add description..."
-              }
-              onAddNewOption={handleAddNewDescription}
-              onRemoveOption={handleRemoveDescription}
-              isOptionRemovable={isCustomDescription}
-            />
-
-            {/* Row 2: UOM & Target Price */}
-            <SearchableSelect
-              id="uom"
-              name="uom"
-              label="Unit of Measure (UOM)"
-              value={item.uom}
-              options={uomOptions}
-              onChange={handleItemChange}
-              hasError={!!itemErrors.uom}
-              errorMessage={itemErrors.uom}
-              placeholder="Select UOM..."
-              disabled={disabled}
-            />
-
-            <div className="space-y-2">
-              <Label
-                htmlFor="targetPrice"
-                className="text-xs font-semibold text-gray-900"
-              >
-                Target Price per unit excl. of taxes{" "}
-                <span className="text-rose-500 font-bold">*</span>
-              </Label>
-              <Input
-                type="text"
-                id="targetPrice"
-                name="targetPrice"
-                className={cn(
-                  "h-11 text-[13px] font-mono border border-[#E2E8F0] bg-[#F8FAFC] placeholder:font-mono placeholder:text-[#64748B] rounded-xl shadow-2xs focus-visible:ring-1 focus-visible:ring-blue-600",
-                  itemErrors.targetPrice &&
-                    "border-rose-500 focus-visible:ring-rose-500",
-                  !item.isVisible &&
-                    "bg-[#F1F5F9] text-[#94A3B8] border-[#E2E8F0] cursor-not-allowed",
-                )}
-                value={item.targetPrice}
-                onChange={handleItemChange}
-                placeholder="Target price"
-                inputMode="decimal"
-                disabled={!item.isVisible || disabled}
-              />
-              {itemErrors.targetPrice && (
-                <p className="text-rose-600 text-xs">
-                  {itemErrors.targetPrice}
-                </p>
-              )}
-              <div className="flex items-center gap-2 pt-0.5">
-                <input
-                  type="checkbox"
-                  id="enableTargetPrice"
-                  name="isVisible"
-                  checked={item.isVisible}
-                  onChange={handleItemChange}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
-                />
-                <Label
-                  htmlFor="enableTargetPrice"
-                  className="text-xs text-gray-900 font-semibold cursor-pointer"
-                >
-                  Enable Target Price
-                </Label>
-              </div>
-            </div>
-
-            {/* Row 3: Quantity & Specification */}
-            <div className="space-y-2">
-              <Label
-                htmlFor="qty"
-                className="text-xs font-semibold text-gray-900"
-              >
-                Quantity <span className="text-rose-500 font-bold">*</span>
-              </Label>
-              <Input
-                type="text"
-                id="qty"
-                name="qty"
-                className={cn(
-                  "h-11 text-[13px] font-mono border border-[#E2E8F0] bg-[#F8FAFC] placeholder:font-mono placeholder:text-[#64748B] rounded-xl shadow-2xs focus-visible:ring-1 focus-visible:ring-blue-600",
-                  itemErrors.qty &&
-                    "border-rose-500 focus-visible:ring-rose-500",
-                )}
-                value={item.qty}
-                onChange={handleItemChange}
-                placeholder="e.g., 10 or 12.5"
-                inputMode="decimal"
-                required
-                disabled={disabled}
-              />
-              {itemErrors.qty && (
-                <p className="text-rose-600 text-xs">{itemErrors.qty}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label
-                  htmlFor="specification"
-                  className="text-xs font-semibold text-gray-900"
-                >
-                  Specification{" "}
-                  <span className="text-rose-500 font-bold">*</span>
-                </Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 text-[11px] font-extrabold uppercase text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2 tracking-wider flex items-center gap-1"
-                  onClick={() => setShowSpecModal(true)}
-                  disabled={!item.category || !item.description || disabled}
-                >
-                  <Sparkles className="w-3 h-3 text-blue-600" />
-                  GENERATE WITH AI
-                </Button>
-              </div>
-              <Input
-                type="text"
-                id="specification"
-                name="specification"
-                className={cn(
-                  "h-11 text-[13px] font-mono border border-[#E2E8F0] bg-[#F8FAFC] placeholder:font-mono placeholder:text-[#64748B] rounded-xl shadow-2xs focus-visible:ring-1 focus-visible:ring-blue-600",
-                  itemErrors.specification &&
-                    "border-rose-500 focus-visible:ring-rose-500",
-                )}
-                value={item.specification}
-                onChange={handleItemChange}
-                placeholder="e.g., Color: Blue, Size: Large"
-                disabled={disabled}
-              />
-              {itemErrors.specification && (
-                <p className="text-rose-600 text-xs">
-                  {itemErrors.specification}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Row 4: Remarks */}
-          <div className="space-y-2 mt-5">
-            <Label
-              htmlFor="remarks"
-              className="text-xs font-semibold text-gray-900"
-            >
-              Remarks (Optional)
-            </Label>
-            <Textarea
-              id="remarks"
-              name="remarks"
-              value={item.remarks}
-              onChange={handleItemChange}
-              placeholder="Any additional notes about this item"
-              rows={3}
-              className="text-[13px] font-mono border border-[#E2E8F0] bg-[#F8FAFC] placeholder:font-mono placeholder:text-[#64748B] rounded-xl shadow-2xs focus-visible:ring-1 focus-visible:ring-blue-600"
-              disabled={disabled}
-            />
-          </div>
-
-          {/* Attachments Section */}
-          <div className="mt-5 border-t border-gray-100 pt-5">
-            <BOQAttachments
-              boqItemRef={item.itemRef!}
-              attachments={item.attachments || []}
-              onChange={handleAttachmentsChange}
-              disabled={disabled}
-            />
-          </div>
-
-          {/* Submit Action */}
-          <div className="flex items-center gap-3 mt-6">
-            <Button
-              onClick={editingIndex !== null ? updateItem : addItem}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs tracking-wider uppercase px-6 py-2.5 rounded-lg shadow-sm"
-            >
-              {editingIndex !== null ? "UPDATE ITEM" : "ADD ITEM"}
-            </Button>
-            {editingIndex !== null && (
-              <Button
-                variant="outline"
-                onClick={cancelEditing}
-                className="font-bold text-xs uppercase px-4 py-2.5 rounded-lg"
-              >
-                Cancel Edit
-              </Button>
+      <div className="space-y-6">
+        {/* ─── Top In-Page View Switcher Bar ─── */}
+        <div className="bg-grey-200 text-white rounded-xl p-3 shadow-md flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="bg-blue-600 text-white text-xs font-black uppercase px-2.5 py-1 rounded-md tracking-wider">
+              One Category → Multiple Descriptions
+            </span>
+            {uploadedFile && (
+              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {uploadedFile}
+              </span>
             )}
+          </div>
+
+          {/* Mode Switcher Buttons */}
+          <div className="flex items-center  rounded-xl border border-grey-300 gap-1">
+            <button
+              type="button"
+              onClick={() => setViewMode("description")}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2",
+                viewMode === "description"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-900 hover:bg-blue-600 hover:text-white",
+              )}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              Category & Descriptions View ({data.length})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode("excel")}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2",
+                viewMode === "excel"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-900 hover:bg-blue-600 hover:text-white",
+              )}
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              In-Page Excel View
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                resetForm();
+                setViewMode("form");
+              }}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2",
+                viewMode === "form"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-900 hover:bg-blue-600 hover:text-white",
+              )}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Category / Description
+            </button>
           </div>
         </div>
 
-        {errors?.items && (
-          <p className="text-rose-600 my-3 text-xs">{errors.items}</p>
+        {/* Error Alert Banner when no BOQ item is added */}
+        {errors?.boq && (!data || data.length === 0) && (
+          <div className="bg-rose-50 border-2 border-rose-300 text-rose-900 p-4 rounded-xl flex items-center justify-between gap-3 text-xs font-extrabold shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+              <span>{errors.boq}</span>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setViewMode("form")}
+              className="bg-rose-600 hover:bg-rose-700 text-white font-black text-xs px-3 py-1"
+            >
+              + Add BOQ Item Now
+            </Button>
+          </div>
         )}
 
-        {/* Bulk Upload Section */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-200/90">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-extrabold text-gray-900">
-              Bulk Upload
-            </h3>
-            <Button
-              onClick={downloadSampleExcel}
-              variant="outline"
-              className="text-blue-600 border-blue-600 hover:bg-blue-50 font-extrabold uppercase text-xs tracking-wider px-4 py-2 rounded-lg flex items-center gap-2 shadow-xs"
-            >
-              <FaFileDownload className="w-3.5 h-3.5" /> DOWNLOAD TEMPLATE
-            </Button>
-          </div>
-          <p className="text-xs sm:text-sm text-gray-500 mb-5">
-            Upload a{" "}
-            <strong className="font-semibold text-gray-700">CSV</strong> or{" "}
-            <strong className="font-semibold text-gray-700">
-              Excel (.xlsx)
-            </strong>{" "}
-            file using the template format.
-          </p>
-          <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-blue-200 rounded-xl bg-blue-50/40 hover:border-blue-300 transition-colors duration-200">
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              <Label
-                htmlFor="bulkUpload"
-                className={cn(
-                  "cursor-pointer flex items-center gap-2",
-                  uploadedFile ? "text-green-600" : "text-blue-600",
-                )}
-              >
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={cn(
-                    "text-blue-600 border-blue-600 hover:bg-blue-50 font-extrabold uppercase text-xs tracking-wider px-5 py-2.5 rounded-lg flex items-center gap-2 bg-white shadow-xs",
-                    uploadedFile &&
-                      "bg-green-600 border-green-600 hover:bg-green-700 text-white",
-                  )}
-                  asChild
-                >
-                  <span>
-                    <FaUpload className="w-3.5 h-3.5" />
-                    {uploadedFile ? "FILE SELECTED" : "CHOOSE FILE"}
-                  </span>
-                </Button>
-              </Label>
-              {uploadedFile && (
-                <Button
-                  variant="destructive"
-                  onClick={removeUploadedFile}
-                  title={`Remove ${uploadedFile}`}
-                  className="font-bold text-xs uppercase px-4 py-2.5 rounded-lg"
-                >
-                  <FaTrash className="w-3.5 h-3.5 mr-1.5" /> Remove File
-                </Button>
-              )}
-            </div>
-            <p className="text-xs text-gray-400 mt-3">
-              Accepted formats: .csv, .xlsx
-            </p>
-            {uploadedFile && (
-              <p
-                className="text-sm text-gray-700 mb-2 font-medium truncate max-w-xs"
-                title={uploadedFile}
-              >
-                {uploadedFile}
-              </p>
-            )}
-            <input
-              type="file"
-              id="bulkUpload"
-              accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-              onChange={handleBulkUpload}
-              className="hidden"
-              ref={fileInputRef}
-              disabled={disabled}
-            />
-            <p className="text-xs text-gray-500">
-              Accepted formats: <strong>.csv, .xlsx</strong>
-            </p>
-          </div>
-        </div>
+        {/* ─── VIEW 1: Grouped Category & Multiple Descriptions View ─── */}
+        {viewMode === "description" && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
+            <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-4 gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-blue-600" />
+                  Categories & Multiple Descriptions List
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Each Category contains multiple Descriptions. Each Description
+                  has its own Quantity, Target Price, Specification, and Logo
+                  Requirement.
+                </p>
+              </div>
 
-        {data?.length > 0 && (
-          <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-            <h3 className="text-xl font-semibold mb-4 text-gray-800">
-              Added Items ({data.length})
-            </h3>
-            <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300">
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="bg-gray-100 text-gray-700">
-                    <th className="p-2 border border-gray-300 text-center">
-                      S.No.
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    resetForm();
+                    setViewMode("form");
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5"
+                >
+                  <FolderPlus className="w-4 h-4" /> Add Category / Description
+                </Button>
+              </div>
+            </div>
+
+            {Object.keys(groupedBOQItems).length === 0 ? (
+              <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                <FileText className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                <h4 className="text-sm font-bold text-slate-800">
+                  No Category Descriptions Added Yet
+                </h4>
+                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto mb-4">
+                  Select a category from the master list (e.g. Books, Indoor
+                  Plants, Coffee Mug) and add multiple description rows.
+                </p>
+                <div className="flex items-center justify-center gap-3">
+                  <Button
+                    size="sm"
+                    onClick={() => setViewMode("form")}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs"
+                  >
+                    Add Category / Description
+                  </Button>
+                  <Label
+                    htmlFor="bulkUploadDescGroup"
+                    className="cursor-pointer"
+                  >
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-bold text-xs flex items-center gap-1.5"
+                      asChild
+                    >
+                      <span>
+                        <Upload className="w-3.5 h-3.5" /> Upload Excel
+                      </span>
+                    </Button>
+                  </Label>
+                  <input
+                    type="file"
+                    id="bulkUploadDescGroup"
+                    accept=".csv, .xlsx"
+                    onChange={handleBulkUpload}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {Object.entries(groupedBOQItems).map(
+                  ([categoryName, group]) => (
+                    <div
+                      key={categoryName}
+                      className="border border-slate-200 rounded-xl bg-white shadow-2xs overflow-hidden"
+                    >
+                      {/* Category Header Bar with "Add Description" Action */}
+                      <div className="flex flex-wrap items-center justify-between p-4 bg-slate-200 text-black gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className="bg-blue-600 text-white text-xs font-black uppercase px-2.5 py-1 rounded-md tracking-wider">
+                            Category
+                          </span>
+                          <h4 className="font-extrabold text-base tracking-tight text-black">
+                            {categoryName}
+                          </h4>
+                          <span className="bg-slate-800 text-slate-300 font-mono text-xs px-2.5 py-0.5 rounded-full font-bold">
+                            {group.items.length}{" "}
+                            {group.items.length === 1
+                              ? "description"
+                              : "descriptions"}
+                          </span>
+                        </div>
+
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            handleAddDescriptionUnderCategory(categoryName)
+                          }
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm"
+                        >
+                          <Plus className="w-4 h-4" /> Add Description to &quot;
+                          {categoryName}&quot;
+                        </Button>
+                      </div>
+
+                      {/* Dynamic Table of Descriptions under this Category */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left font-mono border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-100 border-b border-slate-200 text-[11px] text-slate-700 uppercase font-bold">
+                              <th className="p-3 border-r border-slate-200 w-10 text-center">
+                                #
+                              </th>
+                              <th className="p-3 border-r border-slate-200 min-w-[200px]">
+                                Description
+                              </th>
+                              <th className="p-3 border-r border-slate-200 text-center w-28">
+                                Qty
+                              </th>
+                              <th className="p-3 border-r border-slate-200 text-right min-w-[160px] w-44">
+                                Target Price (₹)
+                              </th>
+                              <th className="p-3 border-r border-slate-200 text-center w-36">
+                                Logo Required
+                              </th>
+                              <th className="p-3 border-r border-slate-200 min-w-[220px]">
+                                Specification
+                              </th>
+                              <th className="p-3 text-center w-24">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200 bg-white text-slate-800">
+                            {group.items.map((row, idx) => {
+                              const originalIndex = group.originalIndices[idx];
+
+                              return (
+                                <tr
+                                  key={row.itemRef || idx}
+                                  className="hover:bg-blue-50/40 transition-colors"
+                                >
+                                  <td className="p-2 border-r border-slate-200 text-center font-bold text-slate-500 bg-slate-50/50">
+                                    {idx + 1}
+                                  </td>
+
+                                  {/* Description Field - Direct Inline Edit */}
+                                  <td className="p-1.5 border-r border-slate-200">
+                                    <input
+                                      type="text"
+                                      value={row.description}
+                                      onChange={(e) =>
+                                        handleSpreadsheetCellChange(
+                                          originalIndex,
+                                          "description",
+                                          e.target.value,
+                                        )
+                                      }
+                                      placeholder="e.g. Kids Books, Fantasy Book..."
+                                      className="w-full h-8 px-2 border border-slate-200 rounded font-extrabold text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                  </td>
+
+                                  {/* Quantity Field - Direct Inline Edit */}
+                                  <td className="p-1.5 border-r border-slate-200 text-center">
+                                    <div className="flex items-center gap-1">
+                                      <input
+                                        type="number"
+                                        value={row.qty}
+                                        onChange={(e) =>
+                                          handleSpreadsheetCellChange(
+                                            originalIndex,
+                                            "qty",
+                                            e.target.value,
+                                          )
+                                        }
+                                        className="w-16 h-8 px-1 border border-slate-200 rounded font-black text-blue-700 text-center bg-white focus:ring-2 focus:ring-blue-500"
+                                      />
+                                      <select
+                                        value={row.uom || "Nos"}
+                                        onChange={(e) =>
+                                          handleSpreadsheetCellChange(
+                                            originalIndex,
+                                            "uom",
+                                            e.target.value,
+                                          )
+                                        }
+                                        className="h-8 px-1 border border-slate-200 rounded text-[11px] font-bold bg-slate-50"
+                                      >
+                                        {uomOptions.map((u) => (
+                                          <option key={u.value} value={u.value}>
+                                            {u.value}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </td>
+
+                                  {/* Target Price Field - Direct Inline Edit */}
+                                  <td className="p-1.5 border-r border-slate-200 text-right min-w-[160px] w-44">
+                                    <div className="relative">
+                                      <span className="absolute left-2 top-2 text-slate-400 font-bold">
+                                        ₹
+                                      </span>
+                                      <input
+                                        type="number"
+                                        value={row.targetPrice}
+                                        onChange={(e) =>
+                                          handleSpreadsheetCellChange(
+                                            originalIndex,
+                                            "targetPrice",
+                                            e.target.value,
+                                          )
+                                        }
+                                        placeholder="0"
+                                        className="w-full h-8 pl-5 pr-2 border border-slate-200 rounded font-black text-slate-900 text-right bg-white focus:ring-2 focus:ring-blue-500"
+                                      />
+                                    </div>
+                                  </td>
+
+                                  {/* Logo Requirement Selector */}
+                                  <td className="p-1.5 border-r border-slate-200 text-center">
+                                    <select
+                                      value={
+                                        row.logoRequirement || "without_logo"
+                                      }
+                                      onChange={(e) =>
+                                        handleSpreadsheetCellChange(
+                                          originalIndex,
+                                          "logoRequirement",
+                                          e.target.value,
+                                        )
+                                      }
+                                      className={cn(
+                                        "w-full h-8 px-2 text-[10px] font-extrabold rounded cursor-pointer uppercase border",
+                                        row.logoRequirement === "with_logo"
+                                          ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                          : "bg-slate-100 text-slate-700 border-slate-300",
+                                      )}
+                                    >
+                                      <option value="with_logo">
+                                        With Logo
+                                      </option>
+                                      <option value="without_logo">
+                                        Without Logo
+                                      </option>
+                                    </select>
+                                    {row.logoRequirement === "with_logo" && (
+                                      <RowLogoUploader
+                                        row={row}
+                                        rowIndex={originalIndex}
+                                        onUpload={handleRowLogoUpload}
+                                        onRemove={handleRowLogoRemove}
+                                        disabled={disabled}
+                                      />
+                                    )}
+                                  </td>
+
+                                  {/* Specification Field - Direct Inline Edit */}
+                                  <td className="p-1.5 border-r border-slate-200">
+                                    <input
+                                      type="text"
+                                      value={row.specification}
+                                      onChange={(e) =>
+                                        handleSpreadsheetCellChange(
+                                          originalIndex,
+                                          "specification",
+                                          e.target.value,
+                                        )
+                                      }
+                                      placeholder="e.g. Comics, Illustrated, Hardcover..."
+                                      className="w-full h-8 px-2 border border-slate-200 rounded text-slate-800 bg-white focus:ring-2 focus:ring-blue-500"
+                                    />
+                                  </td>
+
+                                  {/* Actions */}
+                                  <td className="p-1.5 text-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        size="iconSmall"
+                                        variant="ghost"
+                                        onClick={() =>
+                                          startEditing(originalIndex)
+                                        }
+                                        title="Edit Description"
+                                      >
+                                        <FaEdit className="text-blue-600 w-3.5 h-3.5" />
+                                      </Button>
+                                      <Button
+                                        size="iconSmall"
+                                        variant="ghost"
+                                        onClick={() =>
+                                          removeItem(originalIndex)
+                                        }
+                                        title="Remove Description"
+                                      >
+                                        <FaTrash className="text-rose-600 w-3.5 h-3.5" />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Bottom Action inside Category Card */}
+                      <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+                        <span className="text-xs text-slate-500 font-medium">
+                          Total {group.items.length} descriptions under{" "}
+                          {categoryName}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            handleAddDescriptionUnderCategory(categoryName)
+                          }
+                          className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 text-xs font-bold flex items-center gap-1.5"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Add Another
+                          Description to &quot;{categoryName}&quot;
+                        </Button>
+                      </div>
+                    </div>
+                  ),
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── VIEW 2: In-Page Interactive Excel Spreadsheet View ─── */}
+        {viewMode === "excel" && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+                  In-Page Interactive Excel Spreadsheet
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  View and update all item details directly within this in-page
+                  grid. Changes auto-save to database.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Label htmlFor="excelGridUpload" className="cursor-pointer">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-bold text-xs flex items-center gap-1.5"
+                    asChild
+                  >
+                    <span>
+                      <Upload className="w-3.5 h-3.5" /> Upload File (.xlsx)
+                    </span>
+                  </Button>
+                </Label>
+                <input
+                  type="file"
+                  id="excelGridUpload"
+                  accept=".csv, .xlsx"
+                  onChange={handleBulkUpload}
+                  className="hidden"
+                />
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={downloadSampleExcel}
+                  className="border-slate-300 text-slate-700 hover:bg-slate-50 font-bold text-xs flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" /> Export Excel
+                </Button>
+
+                <Button
+                  size="sm"
+                  onClick={handleAddSpreadsheetRow}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Row
+                </Button>
+              </div>
+            </div>
+
+            {/* In-Page Interactive Spreadsheet Grid Table */}
+            <div className="overflow-x-auto border border-slate-300 rounded-xl shadow-2xs max-h-[1000px] overflow-y-auto custom-slim-scrollbar">
+              <table className="w-full border-collapse text-xs font-mono min-w-[900px]">
+                <thead className="sticky top-0 bg-slate-200 text-slate-900 z-10 text-[11px] uppercase tracking-wider font-extrabold border-b border-slate-300">
+                  <tr>
+                    <th className="p-3 border border-slate-300 text-center w-12">
+                      #
                     </th>
-                    <th className="p-2 border border-gray-300">Category</th>
-                    <th className="p-2 border border-gray-300">Description</th>
-                    <th className="p-2 border border-gray-300">UOM</th>
-                    <th className="p-2 border border-gray-300 text-right">
-                      Qty
+                    <th className="p-3 border border-slate-300 text-left min-w-[150px]">
+                      Category
                     </th>
-                    <th className="p-2 border border-gray-300 text-right">
-                      Target Price
+                    <th className="p-3 border border-slate-300 text-left min-w-[180px]">
+                      Item / Description
                     </th>
-                    <th className="p-2 border border-gray-300 text-center">
-                      Visible Target Price
+                    <th className="p-3 border border-slate-300 text-center w-24">
+                      Quantity
                     </th>
-                    <th className="p-2 border border-gray-300">
+                    <th className="p-3 border border-slate-300 text-center w-24">
+                      UOM
+                    </th>
+                    <th className="p-3 border border-slate-300 text-right min-w-[160px] w-44">
+                      Target Price (₹)
+                    </th>
+                    <th className="p-3 border border-slate-300 text-center w-36">
+                      Logo Requirement
+                    </th>
+                    <th className="p-3 border border-slate-300 text-left min-w-[200px]">
                       Specification
                     </th>
-                    <th className="p-2 border border-gray-300">Remarks</th>
-                    <th className="p-2 border border-gray-300 text-center">
-                      Attachments
+                    <th className="p-3 border border-slate-300 text-left min-w-[140px]">
+                      Remarks
                     </th>
-                    <th className="p-2 border border-gray-300 text-center">
-                      Actions
+                    <th className="p-3 border border-slate-300 text-center w-16">
+                      Action
                     </th>
                   </tr>
                 </thead>
-                <tbody>
-                  {data.map((addedItem, index) => (
-                    <tr
-                      key={addedItem.itemRef || index}
-                      className={cn(
-                        "hover:bg-gray-50 transition-colors",
-                        editingIndex === index && "bg-blue-50",
-                      )}
-                    >
-                      <td className="p-2 border border-gray-300 text-center">
-                        {index + 1}
-                      </td>
-                      <td className="p-2 border border-gray-300">
-                        {addedItem.category}
-                      </td>
-                      <td className="p-2 border border-gray-300">
-                        {addedItem.description}
-                      </td>
-                      <td className="p-2 border border-gray-300">
-                        {addedItem.uom}
-                      </td>
-                      <td className="p-2 border border-gray-300 text-right">
-                        {addedItem.qty}
-                      </td>
-                      <td className="p-2 border border-gray-300 text-right">
-                        {addedItem.targetPrice || "-"}
-                      </td>
-                      <td className="p-2 border border-gray-300 text-center">
-                        {addedItem.isVisible === true
-                          ? "Yes"
-                          : addedItem.isVisible === false
-                            ? "No"
-                            : "-"}
-                      </td>
-                      <td className="p-2 border border-gray-300">
-                        {addedItem.specification || "-"}
-                      </td>
-                      <td className="p-2 border border-gray-300">
-                        {addedItem.remarks || "-"}
-                      </td>
-                      <td className="p-2 border border-gray-300 text-center">
-                        {addedItem.attachments &&
-                        addedItem.attachments.length > 0 ? (
-                          <div className="flex flex-col gap-1">
-                            {addedItem.attachments.map((att, ai) => (
-                              <a
-                                key={att.id || ai}
-                                href={att.fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-blue-600 hover:underline truncate max-w-[120px] block"
-                                title={att.fileName}
-                              >
-                                {att.fileName}
-                              </a>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="p-2 border border-gray-300 text-center">
-                        <div className="flex justify-center items-center gap-2">
-                          <Button
-                            size="iconSmall"
-                            onClick={() => startEditing(index)}
-                            title="Edit Item"
-                            disabled={editingIndex === index || disabled}
-                            aria-label="Edit item"
-                          >
-                            <FaEdit />
-                          </Button>
-                          <Button
-                            size="iconSmall"
-                            variant="destructive"
-                            onClick={() => removeItem(index)}
-                            title="Remove Item"
-                            aria-label="Remove item"
-                            disabled={disabled}
-                          >
-                            <FaTrash />
-                          </Button>
-                        </div>
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {data.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={10}
+                        className="p-8 text-center text-slate-500"
+                      >
+                        No rows in spreadsheet. Click &quot;Add Row&quot; or
+                        &quot;Upload File&quot; to insert items.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    data.map((row, rIdx) => (
+                      <tr
+                        key={rIdx}
+                        className="hover:bg-blue-50/40 transition-colors"
+                      >
+                        <td className="p-2 border border-slate-200 text-center font-bold text-slate-600 bg-slate-50">
+                          {rIdx + 1}
+                        </td>
+
+                        {/* Category cell */}
+                        <td className="p-1 border border-slate-200">
+                          <input
+                            type="text"
+                            value={row.category}
+                            onChange={(e) =>
+                              handleSpreadsheetCellChange(
+                                rIdx,
+                                "category",
+                                e.target.value,
+                              )
+                            }
+                            className="w-full h-8 px-2 border-0 bg-transparent text-xs font-bold focus:bg-white focus:ring-2 focus:ring-blue-500 rounded"
+                          />
+                        </td>
+
+                        {/* Description cell */}
+                        <td className="p-1 border border-slate-200">
+                          <input
+                            type="text"
+                            value={row.description}
+                            onChange={(e) =>
+                              handleSpreadsheetCellChange(
+                                rIdx,
+                                "description",
+                                e.target.value,
+                              )
+                            }
+                            className="w-full h-8 px-2 border-0 bg-transparent text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded"
+                          />
+                        </td>
+
+                        {/* Quantity cell */}
+                        <td className="p-1 border border-slate-200 text-center">
+                          <input
+                            type="number"
+                            value={row.qty}
+                            onChange={(e) =>
+                              handleSpreadsheetCellChange(
+                                rIdx,
+                                "qty",
+                                e.target.value,
+                              )
+                            }
+                            className="w-full h-8 px-2 border-0 bg-transparent text-xs font-extrabold text-blue-700 text-center focus:bg-white focus:ring-2 focus:ring-blue-500 rounded"
+                          />
+                        </td>
+
+                        {/* UOM cell */}
+                        <td className="p-1 border border-slate-200 text-center">
+                          <select
+                            value={row.uom}
+                            onChange={(e) =>
+                              handleSpreadsheetCellChange(
+                                rIdx,
+                                "uom",
+                                e.target.value,
+                              )
+                            }
+                            className="w-full h-8 px-1 border-0 bg-transparent text-xs text-center focus:bg-white focus:ring-2 focus:ring-blue-500 rounded cursor-pointer"
+                          >
+                            {uomOptions.map((u) => (
+                              <option key={u.value} value={u.value}>
+                                {u.value}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+
+                        {/* Target Price cell */}
+                        <td className="p-1 border border-slate-200 text-right">
+                          <input
+                            type="number"
+                            value={row.targetPrice}
+                            onChange={(e) =>
+                              handleSpreadsheetCellChange(
+                                rIdx,
+                                "targetPrice",
+                                e.target.value,
+                              )
+                            }
+                            className="w-full h-8 px-2 border-0 bg-transparent text-xs font-bold text-right focus:bg-white focus:ring-2 focus:ring-blue-500 rounded"
+                          />
+                        </td>
+
+                        {/* Logo Requirement cell */}
+                        <td className="p-1 border border-slate-200 text-center">
+                          <select
+                            value={row.logoRequirement || "without_logo"}
+                            onChange={(e) =>
+                              handleSpreadsheetCellChange(
+                                rIdx,
+                                "logoRequirement",
+                                e.target.value,
+                              )
+                            }
+                            className={cn(
+                              "w-full h-8 px-2 text-[11px] font-bold rounded cursor-pointer uppercase border-0 focus:ring-2 focus:ring-blue-500",
+                              row.logoRequirement === "with_logo"
+                                ? "bg-emerald-100 text-emerald-900"
+                                : "bg-slate-100 text-slate-700",
+                            )}
+                          >
+                            <option value="with_logo">With Logo</option>
+                            <option value="without_logo">Without Logo</option>
+                          </select>
+                          {row.logoRequirement === "with_logo" && (
+                            <RowLogoUploader
+                              row={row}
+                              rowIndex={rIdx}
+                              onUpload={handleRowLogoUpload}
+                              onRemove={handleRowLogoRemove}
+                              disabled={disabled}
+                            />
+                          )}
+                        </td>
+
+                        {/* Specification cell */}
+                        <td className="p-1 border border-slate-200">
+                          <input
+                            type="text"
+                            value={row.specification}
+                            onChange={(e) =>
+                              handleSpreadsheetCellChange(
+                                rIdx,
+                                "specification",
+                                e.target.value,
+                              )
+                            }
+                            placeholder="Specification details..."
+                            className="w-full h-8 px-2 border-0 bg-transparent text-xs focus:bg-white focus:ring-2 focus:ring-blue-500 rounded"
+                          />
+                        </td>
+
+                        {/* Remarks cell */}
+                        <td className="p-1 border border-slate-200">
+                          <input
+                            type="text"
+                            value={row.remarks}
+                            onChange={(e) =>
+                              handleSpreadsheetCellChange(
+                                rIdx,
+                                "remarks",
+                                e.target.value,
+                              )
+                            }
+                            placeholder="Optional notes"
+                            className="w-full h-8 px-2 border-0 bg-transparent text-xs focus:bg-white focus:ring-2 focus:ring-blue-500 rounded"
+                          />
+                        </td>
+
+                        {/* Action cell */}
+                        <td className="p-1 border border-slate-200 text-center">
+                          <Button
+                            size="iconSmall"
+                            variant="ghost"
+                            onClick={() => removeItem(rIdx)}
+                            className="h-7 w-7 text-rose-600 hover:bg-rose-50"
+                            title="Delete Row"
+                          >
+                            <FaTrash className="w-3 h-3" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Note below spreadsheet table */}
+            <div className="flex flex-wrap items-center justify-between text-xs text-slate-600 font-mono bg-slate-50 p-3 rounded-lg border border-slate-200 gap-2">
+              <span className="flex items-center gap-2 font-semibold text-slate-700">
+                <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                No rows in spreadsheet. Click &quot;Add Row&quot; or
+                &quot;Upload File&quot; to insert items.
+              </span>
+              <span className="font-bold text-slate-800 bg-white border border-slate-300 px-2.5 py-0.5 rounded shadow-2xs">
+                Total Rows: {data.length}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* ─── VIEW 3: Add / Edit Description Row Form ─── */}
+        {viewMode === "form" && (
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+                <PlusCircle className="w-5 h-5 text-blue-600" />
+                {editingIndex !== null
+                  ? "Edit Description Row"
+                  : "Add Description under Category"}
+              </h3>
+
+              {data.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setViewMode("description")}
+                  className="text-xs font-bold text-blue-600 border-blue-600 hover:bg-blue-50"
+                >
+                  <FileText className="w-3.5 h-3.5 mr-1.5" />
+                  View Added Category Items ({data.length})
+                </Button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Category Dropdown (Search & Add from Master List) */}
+              <div className="space-y-2">
+                <SearchableSelect
+                  id="category"
+                  name="category"
+                  label="Category (Search default list or Add Custom)"
+                  value={item.category}
+                  options={availableCategories}
+                  onChange={handleItemChange}
+                  onAddNewOption={handleAddNewCategory}
+                  hasError={!!itemErrors.category}
+                  errorMessage={itemErrors.category}
+                  placeholder="Select Category (e.g. Books, Indoor Plants, Coffee Mug)..."
+                  disabled={disabled}
+                />
+              </div>
+
+              {/* Description Field (Search & Add under Category) */}
+              <div className="space-y-2" ref={descriptionRef}>
+                <SearchableSelect
+                  id="description"
+                  name="description"
+                  label="Description Item (Search or Add Custom)"
+                  value={item.description}
+                  options={availableDescriptions}
+                  onChange={handleItemChange}
+                  onAddNewOption={handleAddNewDescription}
+                  hasError={!!itemErrors.description}
+                  errorMessage={itemErrors.description}
+                  placeholder={
+                    item.category
+                      ? `Search ${item.category} items or type custom description...`
+                      : "Select Category first..."
+                  }
+                  disabled={!item.category || disabled}
+                />
+              </div>
+
+              {/* Quantity */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="qty"
+                  className="text-xs font-semibold text-gray-900"
+                >
+                  Quantity <span className="text-rose-500 font-bold">*</span>
+                </Label>
+                <Input
+                  type="text"
+                  id="qty"
+                  name="qty"
+                  value={item.qty}
+                  onChange={handleItemChange}
+                  placeholder="e.g. 10"
+                  disabled={disabled}
+                  className="h-10 text-xs font-mono border-slate-300"
+                />
+                {itemErrors.qty && (
+                  <p className="text-rose-600 text-xs">{itemErrors.qty}</p>
+                )}
+              </div>
+
+              {/* Target Price */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="targetPrice"
+                  className="text-xs font-semibold text-gray-900"
+                >
+                  Target Price per unit (₹){" "}
+                  <span className="text-rose-500 font-bold">*</span>
+                </Label>
+                <Input
+                  type="text"
+                  id="targetPrice"
+                  name="targetPrice"
+                  value={item.targetPrice}
+                  onChange={handleItemChange}
+                  placeholder="e.g. 200"
+                  disabled={disabled}
+                  className="h-10 text-xs font-mono border-slate-300"
+                />
+                {itemErrors.targetPrice && (
+                  <p className="text-rose-600 text-xs">
+                    {itemErrors.targetPrice}
+                  </p>
+                )}
+              </div>
+
+              {/* UOM */}
+              <div className="space-y-2">
+                <SearchableSelect
+                  id="uom"
+                  name="uom"
+                  label="Unit of Measure (UOM)"
+                  value={item.uom}
+                  options={uomOptions.map((u) => u.value)}
+                  onChange={handleItemChange}
+                  hasError={!!itemErrors.uom}
+                  errorMessage={itemErrors.uom}
+                  placeholder="Select UOM..."
+                  disabled={disabled}
+                />
+              </div>
+
+              {/* Logo Requirement */}
+              <div className="space-y-2 col-span-2 md:col-span-1">
+                <Label className="text-xs font-semibold text-gray-900">
+                  Logo Requirement
+                </Label>
+                <div className="flex items-center gap-4 pt-1">
+                  <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold">
+                    <input
+                      type="radio"
+                      name="logoRequirement"
+                      value="with_logo"
+                      checked={item.logoRequirement === "with_logo"}
+                      onChange={handleItemChange}
+                      disabled={disabled}
+                      className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                    />
+                    With Logo
+                  </label>
+                  <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold">
+                    <input
+                      type="radio"
+                      name="logoRequirement"
+                      value="without_logo"
+                      checked={
+                        item.logoRequirement === "without_logo" ||
+                        !item.logoRequirement
+                      }
+                      onChange={handleItemChange}
+                      disabled={disabled}
+                      className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                    />
+                    Without Logo
+                  </label>
+                </div>
+
+                {item.logoRequirement === "with_logo" && (
+                  <div className="mt-3 p-3 bg-blue-50/70 border border-blue-200 rounded-lg space-y-2">
+                    <BOQAttachments
+                      boqItemRef={item.itemRef || uuidv4()}
+                      attachments={item.attachments || []}
+                      onChange={handleAttachmentsChange}
+                      disabled={disabled}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Specification */}
+              <div className="space-y-2 col-span-2">
+                <div className="flex justify-between items-center">
+                  <Label
+                    htmlFor="specification"
+                    className="text-xs font-semibold text-gray-900"
+                  >
+                    Specification
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[11px] font-extrabold uppercase text-blue-600 hover:text-blue-700 px-2 flex items-center gap-1"
+                    onClick={() => setShowSpecModal(true)}
+                    disabled={!item.category || !item.description || disabled}
+                  >
+                    <Sparkles className="w-3 h-3 text-blue-600" />
+                    GENERATE WITH AI
+                  </Button>
+                </div>
+                <Textarea
+                  id="specification"
+                  name="specification"
+                  value={item.specification}
+                  onChange={handleItemChange}
+                  placeholder="e.g. Comics, Illustrated, Hardcover, Custom Branding..."
+                  rows={3}
+                  disabled={disabled}
+                  className="text-xs font-mono border-slate-300"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  resetForm();
+                  setViewMode("description");
+                }}
+                className="text-xs font-bold text-slate-700 border-slate-300 hover:bg-slate-50"
+              >
+                Cancel
+              </Button>
+              {editingIndex !== null ? (
+                <Button
+                  onClick={updateItem}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold px-6 shadow-sm"
+                >
+                  Update Description
+                </Button>
+              ) : (
+                <Button
+                  onClick={addItem}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold px-6 shadow-sm"
+                >
+                  Add Description Row
+                </Button>
+              )}
+            </div>
+
+            {/* ─── Dynamic Live Table of ALL Added BOQ Descriptions ─── */}
+            <div className="mt-6 pt-5 border-t-2 border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-blue-600" />
+                  {item.category ? (
+                    <>
+                      Added Descriptions under{" "}
+                      <span className="text-blue-600 font-extrabold text-sm">
+                        {item.category}
+                      </span>{" "}
+                      & All Categories
+                    </>
+                  ) : (
+                    "All Added Category Descriptions"
+                  )}
+                  <span className="bg-blue-100 text-blue-800 text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+                    {data.length} {data.length === 1 ? "item" : "items"} total
+                  </span>
+                </h4>
+                <span className="text-[11px] text-slate-500 font-semibold">
+                  One Category → Multiple Descriptions
+                </span>
+              </div>
+
+              {data.length === 0 ? (
+                <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-center text-xs text-slate-500">
+                  No description rows added yet. Fill out the fields above and
+                  click <strong>&quot;Add Description Row&quot;</strong>.
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-2xs custom-slim-scrollbar">
+                  <table className="w-full text-left font-mono border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-200 text-slate-900 text-[11px] uppercase font-extrabold border-b border-slate-300">
+                        <th className="p-2.5 border-r border-slate-300 w-10 text-center">
+                          #
+                        </th>
+                        <th className="p-2.5 border-r border-slate-300 min-w-[140px]">
+                          Category
+                        </th>
+                        <th className="p-2.5 border-r border-slate-300 min-w-[180px]">
+                          Description
+                        </th>
+                        <th className="p-2.5 border-r border-slate-300 text-center w-24">
+                          Qty
+                        </th>
+                        <th className="p-2.5 border-r border-slate-300 text-right min-w-[160px] w-44">
+                          Target Price
+                        </th>
+                        <th className="p-2.5 border-r border-slate-300 text-center w-28">
+                          Logo Req.
+                        </th>
+                        <th className="p-2.5 border-r border-slate-300 min-w-[180px]">
+                          Specification
+                        </th>
+                        <th className="p-2.5 text-center w-20">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 bg-white">
+                      {data.map((row, idx) => {
+                        const isCurrentCategory =
+                          item.category &&
+                          (row.category || "").trim().toLowerCase() ===
+                            item.category.trim().toLowerCase();
+
+                        return (
+                          <tr
+                            key={row.itemRef || idx}
+                            className={cn(
+                              "hover:bg-blue-50/60 transition-colors",
+                              isCurrentCategory ? "bg-blue-50/30" : "",
+                            )}
+                          >
+                            <td className="p-2.5 border-r border-slate-200 text-center font-bold text-slate-500 bg-slate-50">
+                              {idx + 1}
+                            </td>
+                            <td className="p-2.5 border-r border-slate-200 font-extrabold text-blue-900">
+                              <span className="bg-blue-100 text-blue-800 text-[11px] px-2 py-0.5 rounded font-bold">
+                                {row.category}
+                              </span>
+                            </td>
+                            <td className="p-2.5 border-r border-slate-200 font-extrabold text-slate-900">
+                              {row.description}
+                            </td>
+                            <td className="p-2.5 border-r border-slate-200 text-center font-bold text-blue-700">
+                              {row.qty} {row.uom}
+                            </td>
+                            <td className="p-2.5 border-r border-slate-200 text-right font-black text-slate-900 min-w-[160px] w-44">
+                              ₹{row.targetPrice}
+                            </td>
+                            <td className="p-2.5 border-r border-slate-200 text-center">
+                              <span
+                                className={cn(
+                                  "px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border",
+                                  row.logoRequirement === "with_logo"
+                                    ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                    : "bg-slate-100 text-slate-700 border-slate-300",
+                                )}
+                              >
+                                {row.logoRequirement === "with_logo"
+                                  ? "With Logo"
+                                  : "Without Logo"}
+                              </span>
+                            </td>
+                            <td
+                              className="p-2.5 border-r border-slate-200 text-slate-700 truncate max-w-[200px]"
+                              title={row.specification}
+                            >
+                              {row.specification}
+                            </td>
+                            <td className="p-2.5 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  size="iconSmall"
+                                  variant="ghost"
+                                  onClick={() => startEditing(idx)}
+                                  title="Edit Description"
+                                >
+                                  <FaEdit className="text-blue-600 w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  size="iconSmall"
+                                  variant="ghost"
+                                  onClick={() => removeItem(idx)}
+                                  title="Remove Description"
+                                >
+                                  <FaTrash className="text-rose-600 w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}

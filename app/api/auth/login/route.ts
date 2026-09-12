@@ -31,26 +31,26 @@ export async function POST(request: Request) {
     if (existing.length === 0) {
       return NextResponse.json(
         {
-          error:
-            "No account found with this email address. Please register first.",
+          error: "This email is not registered. Please register first to continue.",
+          isNotRegistered: true,
+          email: emailClean,
         },
         { status: 404 },
       );
     }
 
     const user = existing[0];
-    let rfpId = crypto.randomUUID();
+
+    let rfpId = "074db83b-2fe4-4978-874c-a2d34e269a7c";
 
     try {
-      const userRfqs = await db
+      const existingRfq = await db
         .select()
         .from(rfqs)
-        .where(eq(rfqs.userId, user.id))
+        .where(eq(rfqs.id, rfpId))
         .limit(1);
 
-      if (userRfqs.length > 0) {
-        rfpId = userRfqs[0].id;
-      } else {
+      if (existingRfq.length === 0) {
         await db.insert(rfqs).values({
           id: rfpId,
           userId: user.id,
@@ -73,24 +73,15 @@ export async function POST(request: Request) {
       console.warn("DB RFP/company sync warning during login:", dbErr);
     }
 
-    const verifyUrl = `/auth/verify?token=demo_token_${Date.now()}&email=${encodeURIComponent(emailClean)}&name=${encodeURIComponent(user.name)}&mobile=${encodeURIComponent(user.mobileNumber || "")}&company=${encodeURIComponent(user.companyName || "")}&rfpId=${rfpId}`;
-    const magicLinkUrl = `/rfq/${rfpId}/requirement`;
-
-    try {
-      await EmailService.sendMagicLinkEmail({
-        email: emailClean,
-        url: verifyUrl,
-      });
-    } catch (emailErr) {
-      console.warn("Email service warning during login:", emailErr);
-    }
+    const requirementUrl = `/rfq/${rfpId}/requirement`;
 
     const response = NextResponse.json({
-      message: `Magic link sent to ${emailClean}! Please check your inbox.`,
+      message: `Login successful!`,
       email: emailClean,
       name: user.name,
       company: user.companyName,
-      magicLinkUrl,
+      magicLinkUrl: requirementUrl,
+      redirectUrl: requirementUrl,
     });
 
     response.cookies.set("zopa_user_email", emailClean, {

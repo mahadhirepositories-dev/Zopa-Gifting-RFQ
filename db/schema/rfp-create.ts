@@ -95,6 +95,7 @@ export const rfqBoqItems = pgTable("rfq_boq_items", {
   uom: varchar("uom", { length: 50 }),
   specification: json("specification").default({}),
   targetPrice: numeric("target_price"),
+  logoRequirement: varchar("logo_requirement", { length: 50 }).default("without_logo"),
   remarks: text("remarks"),
   isVisible: boolean("is_visible").default(true),
   lopPrice: numeric("lop_price"),
@@ -265,10 +266,10 @@ export const rfqDates = pgTable("rfq_dates", {
 });
 
 export const rfqApprovalStatus = {
-  DRAFT: "draft",
-  PENDING_APPROVAL: "pending_approval",
-  APPROVED: "approved",
-  REJECTED: "rejected",
-  REVISION_REQUESTED: "revision_requested",
-  SENT: "sent",
+  draft: "draft",
+  pending_approval: "pending_approval",
+  approved: "approved",
+  rejected: "rejected",
+  revision_requested: "revision_requested",
+  sent: "sent",
 } as const;

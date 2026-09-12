@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "dotenv";
 import { defineConfig } from "drizzle-kit";
 
 if (!process.env.DB_HOST || !process.env.DB_NAME || !process.env.DB_USER) {
@@ -7,7 +7,7 @@ if (!process.env.DB_HOST || !process.env.DB_NAME || !process.env.DB_USER) {
 
 export default defineConfig({
   schema: "./db/schema",
-  out: "./drizzle",
+  out: "./db/migrations",
   dialect: "postgresql",
   dbCredentials: {
     host: process.env.DB_HOST,
@@ -15,8 +15,11 @@ export default defineConfig({
     user: process.env.DB_USER || "postgres",
     password: process.env.DB_PASSWORD || "",
     database: process.env.DB_NAME,
-    ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
+    ssl:
+      process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
   },
   verbose: true,
   strict: true,
 });
+
+

@@ -222,9 +222,10 @@ const SearchableSelect = forwardRef<
                       <li
                         key={index}
                         className={cn(
-                          "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-blue-50 hover:text-blue-900 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-                          option === value &&
-                            "bg-blue-50 text-blue-900 font-medium",
+                          "relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-xs font-mono transition-colors my-0.5 mx-1",
+                          option === value
+                            ? "bg-blue-600 text-white font-bold shadow-xs"
+                            : "bg-slate-100 text-slate-900 hover:bg-blue-600 hover:text-white",
                         )}
                         onClick={() => handleOptionSelect(option)}
                       >

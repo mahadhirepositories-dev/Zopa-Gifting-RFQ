@@ -197,7 +197,7 @@ export default function RFQVendorPreviewPage({
     <div className="min-h-screen bg-slate-100/60 font-mono text-slate-800 text-xs flex flex-col">
       {/* Top Header Bar fixed at top */}
       <header className="bg-slate-100 border-b border-slate-200 fixed top-0 left-0 right-0 z-50 shadow-xs py-3 px-6 h-16">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 h-full">
+        <div className="p-6 flex flex-col md:flex-row items-center justify-between gap-4 h-full">
           {/* Left: Logo & Document Title */}
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 relative shrink-0 flex items-center justify-center bg-red-600 rounded-lg overflow-hidden text-white font-bold text-lg shadow-xs">
@@ -252,7 +252,7 @@ export default function RFQVendorPreviewPage({
       </header>
 
       {/* Main Container */}
-      <div className="max-w-7xl mx-auto px-4 pt-24 pb-24 flex-1 w-full grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="p-10 pt-24 pb-24 flex-1 w-full grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Left Column (3/4 Width) */}
         <div className="md:col-span-3 space-y-6">
           {/* Section 1: Company Introduction */}
@@ -275,7 +275,8 @@ export default function RFQVendorPreviewPage({
                     company.postalCode || "600014",
                   ].filter(Boolean).join(", ")}
                 </span>
-                , hereinafter referred to as &quot;Company&quot; which expression shall unless repugnant to the context or meaning thereof and include its administrators and successors in interest of the First Part.
+                , hereinafter referred to as &quot;Company&quot; 
+                {/* which expression shall unless repugnant to the context or meaning thereof and include its administrators and successors in interest of the First Part. */}
               </p>
               <p>
                 Company is in the business of{" "}
@@ -346,6 +347,7 @@ export default function RFQVendorPreviewPage({
                     <th className="p-2.5 border-r border-slate-200 text-center">QTY</th>
                     <th className="p-2.5 border-r border-slate-200 text-right">TARGET PRICE</th>
                     <th className="p-2.5 border-r border-slate-200">SPECIFICATION</th>
+                    <th className="p-2.5 border-r border-slate-200 text-center">LOGO REQUIRED</th>
                     <th className="p-2.5 border-r border-slate-200">REMARKS</th>
                     <th className="p-2.5 text-center">ATTACHMENTS</th>
                   </tr>
@@ -359,6 +361,7 @@ export default function RFQVendorPreviewPage({
                       <td className="p-2.5 border-r border-slate-200 text-center font-bold">20</td>
                       <td className="p-2.5 border-r border-slate-200 text-right font-bold">100</td>
                       <td className="p-2.5 border-r border-slate-200">testing</td>
+                      <td className="p-2.5 border-r border-slate-200 text-center font-bold text-xs uppercase text-slate-600">Without Logo</td>
                       <td className="p-2.5 border-r border-slate-200">testing</td>
                       <td className="p-2.5 text-center text-slate-400">-</td>
                     </tr>
@@ -371,6 +374,11 @@ export default function RFQVendorPreviewPage({
                         <td className="p-2.5 border-r border-slate-200 text-center font-bold">{item.qty || item.quantity || 1}</td>
                         <td className="p-2.5 border-r border-slate-200 text-right font-bold">{item.targetPrice || item.price || "0"}</td>
                         <td className="p-2.5 border-r border-slate-200">{typeof item.specification === "object" ? JSON.stringify(item.specification) : item.specification || "-"}</td>
+                        <td className="p-2.5 border-r border-slate-200 text-center">
+                          <span className={`inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase ${item.logoRequirement === "with_logo" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>
+                            {item.logoRequirement === "with_logo" ? "With Logo" : "Without Logo"}
+                          </span>
+                        </td>
                         <td className="p-2.5 border-r border-slate-200">{item.remarks || "-"}</td>
                         <td className="p-2.5 text-center">
                           {item.attachmentUrl ? (
@@ -468,7 +476,19 @@ export default function RFQVendorPreviewPage({
             <div className="bg-slate-50 border border-slate-200/60 p-3 rounded-lg space-y-1.5">
               <span className="font-bold text-slate-800 block">Delivery Locations:</span>
               <ul className="list-disc list-inside text-slate-700 pl-2">
-                <li>Surat, Gujarat</li>
+                {Array.isArray(generalTerms.deliveryLocations) && generalTerms.deliveryLocations.length > 0 ? (
+                  generalTerms.deliveryLocations.map((loc: any, idx: number) => (
+                    <li key={idx}>
+                      {typeof loc === "string"
+                        ? loc
+                        : loc?.name && loc?.state
+                        ? `${loc.name}, ${loc.state}`
+                        : loc?.name || loc?.label || String(loc)}
+                    </li>
+                  ))
+                ) : (
+                  <li>Surat, Gujarat</li>
+                )}
               </ul>
             </div>
 
@@ -543,14 +563,36 @@ export default function RFQVendorPreviewPage({
               Documents to Share
             </h2>
             <ul className="space-y-2">
-              <li className="flex items-center gap-2 text-slate-700">
-                <File className="w-4 h-4 text-blue-600 shrink-0" />
-                <span>Total installation base</span>
-              </li>
-              <li className="flex items-center gap-2 text-slate-700">
-                <File className="w-4 h-4 text-blue-600 shrink-0" />
-                <span>List of serviceable location</span>
-              </li>
+              {(() => {
+                const docsRaw = documentsToShare?.documentsToShare || documentsToShare;
+                const docsList: string[] = Array.isArray(docsRaw)
+                  ? docsRaw.map((d: any) => (typeof d === "string" ? d : d.name || d.label || String(d)))
+                  : typeof docsRaw === "string" && docsRaw.trim()
+                  ? [docsRaw]
+                  : [];
+
+                if (docsList.length === 0) {
+                  return (
+                    <>
+                      <li className="flex items-center gap-2 text-slate-700">
+                        <File className="w-4 h-4 text-blue-600 shrink-0" />
+                        <span>Total installation base</span>
+                      </li>
+                      <li className="flex items-center gap-2 text-slate-700">
+                        <File className="w-4 h-4 text-blue-600 shrink-0" />
+                        <span>List of serviceable location</span>
+                      </li>
+                    </>
+                  );
+                }
+
+                return docsList.map((docName: string, idx: number) => (
+                  <li key={idx} className="flex items-center gap-2 text-slate-700">
+                    <File className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>{docName}</span>
+                  </li>
+                ));
+              })()}
             </ul>
           </div>
 
@@ -563,7 +605,8 @@ export default function RFQVendorPreviewPage({
               Vendor Selection Methods
             </h2>
             <p className="text-slate-700">
-              <strong className="font-bold text-slate-900">Methods:</strong> Quality-Based Selection
+              <strong className="font-bold text-slate-900">Methods:</strong>{" "}
+              {vendors.selectionMethod || "Quality-Based Selection"}
             </p>
           </div>
         </div>

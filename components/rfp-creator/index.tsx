@@ -158,7 +158,7 @@ export const MainContent: React.FC<MainContentProps> = ({
     [rfpId],
   );
 
-  const flushPendingSave = React.useCallback(() => {
+  const flushPendingSave = React.useCallback(async () => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
@@ -167,10 +167,26 @@ export const MainContent: React.FC<MainContentProps> = ({
     if (Object.keys(payload).length > 0) {
       const payloadStr = JSON.stringify(payload);
       if (lastSavedPayloadMapRef.current[currentSection] !== payloadStr) {
-        saveSectionData(currentSection, payload);
+        await saveSectionData(currentSection, payload);
       }
     }
   }, [currentSection, formData, selection, saveSectionData]);
+
+  // Track section transitions to auto-save previous section when user leaves it
+  const prevSectionRef = React.useRef(currentSection);
+
+  React.useEffect(() => {
+    if (prevSectionRef.current !== currentSection) {
+      const prevSec = prevSectionRef.current;
+      prevSectionRef.current = currentSection;
+      if (rfpId) {
+        const payload = getSectionPayload(prevSec, formData, selection);
+        if (Object.keys(payload).length > 0) {
+          saveSectionData(prevSec, payload);
+        }
+      }
+    }
+  }, [currentSection, rfpId, formData, selection, saveSectionData]);
 
   React.useEffect(() => {
     if (!rfpId) return;
@@ -200,7 +216,7 @@ export const MainContent: React.FC<MainContentProps> = ({
 
     debounceTimerRef.current = setTimeout(() => {
       saveSectionData(currentSection, currentPayload);
-    }, 1000);
+    }, 800);
 
     return () => {
       if (debounceTimerRef.current) {
@@ -211,7 +227,7 @@ export const MainContent: React.FC<MainContentProps> = ({
 
   const handleClick = async (type: "previous" | "next") => {
     if (rfpId) {
-      flushPendingSave();
+      await flushPendingSave();
     }
 
     const currentIndex = sectionsOrder.indexOf(currentSection);

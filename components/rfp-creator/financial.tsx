@@ -467,7 +467,7 @@ export const Financials = forwardRef<FinancialsHandle, FinancialsProps>(
         </div>
 
         {/* Performance Bank Guarantee (PBG) Section */}
-        <div className="mb-8 space-y-3">
+        {/* <div className="mb-8 space-y-3">
           <h3 className="text-lg font-bold text-slate-900">
             Performance Bank Guarantee (PBG)
           </h3>
@@ -509,7 +509,7 @@ export const Financials = forwardRef<FinancialsHandle, FinancialsProps>(
               />
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Additional Financial Notes Section */}
         <div className="mb-6 space-y-2">

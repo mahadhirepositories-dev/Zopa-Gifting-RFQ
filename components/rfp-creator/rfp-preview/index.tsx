@@ -97,23 +97,26 @@ const updateRfpStatus = async (
       throw new Error("Empty response received from server");
     }
 
+    let jsonData: any = null;
     try {
-      const jsonData = JSON.parse(text);
-      if (!response.ok) {
-        throw new Error(
-          jsonData.error || jsonData.message || "Failed to update RFQ data",
-        );
-      }
-      return {
-        success: true,
-        message: "RFQ updated successfully",
-        rfpId: jsonData.rfpId,
-        data: jsonData.data,
-      };
+      jsonData = JSON.parse(text);
     } catch (parseError) {
-      console.error("Error parsing JSON response:", parseError);
-      throw new Error("Invalid response from server");
+      console.error("Error parsing JSON response:", parseError, text);
+      throw new Error("Invalid JSON response from server");
     }
+
+    if (!response.ok) {
+      throw new Error(
+        jsonData?.error || jsonData?.message || `Server error (${response.status})`,
+      );
+    }
+
+    return {
+      success: true,
+      message: "RFQ updated successfully",
+      rfpId: jsonData.rfpId,
+      data: jsonData.data,
+    };
   } catch (error: any) {
     console.error("Error updating RFQ data:", error);
     return {
@@ -321,7 +324,12 @@ export const Preview: React.FC<PreviewProps> = ({
       [],
     contact: data?.contact || {},
     vendors: data?.vendors || {},
-    vendorContacts: data?.vendorContacts || [],
+    vendorContacts:
+      (Array.isArray(data?.vendorContacts) && data.vendorContacts.length > 0
+        ? data.vendorContacts
+        : Array.isArray(data?.vendorcontacts) && data.vendorcontacts.length > 0
+        ? data.vendorcontacts
+        : safeDataRef.current?.vendorContacts) || [],
     rfpDates: data?.rfpDates || {},
     logo: data?.contact?.logo || null,
   };
@@ -710,7 +718,17 @@ export const Preview: React.FC<PreviewProps> = ({
         [],
       rfpDates:
         data?.rfpDates || data?.dates || safeDataRef.current?.rfpDates || {},
+      dates:
+        data?.rfpDates || data?.dates || safeDataRef.current?.rfpDates || {},
     };
+
+    if (
+      data?.rfpsData?.status === "Submitted" ||
+      data?.status === "Submitted" ||
+      submissionStatus === "success"
+    ) {
+      return [];
+    }
 
     const sections: SectionStatus[] = [];
 
@@ -779,11 +797,7 @@ export const Preview: React.FC<PreviewProps> = ({
         name: "7. GENERAL TERMS & CONDITIONS",
         id: "generalTerms",
         isComplete: Boolean(
-          sData.generalTerms &&
-          (sData.generalTerms.selectedTerms?.length > 0 ||
-            (Array.isArray(sData.generalTerms) &&
-              sData.generalTerms.length > 0) ||
-            sData.generalTerms.deliveryTimeValue),
+          sData.generalTerms && typeof sData.generalTerms === "object",
         ),
       },
       {
@@ -794,62 +808,27 @@ export const Preview: React.FC<PreviewProps> = ({
       {
         name: "9. DOCUMENTS TO SHARE",
         id: "documents",
-        isComplete: (() => {
-          const checkDocs = (docData: any): boolean => {
-            if (!docData) return false;
-            let raw = docData;
-            if (
-              typeof raw === "object" &&
-              !Array.isArray(raw) &&
-              raw !== null
-            ) {
-              if (raw.documentsToShare !== undefined)
-                raw = raw.documentsToShare;
-              else if (raw.documents !== undefined) raw = raw.documents;
-            }
-            if (typeof raw === "string") {
-              const trimmed = raw.trim();
-              if (
-                !trimmed ||
-                trimmed === "[]" ||
-                trimmed === "{}" ||
-                trimmed === "null"
-              )
-                return false;
-              try {
-                const parsed = JSON.parse(trimmed);
-                return checkDocs(parsed);
-              } catch {
-                return true;
-              }
-            }
-            if (Array.isArray(raw)) {
-              return raw.length > 0;
-            }
-            return Boolean(raw);
-          };
-          return checkDocs(sData.documents);
-        })(),
+        isComplete: true,
       },
       {
         name: "10. ADD VENDORS",
         id: "vendorcontacts",
         isComplete:
-          Array.isArray(sData.vendorContacts) &&
-          sData.vendorContacts.length > 0,
+          (Array.isArray(sData.vendorContacts) && sData.vendorContacts.length > 0) ||
+          (Array.isArray(data?.vendorcontacts) && data.vendorcontacts.length > 0),
       },
       {
         name: "11. RFQ START AND END DATE",
         id: "dates",
         isComplete: Boolean(
-          sData.rfpDates &&
-          (sData.rfpDates.startDate || sData.rfpDates.endDate),
+          (sData.rfpDates && (sData.rfpDates.startDate || sData.rfpDates.endDate)) ||
+          (sData.dates && (sData.dates.startDate || sData.dates.endDate)),
         ),
       },
     );
 
     return sections.filter((s) => !s.isComplete);
-  }, [data, loggedIn]);
+  }, [data, loggedIn, submissionStatus]);
 
   useEffect(() => {
     const incomplete = getIncompleteSections();

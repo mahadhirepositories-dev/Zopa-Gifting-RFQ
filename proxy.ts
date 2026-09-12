@@ -121,26 +121,6 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // 7. Redirect Authenticated Users visiting homepage or login page directly to Category step
-  const forceClear =
-    request.nextUrl.searchParams.has("clear") ||
-    request.nextUrl.searchParams.has("logout");
-
-  if (
-    !forceClear &&
-    isAuthenticated &&
-    (pathname === "/" || pathname === "/login")
-  ) {
-    const callbackUrl = request.nextUrl.searchParams.get("callbackUrl");
-    if (callbackUrl && callbackUrl.startsWith("/") && callbackUrl !== "/") {
-      return NextResponse.redirect(new URL(callbackUrl, request.url));
-    }
-    const defaultRfpId = "09ed3409-08c3-4af6-96e8-3ea87eb451cf";
-    return NextResponse.redirect(
-      new URL(`/rfq/${defaultRfpId}/requirement`, request.url),
-    );
-  }
-
   // 8. Forward request with tracking and security headers
   const response = NextResponse.next();
   response.headers.set("X-Request-ID", requestId);

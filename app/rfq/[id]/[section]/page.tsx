@@ -61,9 +61,14 @@ function RfpCreatorPage({
   );
   const [rfpId] = useState<string | null>(initialRfpId || null);
   const [rfpStatus, setRfpStatus] = useState<RFPStatus | null>(null);
-  const [currentSection, setCurrentSection] = useState<string>("category");
+  const [currentSection, setCurrentSection] = useState<string>("requirement");
   const [isLoading, setIsLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const [storedOrgSlug, setStoredOrgSlug] = useState<string | undefined>(
     orgSlug,
   );
@@ -235,7 +240,7 @@ function RfpCreatorPage({
         "zopa_user_email=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
       document.cookie =
         "zopa_user_name=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
-      window.location.href = "/?clear=1";
+      window.location.href = "/";
     }
   }, [authLoading, isLoggedIn]);
 
@@ -257,7 +262,7 @@ function RfpCreatorPage({
               "__Secure-better-auth.session_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
             document.cookie =
               "zopa_user_email=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
-            window.location.href = "/?clear=1";
+            window.location.href = "/";
           }
           return;
         }
@@ -298,15 +303,71 @@ function RfpCreatorPage({
           setRfpStatus(status);
           const rawDocs = rfpData.documents || rfpData.documentsToShare;
           let docsValue = rawDocs;
-          if (typeof rawDocs === "object" && rawDocs !== null && !Array.isArray(rawDocs) && rawDocs.documentsToShare !== undefined) {
+          if (
+            typeof rawDocs === "object" &&
+            rawDocs !== null &&
+            !Array.isArray(rawDocs) &&
+            rawDocs.documentsToShare !== undefined
+          ) {
             docsValue = rawDocs.documentsToShare;
           }
           setFormData((prev: any) => ({
             ...prev,
             ...rfpData,
+            requirement: rfpData.requirement || { projectName: "", purpose: "" },
+            scope: rfpData.scope || { deliverables: [] },
+            boq: rfpData.boq || [],
+            evaluationCriteria: rfpData.evaluationCriteria || [],
+            financials: rfpData.financials || {
+              budgetMin: "",
+              budgetMax: "",
+              budgetType: "",
+              currency: "",
+              financialNotes: "",
+              paymentTerm: "",
+              paymentTerms: "",
+              pbg: "",
+              pricingModel: "",
+              pbgAmount: "",
+              pbgNotes: "",
+            },
+            generalTerms: rfpData.generalTerms || {
+              selectedTerms: [],
+              deliveryTimeValue: undefined,
+              deliveryTimeUnit: "days",
+              deliveryLocations: [],
+            },
+            specialTerms: rfpData.specialTerms || { generalTerms: "" },
             documentsToShare: docsValue
               ? { documentsToShare: docsValue }
-              : prev.documentsToShare,
+              : { documentsToShare: [] },
+            contact: rfpData.contact || {
+              contactName: "",
+              contactTitle: "",
+              contactAddressLine1: "",
+              contactAddressLine2: "",
+              contactCity: "",
+              contactState: "",
+              contactPostalCode: "",
+              contactCountry: "",
+              contactDepartment: "",
+              contactEmail: "",
+              contactPhone: "",
+              contactPhoneCountry: "+1",
+              logodata: null,
+              logoPath: null,
+              logoMimeType: null,
+              logoUrl: null,
+            },
+            vendors: rfpData.vendors || {
+              selectionMethod: "",
+              vendorRequirements: [],
+              vendorSelectionProcess: "",
+              additionalRequirements: "",
+            },
+            vendorContacts: rfpData.vendorContacts || rfpData.vendorcontacts || [],
+            vendorcontacts: rfpData.vendorContacts || rfpData.vendorcontacts || [],
+            rfpDates: rfpData.rfpDates || rfpData.dates || { startDate: "", endDate: "" },
           }));
           if (rfpData.organization?.slug && !storedOrgSlug) {
             setStoredOrgSlug(rfpData.organization.slug);
@@ -321,14 +382,32 @@ function RfpCreatorPage({
 
           setCurrentSection(targetSection);
           const activeRfpId = rfpData.rfpId || rfpId;
-          if (activeRfpId && (urlSection !== targetSection || activeRfpId !== rfpId)) {
+          if (
+            activeRfpId &&
+            (urlSection !== targetSection || activeRfpId !== rfpId)
+          ) {
             const newPath = `/rfq/${activeRfpId}/${targetSection}`;
-            if (typeof window !== "undefined" && window.location.pathname !== newPath) {
+            if (
+              typeof window !== "undefined" &&
+              window.location.pathname !== newPath
+            ) {
               window.history.pushState({}, "", newPath);
             }
           }
         } else {
           console.warn("Failed to fetch RFP data:", response.status);
+          if (response.status === 401 || response.status === 403) {
+            document.cookie =
+              "better-auth.session_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+            document.cookie =
+              "__Secure-better-auth.session_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+            document.cookie =
+              "zopa_user_email=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+            document.cookie =
+              "zopa_user_name=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+            window.location.href = "/";
+            return;
+          }
           if (isMounted) {
             hasInitializedRef.current = true;
           }
@@ -396,18 +475,15 @@ function RfpCreatorPage({
     );
   }
 
-  const [isMounted, setIsMounted] = useState(false);
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
   if (!isMounted || authLoading || isLoading || !isLoggedIn) {
     return (
       <div className="flex items-center justify-center h-screen w-full bg-slate-50">
         <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div>
           <span className="text-sm font-medium text-slate-600">
-            {!isLoggedIn && isMounted ? "Redirecting to Home..." : "Loading RFP..."}
+            {!isLoggedIn && isMounted
+              ? "Redirecting to Home..."
+              : "Loading RFP..."}
           </span>
         </div>
       </div>

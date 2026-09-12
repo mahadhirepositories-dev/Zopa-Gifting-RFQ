@@ -132,7 +132,13 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
     }
     if (activeSection === "boq") {
       const isValid = boqRef.current?.validate() ?? true;
-      if (!isValid) return;
+      if (!isValid) {
+        setErrors((prev: any) => ({
+          ...prev,
+          boq: "Please add at least one BOQ item before proceeding.",
+        }));
+        return;
+      }
     }
     if (activeSection === "evaluation") {
       const isValid = evaluationRef.current?.validate() ?? true;
@@ -248,6 +254,7 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
             disabled={isFormDisabled}
             isLoggedIn={isLoggedIn}
             orgSlug={orgSlug}
+            companyName={formData.company?.name}
           />
         )}
 
@@ -278,7 +285,16 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
           <BOQ
             ref={boqRef}
             data={formData.boq || []}
-            onChange={handleBOQChange}
+            onChange={(boqItems) => {
+              handleBOQChange(boqItems);
+              if (boqItems && boqItems.length > 0) {
+                setErrors((prev: any) => {
+                  const newErrs = { ...prev };
+                  delete newErrs.boq;
+                  return newErrs;
+                });
+              }
+            }}
             errors={errors}
             disabled={isFormDisabled}
             secondaryQuestionId={0}
