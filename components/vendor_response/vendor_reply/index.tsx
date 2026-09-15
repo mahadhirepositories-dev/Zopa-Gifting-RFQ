@@ -56,13 +56,13 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
     Record<number, { message: ReactNode; valid?: boolean; selected?: boolean }>
   >({});
   const [expandedSpecs, setExpandedSpecs] = useState<Record<number, boolean>>(
-    {}
+    {},
   );
   const [revisionNumber, setRevisionNumber] = useState(0);
   const [fieldsDisabled, setFieldsDisabled] = useState(false);
 
   const [vendorBoqAttachments, setVendorBoqAttachments] = useState<
-    Record<number, { url: string; name: string } | null>
+    Record<string, { url: string; name: string }[]>
   >({});
 
   const {
@@ -99,62 +99,168 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
   const [calculationTrigger, setCalculationTrigger] = useState(0);
 
   const handleBoqAttachmentUpload = useCallback(
-    async (index: number, file: File) => {
+    async (
+      groupIndex: number,
+      subItemIndex: number,
+      files: FileList | File[]
+    ) => {
       try {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("type", "boq");
+        const fileArray = Array.from(files);
+        if (fileArray.length === 0) return;
 
-        const res = await fetch("/api/vendor-upload", {
-          method: "POST",
-          body: formData,
-        });
+        const newUploadedFiles: { url: string; name: string }[] = [];
 
-        if (res.ok) {
-          const { url } = await res.json();
-          setVendorBoqAttachments((prev) => ({
-            ...prev,
-            [index]: { url, name: file.name },
-          }));
-          setValue(`boqDetails.${index}.vendorAttachmentUrl` as any, url);
+        for (const file of fileArray) {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("type", "boq");
+
+          const res = await fetch("/api/vendor-upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (res.ok) {
+            const { url } = await res.json();
+            newUploadedFiles.push({ url, name: file.name });
+          }
+        }
+
+        if (newUploadedFiles.length > 0) {
+          const key = `${groupIndex}_${subItemIndex}`;
+          let updatedList: { url: string; name: string }[] = [];
+
+          setVendorBoqAttachments((prev) => {
+            const current = prev[key] || [];
+            updatedList = [...current, ...newUploadedFiles];
+            return {
+              ...prev,
+              [key]: updatedList,
+            };
+          });
+
+          const currentFormAtts =
+            getValues(
+              `boqDetails.${groupIndex}.items.${subItemIndex}.vendorAttachments` as any
+            ) || [];
+          const combinedFormAtts = [...currentFormAtts, ...newUploadedFiles];
+
           setValue(
-            `boqDetails.${index}.vendorAttachmentName` as any,
-            file.name
+            `boqDetails.${groupIndex}.items.${subItemIndex}.vendorAttachments` as any,
+            combinedFormAtts
           );
-          toast.success(`Attachment uploaded for item ${index + 1}`);
-        } else {
-          toast.error("Failed to upload attachment");
+          setValue(
+            `boqDetails.${groupIndex}.items.${subItemIndex}.vendorAttachmentUrl` as any,
+            combinedFormAtts[0]?.url || ""
+          );
+          setValue(
+            `boqDetails.${groupIndex}.items.${subItemIndex}.vendorAttachmentName` as any,
+            combinedFormAtts[0]?.name || ""
+          );
+
+          toast.success(
+            `${newUploadedFiles.length} file(s) uploaded for item ${
+              subItemIndex + 1
+            }`
+          );
         }
       } catch {
         toast.error("Upload error");
       }
     },
-    [setValue]
+    [getValues, setValue]
   );
 
   const handleBoqAttachmentRemove = useCallback(
-    (index: number) => {
-      setVendorBoqAttachments((prev) => ({ ...prev, [index]: null }));
-      setValue(`boqDetails.${index}.vendorAttachmentUrl` as any, "");
-      setValue(`boqDetails.${index}.vendorAttachmentName` as any, "");
+    (groupIndex: number, subItemIndex: number, fileIndex: number) => {
+      const key = `${groupIndex}_${subItemIndex}`;
+      let updatedList: { url: string; name: string }[] = [];
+
+      setVendorBoqAttachments((prev) => {
+        const current = prev[key] || [];
+        updatedList = current.filter((_, idx) => idx !== fileIndex);
+        return {
+          ...prev,
+          [key]: updatedList,
+        };
+      });
+
+      setValue(
+        `boqDetails.${groupIndex}.items.${subItemIndex}.vendorAttachments` as any,
+        updatedList
+      );
+      setValue(
+        `boqDetails.${groupIndex}.items.${subItemIndex}.vendorAttachmentUrl` as any,
+        updatedList[0]?.url || ""
+      );
+      setValue(
+        `boqDetails.${groupIndex}.items.${subItemIndex}.vendorAttachmentName` as any,
+        updatedList[0]?.name || ""
+      );
     },
     [setValue]
   );
 
+  const handleAddSubItem = useCallback(
+    (groupIndex: number) => {
+      const currentGroups = getValues("boqDetails") || [];
+      const targetGroup = currentGroups[groupIndex] || { items: [] };
+      const currentItems = targetGroup.items || [];
+      const newItem = {
+        id: `sub_${Date.now()}_${currentItems.length}`,
+        itemName: "",
+        quotePrice: 0,
+        gst: 0,
+        make: "",
+        model: "",
+        compliance: "Complied",
+        remarks: "",
+        vendorAttachmentUrl: "",
+        vendorAttachmentName: "",
+      };
+      const updatedItems = [...currentItems, newItem];
+      setValue(`boqDetails.${groupIndex}.items`, updatedItems, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      setCalculationTrigger((prev) => prev + 1);
+    },
+    [getValues, setValue],
+  );
+
+  const handleRemoveSubItem = useCallback(
+    (groupIndex: number, subItemIndex: number) => {
+      const currentGroups = getValues("boqDetails") || [];
+      const targetGroup = currentGroups[groupIndex] || { items: [] };
+      const currentItems = targetGroup.items || [];
+      if (currentItems.length <= 1) return;
+      const updatedItems = currentItems.filter(
+        (_, idx) => idx !== subItemIndex
+      );
+      setValue(`boqDetails.${groupIndex}.items`, updatedItems, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      setCalculationTrigger((prev) => prev + 1);
+    },
+    [getValues, setValue],
+  );
+
   const boqList = buyerData?.boq || buyerData?.rfpBoqItems || [];
 
-  const calculateItemTotal = useCallback(
-    (index: number) => {
-      const buyerItem = boqList[index];
-      const formItem = watchBoqDetails?.[index];
+  const calculateSubItemTotal = useCallback(
+    (groupIndex: number, subItemIndex: number) => {
+      const buyerItem = boqList[groupIndex];
+      const formGroup = watchBoqDetails?.[groupIndex];
+      const formSubItem = formGroup?.items?.[subItemIndex];
 
-      if (!buyerItem || !formItem) {
+      if (!buyerItem || !formSubItem) {
         return { itemTotal: 0, itemGST: 0, grandTotal: 0, gstPercentage: 0 };
       }
 
       const qty = parseFloat(buyerItem.qty || buyerItem.quantity || "0");
-      const quotePrice = parseFloat(formItem.quotePrice?.toString() || "0");
-      const gstPercentage = parseFloat(formItem.gst?.toString() || "0");
+      const quotePrice = parseFloat(formSubItem.quotePrice?.toString() || "0");
+      const gstPercentage = parseFloat(formSubItem.gst?.toString() || "0");
 
       const itemTotal = qty * quotePrice;
       const itemGST = itemTotal * (gstPercentage / 100);
@@ -167,51 +273,57 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
         gstPercentage: isNaN(gstPercentage) ? 0 : gstPercentage,
       };
     },
-    [boqList, watchBoqDetails, calculationTrigger]
+    [boqList, watchBoqDetails, calculationTrigger],
   );
 
-  const itemTotals = useMemo(() => {
-    if (!boqList.length || !watchBoqDetails) return [];
-    return boqList.map((_: any, index: number) => calculateItemTotal(index));
-  }, [boqList, watchBoqDetails, calculateItemTotal, calculationTrigger]);
-
   const calculateOverallTotals = useCallback(() => {
-    if (!itemTotals || itemTotals.length === 0) {
+    if (!boqList.length || !watchBoqDetails) {
       return { subTotal: 0, totalGST: 0, grandTotal: 0 };
     }
-    return itemTotals.reduce(
-      (
-        totals: { subTotal: any; totalGST: any; grandTotal: any },
-        item: { itemTotal: any; itemGST: any; grandTotal: any }
-      ) => ({
-        subTotal: totals.subTotal + (item.itemTotal || 0),
-        totalGST: totals.totalGST + (item.itemGST || 0),
-        grandTotal: totals.grandTotal + (item.grandTotal || 0),
-      }),
-      { subTotal: 0, totalGST: 0, grandTotal: 0 }
-    );
-  }, [itemTotals]);
+    let subTotal = 0;
+    let totalGST = 0;
+    let grandTotal = 0;
+
+    boqList.forEach((_: any, groupIndex: number) => {
+      const items = watchBoqDetails[groupIndex]?.items || [];
+      items.forEach((_: any, subItemIndex: number) => {
+        const totals = calculateSubItemTotal(groupIndex, subItemIndex);
+        subTotal += totals.itemTotal;
+        totalGST += totals.itemGST;
+        grandTotal += totals.grandTotal;
+      });
+    });
+
+    return { subTotal, totalGST, grandTotal };
+  }, [boqList, watchBoqDetails, calculateSubItemTotal]);
 
   const overallTotals = useMemo(
     () => calculateOverallTotals(),
-    [calculateOverallTotals]
+    [calculateOverallTotals],
   );
 
   const getGSTMessage = () => {
     const boqDetails = watch("boqDetails") || [];
     if (boqDetails.length === 0) return null;
-    const zeroGSTItems = boqDetails.filter((item) => item?.gst === 0);
-    const totalItems = boqDetails.length;
-    if (zeroGSTItems.length === 0) return null;
-    if (zeroGSTItems.length === totalItems)
-      return "You're proceeding with 0% GST";
-    return "You're proceeding with 0% GST for one of your BOQ items";
+    let zeroCount = 0;
+    let totalCount = 0;
+    boqDetails.forEach((group) => {
+      const items = group?.items || [];
+      items.forEach((sub) => {
+        totalCount++;
+        if (sub?.gst === 0) zeroCount++;
+      });
+    });
+    if (totalCount === 0 || zeroCount === 0) return null;
+    if (zeroCount === totalCount) return "You're proceeding with 0% GST";
+    return "You're proceeding with 0% GST for one or more of your BOQ items";
   };
 
   const [hasSubmittedPast, setHasSubmittedPast] = useState(false);
   const [revisionsList, setRevisionsList] = useState<any[]>([]);
   const [latestRevisionNumber, setLatestRevisionNumber] = useState<number>(0);
-  const [selectedRevisionNumber, setSelectedRevisionNumber] = useState<number>(0);
+  const [selectedRevisionNumber, setSelectedRevisionNumber] =
+    useState<number>(0);
 
   const loadRevisionData = useCallback(
     async (targetRevNum?: number) => {
@@ -254,7 +366,10 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
             setLogoPreview(respData.companyInfo.logoUrl);
           }
           if (respData.companyInfo.phone) {
-            setContact((prev) => ({ ...prev, mobileNo: respData.companyInfo.phone }));
+            setContact((prev) => ({
+              ...prev,
+              mobileNo: respData.companyInfo.phone,
+            }));
           }
         }
         if (respData?.scopeAgreement) {
@@ -284,37 +399,117 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
         if (respData?.specialNote) {
           setValue("otherInformation.warranty", respData.specialNote);
         }
-        if (respData?.boqQuotes) {
+        if (respData?.boqQuotes || respData?.boqDetails) {
+          const boqSource = respData.boqQuotes || respData.boqDetails;
+          const initialAttachmentMap: Record<
+            string,
+            { url: string; name: string }[]
+          > = {};
+
           const boqArray = boqList.map((item: any, idx: number) => {
             const key = item.id || `boq_${idx}`;
-            const q = Array.isArray(respData.boqQuotes)
-              ? respData.boqQuotes[idx] || {}
-              : respData.boqQuotes[key] || {};
+            const storedData = Array.isArray(boqSource)
+              ? boqSource[idx] || {}
+              : boqSource[key] || {};
+
+            let subItemsList: any[] = [];
+
+            if (
+              Array.isArray(storedData?.items) &&
+              storedData.items.length > 0
+            ) {
+              subItemsList = storedData.items.map(
+                (sub: any, subIdx: number) => {
+                  let atts: { url: string; name: string }[] = [];
+                  if (
+                    Array.isArray(sub.vendorAttachments) &&
+                    sub.vendorAttachments.length > 0
+                  ) {
+                    atts = sub.vendorAttachments;
+                  } else if (sub.vendorAttachmentUrl) {
+                    atts = [
+                      {
+                        url: sub.vendorAttachmentUrl,
+                        name: sub.vendorAttachmentName || "Attachment",
+                      },
+                    ];
+                  }
+
+                  if (atts.length > 0) {
+                    initialAttachmentMap[`${idx}_${subIdx}`] = atts;
+                  }
+
+                  return {
+                    id: sub.id || `sub_${idx}_${subIdx}`,
+                    itemName: sub.itemName || sub.name || "",
+                    quotePrice: parseFloat(sub.quotePrice || sub.price) || 0,
+                    gst: parseFloat(sub.gstPercent || sub.gst) || 0,
+                    make: sub.make || "",
+                    model: sub.model || "",
+                    compliance: sub.compliance || "Complied",
+                    remarks: sub.remarks || "",
+                    vendorAttachmentUrl: atts[0]?.url || "",
+                    vendorAttachmentName: atts[0]?.name || "",
+                    vendorAttachments: atts,
+                  };
+                }
+              );
+            } else {
+              let atts: { url: string; name: string }[] = [];
+              if (
+                Array.isArray(storedData.vendorAttachments) &&
+                storedData.vendorAttachments.length > 0
+              ) {
+                atts = storedData.vendorAttachments;
+              } else if (storedData.vendorAttachmentUrl) {
+                atts = [
+                  {
+                    url: storedData.vendorAttachmentUrl,
+                    name: storedData.vendorAttachmentName || "Attachment",
+                  },
+                ];
+              }
+
+              if (atts.length > 0) {
+                initialAttachmentMap[`${idx}_0`] = atts;
+              }
+
+              subItemsList = [
+                {
+                  id: `sub_${idx}_0`,
+                  itemName: storedData.itemName || "",
+                  quotePrice:
+                    parseFloat(storedData.quotePrice || storedData.price) || 0,
+                  gst: parseFloat(storedData.gstPercent || storedData.gst) || 0,
+                  make: storedData.make || "",
+                  model: storedData.model || "",
+                  compliance: storedData.compliance || "Complied",
+                  remarks: storedData.remarks || "",
+                  vendorAttachmentUrl: atts[0]?.url || "",
+                  vendorAttachmentName: atts[0]?.name || "",
+                  vendorAttachments: atts,
+                },
+              ];
+            }
+
             return {
               description: item.description || "",
               uom: item.uom || "EA",
               qty: parseFloat(item.qty || item.quantity) || 1,
               targetPrice: parseFloat(item.targetPrice) || 0,
-              quotePrice: parseFloat(q.quotePrice || q.price) || 0,
-              make: q.make || "",
-              model: q.model || "",
               specification: item.specification || "",
-              productDetails: q.productDetails || "",
-              compliance: q.compliance || "Complied",
-              remarks: q.remarks || "",
-              gst: parseFloat(q.gstPercent || q.gst) || 0,
-              deviation: q.deviation || "",
-              vendorAttachmentUrl: q.vendorAttachmentUrl || "",
-              vendorAttachmentName: q.vendorAttachmentName || "",
+              items: subItemsList,
             };
           });
+
+          setVendorBoqAttachments(initialAttachmentMap);
           setValue("boqDetails", boqArray);
         }
       } catch (err) {
         console.error("Error loading vendor response data:", err);
       }
     },
-    [vendorResponseId, rfpId, boqList, setValue]
+    [vendorResponseId, rfpId, boqList, setValue],
   );
 
   useEffect(() => {
@@ -322,26 +517,35 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
   }, [loadRevisionData]);
 
   const displayRevisionNumber =
-    !isSubmitted && hasSubmittedPast ? latestRevisionNumber + 1 : selectedRevisionNumber;
+    !isSubmitted && hasSubmittedPast
+      ? latestRevisionNumber + 1
+      : selectedRevisionNumber;
 
   useEffect(() => {
-    if (boqList.length > 0 && (!watchBoqDetails || watchBoqDetails.length === 0)) {
-      const initialBoqDetails = boqList.map((item: any) => ({
+    if (
+      boqList.length > 0 &&
+      (!watchBoqDetails || watchBoqDetails.length === 0)
+    ) {
+      const initialBoqDetails = boqList.map((item: any, idx: number) => ({
         description: item.description || "",
         uom: item.uom || "Nos",
         qty: parseFloat(item.qty || item.quantity) || 1,
         targetPrice: parseFloat(item.targetPrice) || 0,
-        quotePrice: 0,
-        make: "",
-        model: "",
         specification: item.specification || "",
-        productDetails: "",
-        compliance: "Complied",
-        remarks: "",
-        gst: 0,
-        deviation: "",
-        vendorAttachmentUrl: "",
-        vendorAttachmentName: "",
+        items: [
+          {
+            id: `sub_${idx}_0`,
+            itemName: "",
+            quotePrice: 0,
+            gst: 0,
+            make: "",
+            model: "",
+            compliance: "Complied",
+            remarks: "",
+            vendorAttachmentUrl: "",
+            vendorAttachmentName: "",
+          },
+        ],
       }));
       setValue("boqDetails", initialBoqDetails);
     }
@@ -358,7 +562,7 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
       "Kolkata, West Bengal",
       "Pune, Maharashtra",
     ],
-    []
+    [],
   );
 
   useEffect(() => {
@@ -377,7 +581,7 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
         for (const state of allStates) {
           const stateCities = City.getCitiesOfState(
             india.isoCode,
-            state.isoCode
+            state.isoCode,
           );
           stateCities.forEach((city) => {
             allCityOptions.push({
@@ -398,11 +602,19 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
   }, []);
 
   const requiredDocuments = useMemo(() => {
-    const docs = buyerData?.documentsToShare?.documentsToShare || buyerData?.documentsToShare;
-    if (Array.isArray(docs)) return docs.map((d: any) => typeof d === "object" ? d.name || d.id : String(d));
+    const docs =
+      buyerData?.documentsToShare?.documentsToShare ||
+      buyerData?.documentsToShare;
+    if (Array.isArray(docs))
+      return docs.map((d: any) =>
+        typeof d === "object" ? d.name || d.id : String(d),
+      );
     if (typeof docs === "string")
       return docs.split(",").map((d: string) => d.trim());
-    return ["Pan Card / Registration Certificate", "ISO / Compliance Certificate"];
+    return [
+      "Pan Card / Registration Certificate",
+      "ISO / Compliance Certificate",
+    ];
   }, [buyerData]);
 
   const safeParseFloat = (value: any): number => {
@@ -452,7 +664,7 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
   const handleDocumentFileChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     documentIndex: number,
-    documentName: string
+    documentName: string,
   ) => {
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files);
@@ -468,7 +680,7 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
 
   const removeDocumentAttachment = (
     documentIndex: number,
-    fileIndex: number
+    fileIndex: number,
   ) => {
     const currentFiles = getValues(`attachments.${documentIndex}.files`);
     const updatedFiles = Array.isArray(currentFiles)
@@ -517,15 +729,13 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
   };
 
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [pendingFormData, setPendingFormData] = useState<VendorReplyFormData | null>(null);
+  const [pendingFormData, setPendingFormData] =
+    useState<VendorReplyFormData | null>(null);
 
-  const prepareSubmit = useCallback(
-    (data: VendorReplyFormData) => {
-      setPendingFormData(data);
-      setShowConfirmation(true);
-    },
-    []
-  );
+  const prepareSubmit = useCallback((data: VendorReplyFormData) => {
+    setPendingFormData(data);
+    setShowConfirmation(true);
+  }, []);
 
   const handleConfirmedSubmit = useCallback(async () => {
     if (!pendingFormData) return;
@@ -535,16 +745,38 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
       const boqQuotesMap: Record<string, any> = {};
       boqList.forEach((item: any, idx: number) => {
         const key = item.id || `boq_${idx}`;
-        const formItem = data.boqDetails?.[idx] || {};
+        const formGroup = data.boqDetails?.[idx] || { items: [] };
+        const itemsList = formGroup.items || [];
         boqQuotesMap[key] = {
-          quotePrice: String(formItem.quotePrice || 0),
-          gstPercent: String(formItem.gst || 0),
-          make: formItem.make || "",
-          model: formItem.model || "",
-          compliance: formItem.compliance || "Complied",
-          remarks: formItem.remarks || "",
-          vendorAttachmentUrl: formItem.vendorAttachmentUrl || "",
-          vendorAttachmentName: formItem.vendorAttachmentName || "",
+          description: item.description || "",
+          qty: item.qty || item.quantity || 1,
+          uom: item.uom || "EA",
+          items: itemsList.map((sub: any) => {
+            const atts = Array.isArray(sub.vendorAttachments)
+              ? sub.vendorAttachments
+              : sub.vendorAttachmentUrl
+              ? [
+                  {
+                    url: sub.vendorAttachmentUrl,
+                    name: sub.vendorAttachmentName || "Attachment",
+                  },
+                ]
+              : [];
+
+            return {
+              id: sub.id,
+              itemName: sub.itemName || "",
+              quotePrice: String(sub.quotePrice || 0),
+              gstPercent: String(sub.gst || 0),
+              make: sub.make || "",
+              model: sub.model || "",
+              compliance: sub.compliance || "Complied",
+              remarks: sub.remarks || "",
+              vendorAttachmentUrl: atts[0]?.url || "",
+              vendorAttachmentName: atts[0]?.name || "",
+              vendorAttachments: atts,
+            };
+          }),
         };
       });
 
@@ -586,7 +818,10 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
 
       if (res.ok) {
         const jsonRes = await res.json();
-        if (jsonRes?.revisionNumber !== undefined && jsonRes?.revisionNumber !== null) {
+        if (
+          jsonRes?.revisionNumber !== undefined &&
+          jsonRes?.revisionNumber !== null
+        ) {
           setRevisionNumber(jsonRes.revisionNumber);
         }
         setHasSubmittedPast(true);
@@ -603,9 +838,7 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
           organizationVendor?.email ||
           "priyavenkatesan41@gmail.com";
         const buyerCompanyName =
-          buyerData?.company?.name ||
-          buyerData?.buyerCompanyName ||
-          "KG Corp";
+          buyerData?.company?.name || buyerData?.buyerCompanyName || "KG Corp";
         const buyerEmail =
           buyerData?.contact?.contactEmail ||
           buyerData?.buyerEmail ||
@@ -684,7 +917,7 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
   ]);
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto px-4 py-6">
+    <div className="space-y-8 px-4 py-6">
       <HeaderSection
         buyerData={buyerData}
         getCurrentDate={getCurrentDate}
@@ -707,7 +940,8 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
             Response Submitted Successfully (Revision R-{revisionNumber})
           </h3>
           <p className="text-sm text-emerald-700">
-            Thank you for submitting your quote for RFQ #{buyerData?.rfpUniqueId || rfpId}.
+            Thank you for submitting your quote for RFQ #
+            {buyerData?.rfpUniqueId || rfpId}.
           </p>
           <div className="pt-2 flex justify-center gap-3">
             <Button
@@ -735,10 +969,9 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
         logoPreview={logoPreview}
         logoFileName={logoFileName}
         buyerData={buyerData}
-        itemTotals={itemTotals}
         expandedSpecs={expandedSpecs}
         toggleSpecification={toggleSpecification}
-        calculateItemTotal={calculateItemTotal}
+        calculateSubItemTotal={calculateSubItemTotal}
         overallTotals={overallTotals}
         getCurrencySymbol={getCurrencySymbol}
         safeParseFloat={safeParseFloat}
@@ -764,6 +997,8 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
         vendorBoqAttachments={vendorBoqAttachments}
         onBoqAttachmentUpload={handleBoqAttachmentUpload}
         onBoqAttachmentRemove={handleBoqAttachmentRemove}
+        onAddSubItem={handleAddSubItem}
+        onRemoveSubItem={handleRemoveSubItem}
       />
 
       {/* Confirmation Modal Popup */}
@@ -771,7 +1006,9 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl space-y-6 text-left border border-slate-100">
             <div className="space-y-2">
-              <h3 className="text-base font-bold text-slate-900">Confirm Submission</h3>
+              <h3 className="text-base font-bold text-slate-900">
+                Confirm Submission
+              </h3>
               <p className="text-sm text-slate-600">
                 Are you sure you want to submit this RFQ response?
               </p>

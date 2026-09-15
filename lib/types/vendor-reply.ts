@@ -21,21 +21,24 @@ export type VendorReplyFormData = {
     logoUrl?: string;
   };
   boqDetails: {
-    description: string;
-    uom: string;
-    qty: number;
-    targetPrice: number;
-    quotePrice: number;
-    make: string;
-    model: string;
-    specification: string;
-    productDetails: string;
-    compliance: string;
-    remarks: string;
-    gst: number;
-    deviation: string;
-    vendorAttachmentUrl?: string;
-    vendorAttachmentName?: string;
+    description?: string;
+    uom?: string;
+    qty?: number;
+    targetPrice?: number;
+    specification?: string;
+    items: {
+      id?: string;
+      itemName: string;
+      quotePrice: number;
+      gst: number;
+      make?: string;
+      model?: string;
+      compliance: string;
+      remarks?: string;
+      vendorAttachmentUrl?: string;
+      vendorAttachmentName?: string;
+      vendorAttachments?: { url: string; name: string }[];
+    }[];
   }[];
   paymentTerms: {
     costTax: boolean;

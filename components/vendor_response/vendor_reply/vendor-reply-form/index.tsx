@@ -31,20 +31,8 @@ interface VendorReplyFormProps {
   logoPreview: string | null;
   logoFileName: string | null;
   buyerData: any;
-  itemTotals: {
-    itemTotal: number;
-    itemGST: number;
-    grandTotal: number;
-    gstPercentage: number;
-  }[];
   expandedSpecs: Record<number, boolean>;
   toggleSpecification: (index: number) => void;
-  calculateItemTotal: (index: number) => {
-    itemTotal: number;
-    itemGST: number;
-    grandTotal: number;
-    gstPercentage: number;
-  };
   overallTotals: { subTotal: number; totalGST: number; grandTotal: number };
   getCurrencySymbol: (currencyCode: any) => string;
   safeParseFloat: (value: any) => number;
@@ -76,9 +64,25 @@ interface VendorReplyFormProps {
   isSubmitted: boolean;
   isloading: boolean | undefined;
   fieldsDisabled: boolean;
-  vendorBoqAttachments: Record<number, { url: string; name: string } | null>;
-  onBoqAttachmentUpload: (index: number, file: File) => Promise<void>;
-  onBoqAttachmentRemove: (index: number) => void;
+  vendorBoqAttachments: Record<string, { url: string; name: string }[]>;
+  onBoqAttachmentUpload: (
+    groupIndex: number,
+    subItemIndex: number,
+    files: FileList | File[]
+  ) => Promise<void>;
+  onBoqAttachmentRemove: (
+    groupIndex: number,
+    subItemIndex: number,
+    fileIndex: number
+  ) => void;
+  onAddSubItem: (groupIndex: number) => void;
+  onRemoveSubItem: (groupIndex: number, subItemIndex: number) => void;
+  calculateSubItemTotal: (groupIndex: number, subItemIndex: number) => {
+    itemTotal: number;
+    itemGST: number;
+    grandTotal: number;
+    gstPercentage: number;
+  };
 }
 
 export const VendorReplyForm: React.FC<VendorReplyFormProps> = ({
@@ -96,10 +100,9 @@ export const VendorReplyForm: React.FC<VendorReplyFormProps> = ({
   logoPreview,
   logoFileName,
   buyerData,
-  itemTotals,
   expandedSpecs,
   toggleSpecification,
-  calculateItemTotal,
+  calculateSubItemTotal,
   overallTotals,
   getCurrencySymbol,
   safeParseFloat,
@@ -125,6 +128,8 @@ export const VendorReplyForm: React.FC<VendorReplyFormProps> = ({
   vendorBoqAttachments,
   onBoqAttachmentUpload,
   onBoqAttachmentRemove,
+  onAddSubItem,
+  onRemoveSubItem,
 }) => {
   return (
     <form onSubmit={handleSubmit(prepareSubmit)} className="space-y-8">
@@ -159,10 +164,9 @@ export const VendorReplyForm: React.FC<VendorReplyFormProps> = ({
         clearErrors={clearErrors}
         errors={errors}
         buyerData={buyerData}
-        itemTotals={itemTotals}
         expandedSpecs={expandedSpecs}
         toggleSpecification={toggleSpecification}
-        calculateItemTotal={calculateItemTotal}
+        calculateSubItemTotal={calculateSubItemTotal}
         overallTotals={overallTotals}
         getCurrencySymbol={getCurrencySymbol}
         safeParseFloat={safeParseFloat}
@@ -172,6 +176,8 @@ export const VendorReplyForm: React.FC<VendorReplyFormProps> = ({
         vendorBoqAttachments={vendorBoqAttachments}
         onBoqAttachmentUpload={onBoqAttachmentUpload}
         onBoqAttachmentRemove={onBoqAttachmentRemove}
+        onAddSubItem={onAddSubItem}
+        onRemoveSubItem={onRemoveSubItem}
       />
 
       <EvaluationCriteria
