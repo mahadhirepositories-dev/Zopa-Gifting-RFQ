@@ -223,7 +223,7 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
           , hereinafter referred to as &quot;Company&quot;.
           {company.businessType
             ? ` Company is in the business of ${company.businessType}`
-            : " Company is in the business of Retail"}
+            : " "}
         </p>
       </div>
 

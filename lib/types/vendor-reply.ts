@@ -148,7 +148,7 @@ export interface DocumentAttachmentsProps {
     [key: number]: {
       hasDocument: boolean;
       documentName: string;
-      files: File[];
+      files: any[];
     };
   };
   handleDocumentSelection: (index: number, hasDocument: boolean) => void;
@@ -182,7 +182,7 @@ export interface DocumentItemProps {
     [key: number]: {
       hasDocument: boolean;
       documentName: string;
-      files: File[];
+      files: any[];
     };
   };
   handleDocumentSelection: (index: number, hasDocument: boolean) => void;
@@ -195,8 +195,16 @@ export interface DocumentItemProps {
   removeDocumentAttachment: (documentIndex: number, fileIndex: number) => void;
 }
 
+export interface DocumentFileObject {
+  name: string;
+  url?: string;
+  size?: number;
+  type?: string;
+  documentName?: string;
+}
+
 export interface UploadedFileProps {
-  file: File;
+  file: File | DocumentFileObject | any;
   onRemove: () => void;
   variant?: "default" | "success";
 }

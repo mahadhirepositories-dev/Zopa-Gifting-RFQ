@@ -280,28 +280,28 @@ export default function BuyerPreviewPage() {
 
     try {
       // Get user's membership info
-      const membershipRes = await fetch("/api/user/current-membership", {
-        credentials: "include",
-      });
+      // const membershipRes = await fetch("/api/user/current-membership", {
+      //   credentials: "include",
+      // });
 
-      if (membershipRes.ok) {
-        const membershipData = await safeJson(membershipRes, null);
-        const role = membershipData?.role;
-        const organizationSlug = membershipData?.organization?.slug;
+      // if (membershipRes.ok) {
+      //   const membershipData = await safeJson(membershipRes, null);
+      //   const role = membershipData?.role;
+      //   const organizationSlug = membershipData?.organization?.slug;
 
-        if (organizationSlug) {
-          setOrgSlug(organizationSlug);
-        }
+      //   if (organizationSlug) {
+      //     setOrgSlug(organizationSlug);
+      //   }
 
-        // Check organization role
-        if (role === "admin" || role === "zopa_admin") {
-          setUserRole("admin");
-        } else {
-          setUserRole("buyer");
-        }
-      } else {
-        setUserRole("buyer");
-      }
+      //   // Check organization role
+      //   if (role === "admin" || role === "zopa_admin") {
+      //     setUserRole("admin");
+      //   } else {
+      //     setUserRole("buyer");
+      //   }
+      // } else {
+      //   setUserRole("buyer");
+      // }
     } catch (error) {
       console.error("[BuyerPreview] Error determining user role:", error);
       setUserRole("buyer");

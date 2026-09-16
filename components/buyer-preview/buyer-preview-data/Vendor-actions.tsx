@@ -87,11 +87,11 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
     if (!rfpId) return;
 
     try {
-      const response = await fetch(`/api/rfq/${rfpId}/recommendations`);
-      if (response.ok) {
-        const data = await response.json();
-        setRecommendations(data.recommendations || []);
-      }
+      // const response = await fetch(`/api/rfq/${rfpId}/recommendations`);
+      // if (response.ok) {
+      //   const data = await response.json();
+      //   setRecommendations(data.recommendations || []);
+      // }
     } catch (error) {
       console.error("Error fetching recommendations:", error);
     }

@@ -672,33 +672,33 @@ export default function BuyerPreview({
     }
   }, [disqualifiedResponses, selectedDisqualifiedVendor]);
 
-  useEffect(() => {
-    const fetchUserId = async () => {
-      try {
-        const response = await fetch("/api/user/current-membership");
-        if (response.ok) {
-          const data = await response.json();
-          setUserId(data.userId);
-        }
-      } catch (error) {
-        console.error("Error fetching user ID:", error);
-      }
-    };
+  // useEffect(() => {
+  //   const fetchUserId = async () => {
+  //     try {
+  //       const response = await fetch("/api/user/current-membership");
+  //       if (response.ok) {
+  //         const data = await response.json();
+  //         setUserId(data.userId);
+  //       }
+  //     } catch (error) {
+  //       console.error("Error fetching user ID:", error);
+  //     }
+  //   };
 
-    if (isLoggedIn) {
-      fetchUserId();
-    }
-  }, [isLoggedIn]);
+  //   if (isLoggedIn) {
+  //     fetchUserId();
+  //   }
+  // }, [isLoggedIn]);
 
   const fetchRecommendations = useCallback(async () => {
     if (!rfpId) return;
 
     try {
-      const response = await fetch(`/api/rfq/${rfpId}/recommendations`);
-      if (response.ok) {
-        const data = await response.json();
-        setRecommendations(data.recommendations || []);
-      }
+      // const response = await fetch(`/api/rfq/${rfpId}/recommendations`);
+      // if (response.ok) {
+      //   const data = await response.json();
+      //   setRecommendations(data.recommendations || []);
+      // }
     } catch (error) {
       console.error("Error fetching recommendations:", error);
     }
@@ -713,33 +713,33 @@ export default function BuyerPreview({
   useEffect(() => {
     const fetchTemplateSettings = async () => {
       try {
-        const response = await fetch(
-          "/api/admin/global-defaults/template-settings",
-        );
-        if (response.ok) {
-          const contentType = response.headers.get("content-type");
-          if (contentType && contentType.includes("application/json")) {
-            const data = await response.json();
-            if (data.success && data.templateSettings) {
-              setTemplateSettings({
-                ...defaultTemplateSettings,
-                ...data.templateSettings,
-                includeSections: {
-                  ...defaultTemplateSettings.includeSections,
-                  ...data.templateSettings.includeSections,
-                },
-                fontSize: {
-                  ...defaultTemplateSettings.fontSize,
-                  ...data.templateSettings.fontSize,
-                },
-                pageMargins: {
-                  ...defaultTemplateSettings.pageMargins,
-                  ...data.templateSettings.pageMargins,
-                },
-              });
-            }
-          }
-        }
+        // const response = await fetch(
+        //   "/api/admin/global-defaults/template-settings",
+        // );
+        // if (response.ok) {
+        //   const contentType = response.headers.get("content-type");
+        //   if (contentType && contentType.includes("application/json")) {
+        //     const data = await response.json();
+        //     if (data.success && data.templateSettings) {
+        //       setTemplateSettings({
+        //         ...defaultTemplateSettings,
+        //         ...data.templateSettings,
+        //         includeSections: {
+        //           ...defaultTemplateSettings.includeSections,
+        //           ...data.templateSettings.includeSections,
+        //         },
+        //         fontSize: {
+        //           ...defaultTemplateSettings.fontSize,
+        //           ...data.templateSettings.fontSize,
+        //         },
+        //         pageMargins: {
+        //           ...defaultTemplateSettings.pageMargins,
+        //           ...data.templateSettings.pageMargins,
+        //         },
+        //       });
+        //     }
+        //   }
+        // }
       } catch (error) {
         console.error("Error fetching template settings:", error);
       }

@@ -1061,9 +1061,9 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
                 <p className="text-sm text-amber-800 mt-1">
                   The approver has requested a lower price re-quote / negotiation. The buyer can negotiate with the vendor and click &quot;Send for Approval&quot; again.
                 </p>
-                {currentApproval?.level1Comments && (
+                {(currentApproval?.level1Comments || currentApproval?.level2Comments) && (
                   <p className="text-xs text-amber-700 italic mt-2 bg-white/60 p-2 rounded border border-amber-200">
-                    Approver Instructions: &quot;{currentApproval.level1Comments}&quot;
+                    Approver Instructions: &quot;{currentApproval.level1Comments || currentApproval.level2Comments}&quot;
                   </p>
                 )}
               </div>
@@ -1072,8 +1072,8 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
         </Card>
       )}
 
-      {/* Unified Approver Action Section - Only for Active/Pending RFQs */}
-      {(isApproverMode || !!currentApproval) && !isRFQCompleted && (
+      {/* Unified Approver Action Section - Only for Approvers */}
+      {isApproverMode && !isRFQCompleted && (
         <Card className="border-blue-200 bg-blue-50 my-6 shadow-sm">
 
           <CardHeader>

@@ -48,7 +48,7 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
     [key: number]: {
       hasDocument: boolean;
       documentName: string;
-      files: File[];
+      files: any[];
     };
   }>({});
   const [submissionAttempted, setSubmissionAttempted] = useState(false);
@@ -682,21 +682,91 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
     }, 0);
   };
 
-  const handleDocumentFileChange = (
+  const handleDocumentFileChange = async (
     e: React.ChangeEvent<HTMLInputElement>,
     documentIndex: number,
     documentName: string,
   ) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const files = Array.from(e.target.files);
-      setValue(`attachments.${documentIndex}.files`, files, {
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    const selectedFiles = Array.from(e.target.files);
+    console.log(
+      `[GST Document Upload] Selected ${selectedFiles.length} file(s) for ${documentName}:`,
+      selectedFiles.map((f) => f.name),
+    );
+
+    try {
+      const uploadedFileObjects: Array<{
+        name: string;
+        url: string;
+        size: number;
+        type: string;
+        documentName: string;
+      }> = [];
+
+      for (const file of selectedFiles) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("documentName", documentName);
+        formData.append("type", "documents");
+
+        console.log(
+          `[GST Document Upload] Immediately triggering POST /api/vendor-upload for:`,
+          file.name,
+        );
+
+        const res = await fetch("/api/vendor-upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData?.error || `Failed to upload ${file.name}`);
+        }
+
+        const data = await res.json();
+        console.log(
+          `[GST Document Upload] Upload API response received for ${file.name}:`,
+          data,
+        );
+
+        uploadedFileObjects.push({
+          name: data.name || file.name,
+          url: data.url,
+          size: data.size || data.fileSize || file.size,
+          type: data.type || data.fileType || file.type,
+          documentName: documentName,
+        });
+      }
+
+      const existingFiles = documentAttachments[documentIndex]?.files || [];
+      const combinedFiles = [...existingFiles, ...uploadedFileObjects];
+
+      setValue(`attachments.${documentIndex}.files` as any, combinedFiles, {
         shouldValidate: true,
         shouldDirty: true,
       });
+
       setDocumentAttachments((prev) => ({
         ...prev,
-        [documentIndex]: { hasDocument: true, documentName, files },
+        [documentIndex]: {
+          hasDocument: true,
+          documentName,
+          files: combinedFiles,
+        },
       }));
+
+      toast.success(
+        `Uploaded ${uploadedFileObjects.length} file(s) for ${documentName}`,
+      );
+    } catch (err: any) {
+      console.error(
+        `[GST Document Upload] Error uploading ${documentName}:`,
+        err,
+      );
+      toast.error(err?.message || `Failed to upload ${documentName}`);
+    } finally {
       setTimeout(() => {
         validateDocuments();
       }, 0);
@@ -873,6 +943,29 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
         };
       });
 
+      const allUploadedDocAttachments: Array<{
+        documentName: string;
+        name: string;
+        url: string;
+        size?: number;
+      }> = [];
+
+      Object.values(documentAttachments).forEach((docGroup: any) => {
+        if (docGroup?.files && Array.isArray(docGroup.files)) {
+          docGroup.files.forEach((fileObj: any) => {
+            if (fileObj.url) {
+              allUploadedDocAttachments.push({
+                documentName:
+                  docGroup.documentName || fileObj.documentName || "Document",
+                name: fileObj.name,
+                url: fileObj.url,
+                size: fileObj.size,
+              });
+            }
+          });
+        }
+      });
+
       const payload = {
         rfpId,
         vendorResponseId:
@@ -898,6 +991,8 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
         specialTerms: data.specialTerms,
         specialNote: data.otherInformation?.warranty || "",
         otherInformation: data.otherInformation,
+        attachments: allUploadedDocAttachments,
+        documentAttachments: allUploadedDocAttachments,
         grandTotal: overallTotals.grandTotal.toFixed(2),
         status: "submitted",
         submittedAt: new Date().toISOString(),

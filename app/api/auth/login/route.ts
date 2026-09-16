@@ -7,6 +7,13 @@ import { EmailService } from "@/lib/email/email-service";
 import { createAndSetAuthSession } from "@/lib/auth-session";
 import { upsertRfpCompany } from "@/lib/rfq-updates";
 
+export async function GET() {
+  return NextResponse.json(
+    { message: "Auth login endpoint. Please send a POST request with email to login." },
+    { status: 200 }
+  );
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -35,7 +42,7 @@ export async function POST(request: Request) {
           isNotRegistered: true,
           email: emailClean,
         },
-        { status: 404 },
+        { status: 400 },
       );
     }
 

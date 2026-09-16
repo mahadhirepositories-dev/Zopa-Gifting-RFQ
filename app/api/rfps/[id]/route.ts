@@ -241,6 +241,8 @@ export async function GET(
       rfpId: targetRfpId,
       rfpUniqueId: formattedRfpUniqueId,
       rfpuniqId: formattedRfpUniqueId,
+      creatorEmail: user?.email || contactDetails?.contactEmail || "",
+      creatorUserId: targetRfq?.userId || user?.id || "",
       rfpsData: targetRfq || { status: "draft" },
       categorySelection: categoryRow
         ? {

@@ -102,6 +102,7 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
   recommendations,
   rfpId,
   currentApproval,
+  isBuyerActionsLocked = false,
 }) => {
   const [expandedItems] = React.useState<Record<number, boolean>>({});
   const [expandedSpecs, setExpandedSpecs] = React.useState<
@@ -605,7 +606,27 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
 
   const [selectedSubItems, setSelectedSubItems] = React.useState<
     Record<string, number>
-  >({});
+  >(() => {
+    if (typeof window === "undefined" || !rfpId) return {};
+    try {
+      const saved = localStorage.getItem(`rfp_sub_items_${rfpId}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  React.useEffect(() => {
+    if (typeof window === "undefined" || !rfpId) return;
+    try {
+      const saved = localStorage.getItem(`rfp_sub_items_${rfpId}`);
+      if (saved) {
+        setSelectedSubItems(JSON.parse(saved));
+      }
+    } catch (err) {
+      console.error("Error loading selected sub items:", err);
+    }
+  }, [rfpId]);
 
   const getSelectedSubItemIndex = (
     vendorId: string | number,
@@ -622,11 +643,20 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
     itemIndex: number,
     subIdx: number
   ) => {
+    if (isBuyerActionsLocked) return;
     const key = `${vendorId}-rev-${revIndex}-item-${itemIndex}`;
-    setSelectedSubItems((prev) => ({
-      ...prev,
+    const next = {
+      ...selectedSubItems,
       [key]: subIdx,
-    }));
+    };
+    setSelectedSubItems(next);
+    if (typeof window !== "undefined" && rfpId) {
+      try {
+        localStorage.setItem(`rfp_sub_items_${rfpId}`, JSON.stringify(next));
+      } catch (err) {
+        console.error("Error saving selected sub items:", err);
+      }
+    }
   };
 
   const calculateCumulativeTotals = (): Record<string, number> => {
@@ -1668,7 +1698,11 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
                                 );
                                 const isSubItemSelected = subIdx === selectedSubIdx;
 
-                                const cellClass = `${tdClass} cursor-pointer hover:bg-blue-50/50 ${
+                                const cellClass = `${tdClass} ${
+                                  isBuyerActionsLocked
+                                    ? "cursor-default"
+                                    : "cursor-pointer hover:bg-blue-50/50"
+                                } ${
                                   isSubItemSelected && subItems.length > 1
                                     ? "bg-blue-50/80 ring-1 ring-blue-300"
                                     : ""
@@ -1678,14 +1712,16 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
                                   <td
                                     key={`${vendor.id}-${index}-${subIdx}-rev-${revIndex}`}
                                     className={cellClass}
-                                    onClick={() =>
-                                      handleSelectSubItem(
-                                        vendor.id,
-                                        revIndex,
-                                        index,
-                                        subIdx
-                                      )
-                                    }
+                                    onClick={() => {
+                                      if (!isBuyerActionsLocked) {
+                                        handleSelectSubItem(
+                                          vendor.id,
+                                          revIndex,
+                                          index,
+                                          subIdx
+                                        );
+                                      }
+                                    }}
                                   >
                                     <div className="flex flex-col items-center justify-center space-y-1 text-center max-w-[200px] mx-auto font-mono text-xs">
                                       {subItems.length > 1 && (
@@ -1694,15 +1730,18 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
                                             type="radio"
                                             name={`select-${vendor.id}-rev-${revIndex}-item-${index}`}
                                             checked={isSubItemSelected}
-                                            onChange={() =>
-                                              handleSelectSubItem(
-                                                vendor.id,
-                                                revIndex,
-                                                index,
-                                                subIdx
-                                              )
-                                            }
-                                            className="h-3 w-3 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                            disabled={isBuyerActionsLocked}
+                                            onChange={() => {
+                                              if (!isBuyerActionsLocked) {
+                                                handleSelectSubItem(
+                                                  vendor.id,
+                                                  revIndex,
+                                                  index,
+                                                  subIdx
+                                                );
+                                              }
+                                            }}
+                                            className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed"
                                           />
                                           <span
                                             className={`text-[11px] ${

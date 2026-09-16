@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,11 +8,17 @@ import { Remove } from "@/components/svg";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { cn } from "@/lib/utils";
 import { z } from "zod";
+import { Upload, FileText, Download, Link as LinkIcon } from "lucide-react";
 
 // TypeScript interfaces
 interface Document {
   id: string | number;
   name: string;
+  url?: string;
+  path?: string;
+  size?: number;
+  type?: string;
+  isUploaded?: boolean;
 }
 
 interface DocumentsData {
@@ -100,9 +105,11 @@ export const DocumentsToShare: React.FC<DocumentsToShareProps> = ({
   >(defaultPredefinedDocs);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const documents = useMemo(() => {
-    const parseDocuments = () => {
+    const parseDocuments = (): Document[] => {
       let docInput = safeData.documentsToShare ?? safeData.documents;
 
       if (!docInput) {
@@ -124,7 +131,15 @@ export const DocumentsToShare: React.FC<DocumentsToShareProps> = ({
           if (typeof item === "string") {
             return { id: `arr-${index}`, name: item };
           }
-          return item;
+          return {
+            id: item.id || `arr-${index}`,
+            name: item.name || item.fileName || "Document",
+            url: item.url || item.path,
+            path: item.path || item.url,
+            size: item.size,
+            type: item.type,
+            isUploaded: !!(item.url || item.path),
+          };
         });
       }
 
@@ -138,6 +153,11 @@ export const DocumentsToShare: React.FC<DocumentsToShareProps> = ({
             return parsed.map((item, index) => ({
               id: typeof item === "object" && item?.id ? item.id : `json-${index}`,
               name: typeof item === "object" && item?.name ? item.name : String(item),
+              url: typeof item === "object" ? (item?.url || item?.path) : undefined,
+              path: typeof item === "object" ? (item?.path || item?.url) : undefined,
+              size: typeof item === "object" ? item?.size : undefined,
+              type: typeof item === "object" ? item?.type : undefined,
+              isUploaded: typeof item === "object" && !!(item?.url || item?.path),
             }));
           }
           if (typeof parsed === "object" && parsed !== null && parsed.documentsToShare) {
@@ -166,9 +186,66 @@ export const DocumentsToShare: React.FC<DocumentsToShareProps> = ({
     setIsLoading(false);
   }, []);
 
-  // Helper function to convert documents array to comma-separated string
+  // Helper function to convert documents array to JSON string or comma-separated string
   const documentsToString = (docsList: Document[]): string => {
+    const hasUploaded = docsList.some((d) => d.url || d.path || d.isUploaded);
+    if (hasUploaded) {
+      return JSON.stringify(docsList);
+    }
     return docsList.map((doc) => doc.name).join(", ");
+  };
+
+  // Upload handler for document files
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    setErrorMessage(null);
+
+    try {
+      const newDocs: Document[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const res = await fetch("/api/rfq/upload-document", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData?.error || `Failed to upload ${file.name}`);
+        }
+
+        const data = await res.json();
+        newDocs.push({
+          id: `uploaded-${Date.now()}-${i}`,
+          name: data.name,
+          url: data.url,
+          path: data.path,
+          size: data.size,
+          type: data.type,
+          isUploaded: true,
+        });
+      }
+
+      const updatedDocuments = [...documents, ...newDocs];
+      if (validateDocuments(updatedDocuments)) {
+        const documentsString = documentsToString(updatedDocuments);
+        onChange({ ...safeData, documentsToShare: documentsString });
+      }
+    } catch (err: any) {
+      console.error("Error uploading document:", err);
+      setErrorMessage(err?.message || "Failed to upload document file.");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   // Validate documents with Zod
@@ -354,6 +431,56 @@ export const DocumentsToShare: React.FC<DocumentsToShareProps> = ({
           )}
         </div>
 
+        {/* Upload Document File Section */}
+        <div className="space-y-2">
+          <Label className="text-sm font-semibold text-slate-900 flex items-center justify-between">
+            <span>Upload Document Files</span>
+            <span className="text-xs font-mono text-slate-500">
+              Saved to /public/uploads
+            </span>
+          </Label>
+
+          <div
+            onClick={() =>
+              !disabled && !isUploading && fileInputRef.current?.click()
+            }
+            className={cn(
+              "border-2 border-dashed border-[#CBD5E1] hover:border-[#1E6BFF] bg-[#F8FAFC] hover:bg-blue-50/50 rounded-xl p-5 text-center cursor-pointer transition-all",
+              disabled && "opacity-50 cursor-not-allowed",
+              isUploading && "animate-pulse",
+            )}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={handleFileUpload}
+              className="hidden"
+              disabled={disabled || isUploading}
+              multiple
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip"
+            />
+            <div className="flex flex-col items-center justify-center space-y-2">
+              <div className="h-10 w-10 bg-blue-100 text-[#1E6BFF] rounded-full flex items-center justify-center">
+                {isUploading ? (
+                  <div className="h-5 w-5 border-2 border-[#1E6BFF] border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Upload className="h-5 w-5" />
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-800">
+                  {isUploading
+                    ? "Uploading file(s)..."
+                    : "Click to Upload Document File"}
+                </p>
+                <p className="text-[11px] font-mono text-slate-500 mt-1">
+                  Saved to /public/uploads/ (PDF, DOCX, XLSX, Images, ZIP)
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Custom Document Addition */}
         <div className="space-y-2">
           <Label
@@ -435,9 +562,23 @@ export const DocumentsToShare: React.FC<DocumentsToShareProps> = ({
                               >
                                 ⠿
                               </div>
-                              <span className="font-mono text-[13px] text-slate-900">
-                                {doc.name}
-                              </span>
+                              <div className="flex flex-col">
+                                <span className="font-mono text-[13px] text-slate-900 font-medium">
+                                  {doc.name}
+                                </span>
+                                {(doc.url || doc.path) && (
+                                  <a
+                                    href={doc.url || doc.path}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    download
+                                    className="text-[11px] font-mono text-blue-600 hover:underline flex items-center gap-1 mt-0.5"
+                                  >
+                                    <LinkIcon className="h-3 w-3" />
+                                    {doc.url || doc.path}
+                                  </a>
+                                )}
+                              </div>
                             </div>
                             <Button
                               type="button"
