@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Download, Share2, Users, Edit, Star } from "lucide-react";
+import { Download, Share2, Users, Edit, Star, CheckCircle, XCircle, ArrowLeft } from "lucide-react";
 import { RFPData, VendorResponse, VendorRevision } from "@/lib/types/index";
 
 interface VendorActionsProps {
@@ -32,7 +32,13 @@ interface VendorActionsProps {
   onRecommendationUpdate?: () => void | Promise<void>;
   showCompareButton?: boolean;
   isLoggedIn?: boolean;
-  urlResponseId?: string | null; // Add this prop
+  urlResponseId?: string | null;
+  onQualificationChange?: (
+    vendorResponseId: string,
+    status: "qualified" | "disqualified"
+  ) => Promise<void> | void;
+  isDisqualifiedView?: boolean;
+  onBackToQualified?: () => void;
 }
 
 interface VendorRecommendation {
@@ -69,6 +75,9 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
   rfpId,
   rfpData,
   urlResponseId,
+  onQualificationChange,
+  isDisqualifiedView = false,
+  onBackToQualified,
 }) => {
   const [recommendations, setRecommendations] = useState<
     VendorRecommendation[]
@@ -78,7 +87,7 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
     if (!rfpId) return;
 
     try {
-      const response = await fetch(`/api/rfp/${rfpId}/recommendations`);
+      const response = await fetch(`/api/rfq/${rfpId}/recommendations`);
       if (response.ok) {
         const data = await response.json();
         setRecommendations(data.recommendations || []);
@@ -131,10 +140,19 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
     setPremiumFeaturesDialogOpen(true);
   };
 
+  // Qualified vs Disqualified vendors list depending on current view mode
+  const qualifiedResponses = formattedResponses.filter(
+    (vendor) => vendor.qualificationStatus !== "disqualified"
+  );
+  const disqualifiedResponses = formattedResponses.filter(
+    (vendor) => vendor.qualificationStatus === "disqualified"
+  );
+
+  const activeResponsesList = isDisqualifiedView
+    ? disqualifiedResponses
+    : qualifiedResponses;
+
   // Builds a single dropdown option for a given vendor + revision.
-  // `isHighlighted` controls whether this specific option gets the
-  // priority/recommended background styling (only the latest revision
-  // of a vendor should ever be highlighted).
   const buildOption = (
     vendor: VendorResponse,
     key: string | number,
@@ -151,8 +169,6 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
     return {
       value: `${vendor.id}-${key}`,
       vendorResponseId: vendor.vendorResponseId,
-      // Only the latest revision carries the highlight flags through to
-      // the SelectItem's className below.
       isPriority: isHighlighted && isPriorityVendor,
       isRecommended: isHighlighted && isRecommended,
       recommendationInfo: isHighlighted ? recommendationInfo : undefined,
@@ -190,19 +206,17 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
   };
 
   const generateSelectOptions = () => {
-    const filteredVendors = formattedResponses.filter(
+    const filteredVendors = activeResponsesList.filter(
       (vendor) => vendor.companydetails?.companyName,
     );
 
     // Sort vendors: URL priority first, then recommended vendors, then others
     const sortedVendors = [...filteredVendors].sort((a, b) => {
-      // URL priority vendor comes first
       if (urlResponseId) {
         if (a.vendorResponseId === urlResponseId) return -1;
         if (b.vendorResponseId === urlResponseId) return 1;
       }
 
-      // Then sort by recommendation status
       const aRecommended = isVendorRecommended(a.vendorResponseId);
       const bRecommended = isVendorRecommended(b.vendorResponseId);
 
@@ -217,8 +231,6 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
       const recommendationInfo = getRecommendationInfo(vendor.vendorResponseId);
       const isPriorityVendor = vendor.vendorResponseId === urlResponseId;
 
-      // Case 1: vendor.revisions is an array -> show ALL revisions,
-      // sorted latest-first, highlight only the latest one.
       if (Array.isArray(vendor.revisions) && vendor.revisions.length > 0) {
         const indexedRevisions = vendor.revisions.map(
           (rev: any, index: number) => ({ rev, index }),
@@ -227,7 +239,7 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
         indexedRevisions.sort((a, b) => {
           const aNum = Number(a.rev.revisionNumber ?? a.index);
           const bNum = Number(b.rev.revisionNumber ?? b.index);
-          return bNum - aNum; // descending: latest revision first
+          return bNum - aNum;
         });
 
         return indexedRevisions.map(({ rev, index }, sortedPos) =>
@@ -239,13 +251,11 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
             isPriorityVendor,
             isRecommended,
             recommendationInfo,
-            sortedPos === 0, // only the first (latest) is highlighted
+            sortedPos === 0,
           ),
         );
       }
 
-      // Case 2: vendor.revisionNumber is a keyed object -> show ALL entries,
-      // sorted latest-first, highlight only the latest one.
       if (
         typeof vendor.revisionNumber === "object" &&
         vendor.revisionNumber !== null
@@ -261,7 +271,7 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
             const bRev = b[1] as any;
             const aNum = Number(aRev.revisionNumber ?? a[0]);
             const bNum = Number(bRev.revisionNumber ?? b[0]);
-            return bNum - aNum; // descending: latest revision first
+            return bNum - aNum;
           });
 
           return sortedEntries.map(([key, revision], sortedPos) => {
@@ -274,7 +284,7 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
               isPriorityVendor,
               isRecommended,
               recommendationInfo,
-              sortedPos === 0, // only the first (latest) is highlighted
+              sortedPos === 0,
             );
           });
         } else {
@@ -287,13 +297,12 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
               isPriorityVendor,
               isRecommended,
               recommendationInfo,
-              true, // only revision -> it's the latest
+              true,
             ),
           ];
         }
       }
 
-      // Case 3: no revisions at all -> single R-0 option (always "latest")
       return [
         buildOption(
           vendor,
@@ -317,10 +326,12 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
         <div className="flex flex-col lg:flex-row justify-between gap-4 w-full bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           {/* Left side - Vendor selection and contacts */}
           <div className="flex flex-wrap gap-3 place-items-end">
-            {/* Vendor select with URL priority and recommendation highlighting */}
+            {/* Vendor select dropdown */}
             <div className="w-80">
               <label className="block text-sm font-semibold text-gray-800 mb-1">
-                Select Vendor Response:
+                {isDisqualifiedView
+                  ? "Select Disqualified Vendor Response:"
+                  : "Select Vendor Response:"}
               </label>
               <Select
                 value={
@@ -330,7 +341,7 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
                 }
                 onValueChange={(value) => {
                   const [vendorId, revIndex] = value.split("-");
-                  const vendor = formattedResponses.find(
+                  const vendor = activeResponsesList.find(
                     (v) => v.id === vendorId,
                   );
 
@@ -371,21 +382,29 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
                   <SelectValue placeholder="Select a vendor" />
                 </SelectTrigger>
                 <SelectContent className="max-h-60 overflow-y-auto">
-                  {selectOptions.map((option) => (
-                    <SelectItem
-                      key={option.value}
-                      value={option.value}
-                      className={`${
-                        option.isPriority
-                          ? "bg-blue-50 hover:bg-blue-100"
-                          : option.isRecommended
-                            ? "bg-green-50 hover:bg-green-100 border-l-4 border-green-400"
-                            : "hover:bg-gray-50"
-                      }`}
-                    >
-                      {option.label}
-                    </SelectItem>
-                  ))}
+                  {selectOptions.length > 0 ? (
+                    selectOptions.map((option) => (
+                      <SelectItem
+                        key={option.value}
+                        value={option.value}
+                        className={`${
+                          option.isPriority
+                            ? "bg-blue-50 hover:bg-blue-100"
+                            : option.isRecommended
+                              ? "bg-green-50 hover:bg-green-100 border-l-4 border-green-400"
+                              : "hover:bg-gray-50"
+                        }`}
+                      >
+                        {option.label}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="p-3 text-sm text-gray-500 text-center">
+                      {isDisqualifiedView
+                        ? "No disqualified vendors available"
+                        : "No qualified vendors available"}
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -399,6 +418,52 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
               <Users className="h-4 w-4 mr-2" />
               Vendor Contacts
             </Button>
+
+            {/* Single relevant action button: Disqualify (if qualified view) or Qualify (if disqualified view) */}
+            {selectedVendor && (
+              isDisqualifiedView ? (
+                <>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (
+                        onQualificationChange &&
+                        selectedVendor.vendorResponseId
+                      ) {
+                        onQualificationChange(
+                          selectedVendor.vendorResponseId,
+                          "qualified",
+                        );
+                      }
+                    }}
+                    className="h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    Qualify Vendor
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (
+                      onQualificationChange &&
+                      selectedVendor.vendorResponseId
+                    ) {
+                      onQualificationChange(
+                        selectedVendor.vendorResponseId,
+                        "disqualified",
+                      );
+                    }
+                  }}
+                  className="h-10 px-4 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-medium transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <XCircle className="h-4 w-4 text-red-500" />
+                  Disqualify
+                </Button>
+              )
+            )}
           </div>
 
           {/* Right side - Download + Premium Features */}
@@ -413,7 +478,7 @@ export const VendorActions: React.FC<VendorActionsProps> = ({
               Download PDF
             </Button>
 
-            {/* Premium Features Button - Fixed implementation */}
+            {/* Premium Features Button */}
             {isLoggedIn ? null : (
               <Button
                 variant="outline"

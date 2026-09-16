@@ -828,6 +828,12 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
         setIsSubmitted(true);
         setShowConfirmation(false);
 
+        const actualResponseId =
+          jsonRes?.vendorResponseId ||
+          jsonRes?.data?.vendorResponseId ||
+          payload.vendorResponseId ||
+          vendorResponseId;
+
         const vendorCompanyName =
           data.companydetails?.companyName ||
           organizationVendor?.companyName ||
@@ -848,10 +854,15 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
           buyerData?.projectName ||
           buyerData?.rfpTitle ||
           "Facility Expansion & Automation";
-        const submissionUrl =
-          typeof window !== "undefined"
-            ? `${window.location.origin}/rfq/reply/${rfpId}?responseId=${vendorResponseId}`
-            : "";
+
+        const baseURL =
+          process.env.NEXT_PUBLIC_APP_URL ||
+          (typeof window !== "undefined"
+            ? window.location.origin
+            : "http://localhost:3000");
+
+        const buyerPreviewUrl = `${baseURL}/rfq/buyer_preview/${rfpId}?response=${actualResponseId}`;
+        const vendorReplyUrl = `${baseURL}/rfq/reply/${rfpId}?responseId=${actualResponseId}`;
 
         // Trigger notifications to Buyer and Vendor
         try {
@@ -866,7 +877,7 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
                   projectName,
                   vendorEmail,
                   buyerEmail,
-                  url: submissionUrl,
+                  url: buyerPreviewUrl,
                 },
               }),
             }),
@@ -881,7 +892,7 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
                   vendorEmail,
                   VendorCompanyName: vendorCompanyName,
                   buyerEmail,
-                  url: submissionUrl,
+                  url: vendorReplyUrl,
                 },
               }),
             }),

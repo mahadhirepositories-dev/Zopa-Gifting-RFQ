@@ -159,9 +159,10 @@ function VendorRFQPortalContent() {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
-        throw new Error("Failed to submit quotation. Please try again.");
-      }
+      const resData = await res.json();
+      const actualResponseId = resData?.vendorResponseId || resData?.data?.vendorResponseId || vendorResponseId;
+      const baseURL = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+      const buyerPreviewUrl = `${baseURL}/rfq/buyer_preview/${rfpId}?response=${actualResponseId}`;
 
       // Notify buyer via email API
       try {
@@ -171,12 +172,13 @@ function VendorRFQPortalContent() {
           body: JSON.stringify({
             type: "vendor-submission",
             data: {
-              companyName: rfpData?.company?.name || "Buyer Company",
+              companyName: vendorDetails.companyName || rfpData?.company?.name || "Vendor",
               projectName: rfpData?.requirement?.projectName || "RFQ",
               vendorEmail: vendorDetails.email,
               vendorCompanyName: vendorDetails.companyName,
               buyerEmail: rfpData?.contact?.contactEmail,
               grandTotal,
+              url: buyerPreviewUrl,
             },
           }),
         });

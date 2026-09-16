@@ -581,11 +581,16 @@ export const VendorContacts: React.FC<VendorContactsProps> = ({
         const response = await fetch(`/api/rfps/${rfpId}`);
         if (response.ok) {
           const rfpResponseData = await response.json();
-          if (
-            rfpResponseData.vendorContacts &&
-            Array.isArray(rfpResponseData.vendorContacts)
-          ) {
-            onChange(rfpResponseData.vendorContacts);
+          const fetchedContacts =
+            Array.isArray(rfpResponseData.vendorContacts) &&
+            rfpResponseData.vendorContacts.length > 0
+              ? rfpResponseData.vendorContacts
+              : Array.isArray(rfpResponseData.vendorcontacts) &&
+                rfpResponseData.vendorcontacts.length > 0
+                ? rfpResponseData.vendorcontacts
+                : null;
+          if (fetchedContacts && fetchedContacts.length > 0) {
+            onChange(fetchedContacts);
           }
         }
       } catch (error) {

@@ -67,14 +67,15 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
         };
       case "request-revision":
         return {
-          title: "Request Revision",
+          title: "Request Re-quote / Lower Price",
           description:
-            "Are you sure you want to request revisions? The buyer will need to update the RFP and resubmit.",
+            "Request the buyer and vendor to provide a lower price re-quote. The buyer will receive your instructions.",
           color: "text-amber-600",
           icon: <Edit className="h-6 w-6 text-amber-600" />,
-          buttonText: "Request Revision",
+          buttonText: "Submit Re-quote Request",
           buttonClass: "bg-amber-600 hover:bg-amber-700",
         };
+
     }
   };
 

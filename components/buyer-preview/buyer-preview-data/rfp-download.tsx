@@ -567,6 +567,27 @@ const createStyles = (templateSettings: TemplateSettings) => {
       textAlign: "right",
       paddingRight: 2,
     },
+    quoteHeaderBanner: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+      paddingBottom: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.grayLight,
+    },
+    quoteHeaderTitle: {
+      fontSize: templateSettings.fontSize.body + 1,
+      fontWeight: "bold",
+      color: colors.black,
+      fontFamily: pdfFontFamily,
+    },
+    infoRow: {
+      flexDirection: "row",
+      marginBottom: 3,
+      fontSize: templateSettings.fontSize.body,
+      fontFamily: pdfFontFamily,
+    },
   });
 };
 
@@ -745,6 +766,11 @@ export const VendorResponseDocument = ({
   logoBase64?: string;
 }) => {
   const styles = createStyles(templateSettings);
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, "0");
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const year = now.getFullYear();
+  const today = `${day}-${month}-${year}`;
 
   return (
     <Document>
@@ -760,6 +786,152 @@ export const VendorResponseDocument = ({
 
         {/* Main content with top/bottom spacing */}
         <View style={styles.mainContent}>
+          {/* Quote Header Banner */}
+          <View style={styles.quoteHeaderBanner}>
+            <Text style={styles.quoteHeaderTitle}>
+              Quote against the RFQ for &quot;
+              {buyerData?.requirement?.projectName ||
+                "CMS : Content management Systems"}
+              &quot; Date: {today}
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text
+                style={{
+                  fontSize: templateSettings.fontSize.body,
+                  fontWeight: "bold",
+                  color: colors.primary,
+                }}
+              >
+                RFQ ID :{" "}
+              </Text>
+              <Text style={{ fontSize: templateSettings.fontSize.body }}>
+                {rfpUniqueId || "N/A"}{" "}
+              </Text>
+              <Text style={{ fontSize: templateSettings.fontSize.body }}>
+                {" "}
+                /{" "}
+              </Text>
+              <Text
+                style={{
+                  fontSize: templateSettings.fontSize.body,
+                  fontWeight: "bold",
+                  color: colors.primary,
+                }}
+              >
+                VENDOR ID :{" "}
+              </Text>
+              <Text style={{ fontSize: templateSettings.fontSize.body }}>
+                {selectedVendor?.vendorResponseId || "N/A"}
+              </Text>
+            </View>
+          </View>
+
+          {/* Address Cards (To / Quote by) */}
+          <View style={styles.threeColumns}>
+            {/* To Card */}
+            <View style={[styles.card, styles.column]}>
+              <Text
+                style={[
+                  styles.boldText,
+                  { marginBottom: 6, color: colors.black },
+                ]}
+              >
+                To:
+              </Text>
+              <View style={styles.infoRow}>
+                <Text style={[styles.boldText, { width: "45%" }]}>
+                  Buyer Name
+                </Text>
+                <Text style={{ width: "55%" }}>
+                  {buyerData?.contact?.contactName || "Devipriya"}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={[styles.boldText, { width: "45%" }]}>
+                  Company Name
+                </Text>
+                <Text style={{ width: "55%" }}>
+                  {buyerData?.company?.name || "SunNext Pvt Ltd"}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={[styles.boldText, { width: "45%" }]}>Address</Text>
+                <Text style={{ width: "55%" }}>
+                  {[
+                    buyerData?.company?.addressLine1,
+                    buyerData?.company?.addressLine2,
+                  ]
+                    .filter(Boolean)
+                    .join(", ") || "Not provided"}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={[styles.boldText, { width: "45%" }]}>
+                  Location
+                </Text>
+                <Text style={{ width: "55%" }}>
+                  {[
+                    buyerData?.company?.city,
+                    buyerData?.company?.state,
+                    buyerData?.company?.country,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
+                  {buyerData?.company?.postalCode
+                    ? ` - ${buyerData.company.postalCode}`
+                    : ""}
+                </Text>
+              </View>
+            </View>
+
+            {/* Quote by Card */}
+            <View style={[styles.card, styles.column]}>
+              <Text
+                style={[
+                  styles.boldText,
+                  { marginBottom: 6, color: colors.black },
+                ]}
+              >
+                Quote by:
+              </Text>
+              <View style={styles.infoRow}>
+                <Text style={[styles.boldText, { width: "45%" }]}>
+                  Company Name
+                </Text>
+                <Text style={{ width: "55%" }}>
+                  {selectedVendor?.companydetails?.companyName || "N/A"}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={[styles.boldText, { width: "45%" }]}>Address</Text>
+                <Text style={{ width: "55%" }}>
+                  {[
+                    selectedVendor?.companydetails?.addressLine1,
+                    selectedVendor?.companydetails?.addressLine2,
+                    selectedVendor?.companydetails?.city,
+                    selectedVendor?.companydetails?.state,
+                    selectedVendor?.companydetails?.country,
+                    selectedVendor?.companydetails?.postalCode,
+                  ]
+                    .filter(Boolean)
+                    .join(", ") || "N/A"}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={[styles.boldText, { width: "45%" }]}>Phone</Text>
+                <Text style={{ width: "55%" }}>
+                  {selectedVendor?.companydetails?.phone || "N/A"}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={[styles.boldText, { width: "45%" }]}>Email</Text>
+                <Text style={{ width: "55%" }}>
+                  {selectedVendor?.companydetails?.email || "N/A"}
+                </Text>
+              </View>
+            </View>
+          </View>
+
           {/* 1. Company Introduction */}
           {renderSection(
             "companyIntroduction",
@@ -898,7 +1070,7 @@ export const VendorResponseDocument = ({
             </View>,
             templateSettings,
             styles,
-            3
+            2
           )}
 
           {/* 3. Bill of Quantities */}
@@ -1676,23 +1848,25 @@ export const VendorResponseDocument = ({
             </View>,
             templateSettings,
             styles,
-            8
+            7
           )}
 
-          {/* 8. Additional Terms & Conditions - Only show if notes exist */}
-          {selectedVendor?.revisionData?.buyerNotes?.remarks && (
-            <View style={styles.section}>
-              <Text style={styles.sectionHeader}>8. Other Information</Text>
-
-              <View style={styles.remarksSection}>
-                <Text style={styles.remarksTitle}>Notes to Buyer</Text>
-                <View style={styles.remarksContent}>
-                  <Text style={{ fontSize: templateSettings.fontSize.body }}>
-                    {selectedVendor?.revisionData?.buyerNotes?.remarks}
-                  </Text>
-                </View>
+          {/* 8. Other Information */}
+          {renderSection(
+            "vendorSelection",
+            "Other Information",
+            <View style={styles.remarksSection}>
+              <Text style={styles.remarksTitle}>Notes to Buyer</Text>
+              <View style={styles.remarksContent}>
+                <Text style={{ fontSize: templateSettings.fontSize.body }}>
+                  {selectedVendor?.revisionData?.buyerNotes?.remarks ||
+                    "No additional notes"}
+                </Text>
               </View>
-            </View>
+            </View>,
+            templateSettings,
+            styles,
+            8
           )}
 
           {/* 9. Attachments */}

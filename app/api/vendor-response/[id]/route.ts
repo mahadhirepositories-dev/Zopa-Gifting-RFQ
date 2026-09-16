@@ -108,7 +108,7 @@ export async function PUT(
 
     const formattedCompanyDetails = {
       vendorResponseInternalId: internalId,
-      companyName: companyData.companyName || "Unknown Company",
+      companyName: companyData.companyName || "",
       addressLine1: companyData.addressLine1 || "Address 1",
       addressLine2: companyData.addressLine2 || "",
       city: companyData.city || "Unknown",

@@ -6,10 +6,18 @@ import {
   vendorCompanyDetails,
   vendorResponseRevisions,
 } from "@/db/schema/vendor-response-schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
   try {
+    try {
+      await db.execute(
+        sql`ALTER TABLE vendor_responses ADD COLUMN IF NOT EXISTS qualification_status text DEFAULT 'qualified';`
+      );
+    } catch (e) {
+      console.warn("Column migration check warning in POST:", e);
+    }
+
     const body = await request.json();
     const {
       rfpId,
@@ -43,7 +51,7 @@ export async function POST(request: NextRequest) {
     const companyData = companyInfo || companydetails || {};
     const email = inputVendorEmail || companyData.email || "vendor@example.com";
 
-    // 1. Check if vendor response already exists by responseId OR by rfpId
+    // 1. Check if vendor response already exists by responseId OR by (rfpId AND vendorEmail/vendorId)
     let existingResponse = null;
     if (requestedResponseId) {
       existingResponse = await db.query.vendorResponses.findFirst({
@@ -51,9 +59,21 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (!existingResponse && rfpId) {
+    if (!existingResponse && rfpId && email && email !== "vendor@example.com") {
       existingResponse = await db.query.vendorResponses.findFirst({
-        where: eq(vendorResponses.rfpId, rfpId),
+        where: and(
+          eq(vendorResponses.rfpId, rfpId),
+          sql`LOWER(${vendorResponses.vendorEmail}) = LOWER(${email.trim()})`,
+        ),
+      });
+    }
+
+    if (!existingResponse && rfpId && vendorId && vendorId !== "vendor_default") {
+      existingResponse = await db.query.vendorResponses.findFirst({
+        where: and(
+          eq(vendorResponses.rfpId, rfpId),
+          eq(vendorResponses.vendorId, String(vendorId)),
+        ),
       });
     }
 
@@ -96,7 +116,7 @@ export async function POST(request: NextRequest) {
 
     const formattedCompanyDetails = {
       vendorResponseInternalId: internalId,
-      companyName: companyData.companyName || "Unknown Company",
+      companyName: companyData.companyName || "",
       addressLine1: companyData.addressLine1 || "Address 1",
       addressLine2: companyData.addressLine2 || "",
       city: companyData.city || "Unknown",
@@ -194,6 +214,14 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    try {
+      await db.execute(
+        sql`ALTER TABLE vendor_responses ADD COLUMN IF NOT EXISTS qualification_status text DEFAULT 'qualified';`
+      );
+    } catch (e) {
+      console.warn("Column migration check warning in GET:", e);
+    }
+
     const { searchParams } = new URL(request.url);
     const responseId =
       searchParams.get("responseId") || searchParams.get("response");
@@ -214,9 +242,33 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    if (!response && rfpId) {
+    const emailParam =
+      searchParams.get("email") ||
+      searchParams.get("vendorEmail") ||
+      searchParams.get("vendor_email");
+    const vendorIdParam = searchParams.get("vendorId");
+
+    if (!response && rfpId && emailParam) {
       response = await db.query.vendorResponses.findFirst({
-        where: eq(vendorResponses.rfpId, rfpId),
+        where: and(
+          eq(vendorResponses.rfpId, rfpId),
+          sql`LOWER(${vendorResponses.vendorEmail}) = LOWER(${emailParam.trim()})`,
+        ),
+        with: {
+          companyDetails: true,
+          revisions: {
+            orderBy: [desc(vendorResponseRevisions.revisionNumber)],
+          },
+        },
+      });
+    }
+
+    if (!response && rfpId && vendorIdParam && vendorIdParam !== "vendor_default") {
+      response = await db.query.vendorResponses.findFirst({
+        where: and(
+          eq(vendorResponses.rfpId, rfpId),
+          eq(vendorResponses.vendorId, vendorIdParam),
+        ),
         with: {
           companyDetails: true,
           revisions: {

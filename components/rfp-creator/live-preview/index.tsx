@@ -27,7 +27,16 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
   const generalTerms = data.generalTerms || {};
   const specialTerms = data.specialTerms || {};
   const vendors = data.vendors || {};
-  const vendorContacts = data.vendorContacts || data.vendorcontacts || [];
+  const vendorContacts =
+    Array.isArray(data.vendorContacts) && data.vendorContacts.length > 0
+      ? data.vendorContacts
+      : Array.isArray(data.vendorcontacts) && data.vendorcontacts.length > 0
+        ? data.vendorcontacts
+        : Array.isArray(data.vendorContacts)
+          ? data.vendorContacts
+          : Array.isArray(data.vendorcontacts)
+            ? data.vendorcontacts
+            : [];
   const rfpDates = data.rfpDates || data.dates || {};
   const rawDocuments = data.documentsToShare || data.documents;
 

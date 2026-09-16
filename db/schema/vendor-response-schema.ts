@@ -24,6 +24,7 @@ export const vendorResponses = pgTable(
     vendorId: text("vendor_id").notNull(),
     vendorEmail: text("vendor_email").notNull(),
     status: text("status").default("draft"),
+    qualificationStatus: text("qualification_status").default("qualified"),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   },

@@ -14,6 +14,7 @@ import { VendorRecommendationTable } from "./comparision-section/vendor-recommen
 import { VendorFilter } from "./comparision-section/vendor-filter";
 import PremiumFeaturesDialog from "../premium-features";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -35,7 +36,6 @@ import {
 } from "lucide-react";
 import { VendorComparisionPdf } from "./comparision-pdf";
 import { Level2ApprovalDialog } from "@/components/approval/level2ApprovalDialog";
-import { VendorScoringSystem } from "./comparision-section/comparision-score";
 import { isBuyerRevisionPending } from "@/lib/approval-state";
 
 interface SelectedVendor {
@@ -70,7 +70,7 @@ interface ApprovalData {
   id: number;
   rfpId: string;
   status: string;
-  requestedAt: string;
+  requestedAt?: string;
   createdAt?: string;
   reviewedAt?: string;
   buyerComments?: string;
@@ -78,13 +78,17 @@ interface ApprovalData {
   currentLevel?: number;
   level1Status?: string | null;
   level2Status?: string | null;
+  level1Comments?: string | null;
+  level2Comments?: string | null;
   revisionRequestRecipient?: string | null;
-  requester: {
-    id: string;
-    name: string;
-    email: string;
+
+  requester?: {
+    id?: string;
+    name?: string;
+    email?: string;
     company?: string;
-  };
+  } | null;
+
   approver?: {
     id: string;
     name: string;
@@ -160,6 +164,9 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
   const [isSubmittingRecommendations, setIsSubmittingRecommendations] =
     useState(false);
   const [globalComments, setGlobalComments] = useState("");
+  const [approvalLevel, setApprovalLevel] = useState<"level1" | "level2">("level1");
+  const [level1Email, setLevel1Email] = useState("");
+  const [level2Email, setLevel2Email] = useState("");
   const [validationErrors, setValidationErrors] = useState<Map<string, string>>(
     new Map()
   );
@@ -174,11 +181,15 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
     action: "approve" | "reject" | "request-revision";
   }>({ isOpen: false, action: "approve" });
 
-  const isRFPApproved = currentApproval?.status === "approved";
-  // A revision request sitting with the buyer is not "pending approval" - the
-  // buyer has to revise and resubmit, so their actions must stay unlocked.
+  const rfqStatusVal = (buyerData?.rfp?.status || currentApproval?.status || "").toLowerCase();
+  const isRFPApproved = rfqStatusVal === "approved";
+  const isRFPRejected = rfqStatusVal === "rejected";
+  const isRFPRequote = rfqStatusVal === "re-quote requested" || rfqStatusVal === "revision_requested";
+  const isRFQCompleted = isRFPApproved || isRFPRejected;
+
   const isPendingApproval =
-    currentApproval?.status === "pending" &&
+    !isRFQCompleted &&
+    !isRFPRequote &&
     !isBuyerRevisionPending(currentApproval);
 
   // NEW: Check if current user is Level 2 approver
@@ -187,8 +198,9 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
   }, [currentApproval]);
 
   const isBuyerActionsLocked = useMemo(() => {
-    return !isApproverMode && (isPendingApproval || isRFPApproved);
-  }, [isApproverMode, isPendingApproval, isRFPApproved]);
+    return !isApproverMode && (isPendingApproval || isRFPApproved || isRFPRejected);
+  }, [isApproverMode, isPendingApproval, isRFPApproved, isRFPRejected]);
+
 
   const processedVendors = useMemo(() => {
     const vendors = processVendors(formattedResponses || [], buyerData).filter(
@@ -297,14 +309,18 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
     }
 
     if (action === "approve") {
-      if (selectedVendors.size === 0) {
+      const hasRecommendations =
+        selectedVendors.size > 0 ||
+        (buyerRecommendations && buyerRecommendations.length > 0);
+
+      if (!hasRecommendations) {
         toast.error(
-          "You must recommend at least one vendor before approving the RFP"
+          "At least one vendor recommendation is required to approve the RFP"
         );
         return;
       }
 
-      if (!validateRecommendations()) {
+      if (selectedVendors.size > 0 && !validateRecommendations()) {
         toast.error("Please provide remarks for all selected vendors");
         return;
       }
@@ -331,7 +347,10 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
   ) => {
     if (!level2ApprovalAction || !onUnifiedApprovalDecision) return;
 
-    const recommendedVendors = Array.from(selectedVendors.values());
+    const recommendedVendors =
+      selectedVendors.size > 0
+        ? Array.from(selectedVendors.values())
+        : buyerRecommendations || [];
 
     try {
       setIsSubmittingRecommendations(true);
@@ -353,13 +372,16 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
 
   const handleConfirmUnifiedAction = async () => {
     const { action } = confirmationDialog;
-    const recommendedVendors = Array.from(selectedVendors.values());
+    const recommendedVendors =
+      selectedVendors.size > 0
+        ? Array.from(selectedVendors.values())
+        : buyerRecommendations || [];
 
     try {
       setIsSubmittingRecommendations(true);
 
       if (onUnifiedApprovalDecision) {
-        onUnifiedApprovalDecision(
+        await onUnifiedApprovalDecision(
           action,
           approvalComments.trim(),
           recommendedVendors
@@ -372,6 +394,7 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
       setConfirmationDialog({ isOpen: false, action: "approve" });
     }
   };
+
 
   const handleCloseDialog = () => {
     setConfirmationDialog({ isOpen: false, action: "approve" });
@@ -392,13 +415,47 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
       return;
     }
 
+    if (!isApproverMode) {
+      if (approvalLevel === "level1") {
+        if (!level1Email.trim() || !level1Email.includes("@")) {
+          toast.error("Please enter a valid Level 1 Approver Email ID");
+          return;
+        }
+      } else {
+        if (!level1Email.trim() || !level1Email.includes("@")) {
+          toast.error("Please enter a valid Level 1 Approver Email ID");
+          return;
+        }
+        if (!level2Email.trim() || !level2Email.includes("@")) {
+          toast.error("Please enter a valid Level 2 Approver Email ID");
+          return;
+        }
+        if (
+          level1Email.trim().toLowerCase() === level2Email.trim().toLowerCase()
+        ) {
+          toast.error(
+            "Level 1 and Level 2 approvers must have different email addresses"
+          );
+          return;
+        }
+      }
+    }
+
     setIsSubmittingRecommendations(true);
 
     try {
       let approvalId: string | null = null;
 
       if (!isApproverMode) {
-        const approvalRes = await fetch(`/api/rfp/${rfpId}/approval`, {
+        const recommendedVendorsList = Array.from(selectedVendors.values()).map(
+          (vendor) => ({
+            companyName: vendor.companyName,
+            vendorResponseId: vendor.vendorResponseId,
+            reason: vendor.remarks.trim(),
+          })
+        );
+
+        const approvalRes = await fetch(`/api/rfq/${rfpId}/approval`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -407,6 +464,11 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
               `Recommended ${selectedVendors.size} vendor${
                 selectedVendors.size > 1 ? "s" : ""
               } for consideration.`,
+            approvalLevel,
+            level1ApproverEmail: level1Email.trim(),
+            level2ApproverEmail:
+              approvalLevel === "level2" ? level2Email.trim() : null,
+            recommendedVendors: recommendedVendorsList,
           }),
         });
 
@@ -419,9 +481,10 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
         approvalId = approvalData.approval?.id || approvalData.id;
       }
 
+
       const promises = Array.from(selectedVendors.values()).map(
         async (vendor) => {
-          const res = await fetch(`/api/rfp/${rfpId}/recommend`, {
+          const res = await fetch(`/api/rfq/${rfpId}/recommend`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -448,16 +511,22 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
         );
         onRecommendationUpdate?.();
       } else {
-        toast.success(
-          `Successfully recommended ${selectedVendors.size} vendor${
-            selectedVendors.size > 1 ? "s" : ""
-          } and submitted for approval!`
-        );
+        if (approvalLevel === "level1") {
+          toast.success(
+            `Approval request sent to Level 1 Approver (${level1Email.trim()})!`
+          );
+        } else {
+          toast.success(
+            `Approval request sent to Level 1 Approver (${level1Email.trim()}). Level 2 (${level2Email.trim()}) will receive after Level 1 approves!`
+          );
+        }
       }
 
       setSelectedVendors(new Map());
       setShowRecommendationSection(false);
       setGlobalComments("");
+      setLevel1Email("");
+      setLevel2Email("");
       setValidationErrors(new Map());
     } catch (e) {
       toast.error("Failed: " + (e as Error).message);
@@ -732,12 +801,13 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
                         <div className="space-y-1 text-sm text-gray-700">
                           <p>
                             <strong>Recommended by:</strong>{" "}
-                            {rec.recommender.name}
+                            {rec.recommender?.name || rec.recommenderRole || "Approver"}
                           </p>
                           <p>
                             <strong>Date:</strong>{" "}
-                            {new Date(rec.createdAt).toLocaleDateString()}
+                            {rec.createdAt ? new Date(rec.createdAt).toLocaleDateString() : "N/A"}
                           </p>
+
                           <p>
                             <strong>Reason:</strong> {rec.reason}
                           </p>
@@ -841,12 +911,6 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
         </Card>
       )}
 
-      <VendorScoringSystem
-        vendors={visibleVendors}
-        buyerData={buyerData}
-        selectedVendors={selectedVendors}
-      />
-
       <ComplianceTable
         vendors={visibleVendors}
         buyerData={evaluationCriteria}
@@ -893,12 +957,13 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
                       <div className="space-y-1 text-sm text-gray-700">
                         <p>
                           <strong>Recommended by:</strong>{" "}
-                          {rec.recommender.name}
+                          {rec.recommender?.name || rec.recommenderRole || "Buyer"}
                         </p>
                         <p>
                           <strong>Date:</strong>{" "}
-                          {new Date(rec.createdAt).toLocaleDateString()}
+                          {rec.createdAt ? new Date(rec.createdAt).toLocaleDateString() : "N/A"}
                         </p>
+
                         <p>
                           <strong>Reason:</strong> {rec.reason}
                         </p>
@@ -925,179 +990,180 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
       )}
 
 
-      {/* Unified Approval Section - Updated for Level 2 */}
-      {isLoggedIn && isApproverMode && isPendingApproval && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-blue-900">
-              <Shield className="h-5 w-5" />
-              {isLevel2Approver ? "Level 2 " : ""}Approver Decision &
-              Recommendations
-            </CardTitle>
-            <p className="text-sm text-blue-700">
-              Make your final decision on this RFP approval and include vendor
-              recommendations.
-              <strong>
-                {" "}
-                At least one vendor must be recommended for approval.
-              </strong>
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Vendor Selection Requirement Notice */}
-            {selectedVendors.size === 0 && (
-              <Alert className="border-red-200 bg-red-50">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-                <AlertDescription className="text-red-700">
-                  <strong>Action Required:</strong> Please select and recommend
-                  at least one vendor from the comparison tables above before
-                  you can approve this RFP. This ensures proper vendor
-                  evaluation and recommendation tracking.
-                </AlertDescription>
-              </Alert>
-            )}
 
-            {/* Selected Vendors Summary */}
-            {selectedVendors.size > 0 && (
-              <div className="bg-white rounded-lg p-4 border border-blue-200">
-                <div className="flex items-center gap-2 mb-3">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  <span className="font-medium text-gray-900">
-                    Your Vendor Recommendations ({selectedVendors.size})
-                  </span>
-                  <Badge
-                    variant="outline"
-                    className="bg-green-50 text-green-700 border-green-200"
-                  >
-                    <Shield className="h-3 w-3 mr-1" />
-                    Will be included with approval
-                  </Badge>
-                </div>
-                <div className="grid gap-2">
-                  {Array.from(selectedVendors.values()).map((vendor) => (
-                    <div
-                      key={vendor.vendorResponseId}
-                      className="bg-green-50 p-3 rounded border border-green-200"
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-green-900">
-                          {vendor.companyName}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className="text-xs bg-green-100 text-green-700"
-                        >
-                          Recommended
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-green-700">{vendor.remarks}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            {/* Approval Comments */}
-            <div className="bg-white rounded-lg p-4 border border-blue-200">
-              <Label
-                htmlFor="approval-comments"
-                className="text-sm font-medium text-gray-900"
-              >
-                Approval Decision Comments
-              </Label>
-              <Textarea
-                id="approval-comments"
-                placeholder="Add your comments about this RFP approval decision..."
-                value={approvalComments}
-                onChange={(e) => setApprovalComments(e.target.value)}
-                className="min-h-[100px] mt-2"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Required - Explain your approval decision and reasoning.
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex justify-between items-center pt-4 border-t border-blue-200 bg-white p-4 rounded-lg">
-              <div className="text-sm text-gray-700">
-                <p className="font-medium">
-                  Ready to make your final decision?
+      {/* Completed Status Banners (Approve / Reject) */}
+      {isRFPApproved && (
+        <Card className="border-green-300 bg-green-50 my-6 shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <CheckCircle className="h-8 w-8 text-green-600 flex-shrink-0" />
+              <div>
+                <h3 className="text-lg font-bold text-green-900">RFQ Status: Approved</h3>
+                <p className="text-sm text-green-800 mt-1">
+                  This RFQ recommendation has been approved by the approver. The approval flow is complete and permanently closed.
                 </p>
-                <p>
-                  Vendors: {processedVendors.length} • Your recommendations:{" "}
-                  {selectedVendors.size}
-                </p>
-                {selectedVendors.size === 0 && (
-                  <p className="text-red-600 text-xs mt-1">
-                    ⚠️ At least 1 vendor recommendation required for approval
+                {currentApproval?.level1Comments && (
+                  <p className="text-xs text-green-700 italic mt-2 bg-white/60 p-2 rounded border border-green-200">
+                    Approver Comments: &quot;{currentApproval.level1Comments}&quot;
                   </p>
                 )}
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-              <div className="flex gap-3">
+      {isRFPRejected && (
+        <Card className="border-red-300 bg-red-50 my-6 shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <XCircle className="h-8 w-8 text-red-600 flex-shrink-0" />
+              <div>
+                <h3 className="text-lg font-bold text-red-900">RFQ Status: Rejected</h3>
+                <p className="text-sm text-red-800 mt-1">
+                  This RFQ recommendation has been rejected by the approver. The approval flow is completed.
+                </p>
+                {(currentApproval?.level1Comments || currentApproval?.buyerComments) && (
+                  <p className="text-xs text-red-700 italic mt-2 bg-white/60 p-2 rounded border border-red-200">
+                    Rejection Reason: &quot;{currentApproval?.level1Comments || currentApproval?.buyerComments}&quot;
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {isRFPRequote && (
+        <Card className="border-amber-300 bg-amber-50 my-6 shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <Edit className="h-8 w-8 text-amber-600 flex-shrink-0" />
+              <div>
+                <h3 className="text-lg font-bold text-amber-900">RFQ Status: Re-quote Requested</h3>
+                <p className="text-sm text-amber-800 mt-1">
+                  The approver has requested a lower price re-quote / negotiation. The buyer can negotiate with the vendor and click &quot;Send for Approval&quot; again.
+                </p>
+                {currentApproval?.level1Comments && (
+                  <p className="text-xs text-amber-700 italic mt-2 bg-white/60 p-2 rounded border border-amber-200">
+                    Approver Instructions: &quot;{currentApproval.level1Comments}&quot;
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Unified Approver Action Section - Only for Active/Pending RFQs */}
+      {(isApproverMode || !!currentApproval) && !isRFQCompleted && (
+        <Card className="border-blue-200 bg-blue-50 my-6 shadow-sm">
+
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-blue-900">
+              <Shield className="h-5 w-5 text-purple-600" />
+              {isLevel2Approver ? "Level 2 " : ""}Approver Decision & Actions
+            </CardTitle>
+            <p className="text-sm text-blue-700">
+              Review the buyer&apos;s recommendations and justification below, then select your approval decision.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Buyer Comments / Justification Summary */}
+            <div className="bg-white rounded-lg p-4 border border-blue-200 space-y-2">
+              <Label className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-blue-600" />
+                Buyer Comments / Justification
+              </Label>
+              <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded border italic">
+                "{currentApproval?.buyerComments || globalComments || "Recommended selected vendor for consideration."}"
+              </p>
+              {buyerRecommendations && buyerRecommendations.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  <span className="text-xs font-semibold text-slate-600">Buyer Recommended Vendor(s):</span>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {buyerRecommendations.map((rec: any) => (
+                      <Badge key={rec.id || rec.vendorResponseId} className="bg-green-100 text-green-800 border-green-300">
+                        {rec.vendorResponse?.companyDetails?.companyName || rec.vendorResponseId}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Approval Decision Comments Input */}
+            <div className="bg-white rounded-lg p-4 border border-blue-200 space-y-2">
+              <Label htmlFor="approval-comments" className="text-sm font-medium text-gray-900">
+                Approver Decision Comments / Rejection Reason / Re-quote Instructions
+              </Label>
+              <Textarea
+                id="approval-comments"
+                placeholder="Enter comments, rejection reason, or lower price re-quote instructions..."
+                value={approvalComments}
+                onChange={(e) => setApprovalComments(e.target.value)}
+                className="min-h-[90px]"
+              />
+            </div>
+
+            {/* Action Buttons: Cancel, Reject, Request Re-quote, Approve */}
+            <div className="flex flex-wrap justify-between items-center pt-4 border-t border-blue-200 bg-white p-4 rounded-lg gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setApprovalComments("");
+                  toast.info("Action cancelled. Approval request remains pending.");
+                }}
+              >
+                Cancel
+              </Button>
+
+              <div className="flex flex-wrap gap-3">
                 <Button
                   variant="destructive"
                   onClick={() => handleUnifiedApprovalAction("reject")}
                   disabled={isSubmittingRecommendations}
                 >
                   <XCircle className="h-4 w-4 mr-2" />
-                  Reject RFP
+                  Reject RFQ
                 </Button>
 
                 <Button
                   variant="secondary"
-                  onClick={() =>
-                    handleUnifiedApprovalAction("request-revision")
-                  }
+                  onClick={() => handleUnifiedApprovalAction("request-revision")}
                   disabled={isSubmittingRecommendations}
                   className="bg-amber-500 hover:bg-amber-600 text-white"
                 >
                   <Edit className="h-4 w-4 mr-2" />
-                  Request Revision
-                  {isSubmittingRecommendations &&
-                    (isLevel2Approver
-                      ? level2ApprovalAction === "request-revision"
-                      : confirmationDialog.action === "request-revision") && (
-                      <div className="ml-2 animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                    )}
+                  Request Re-quote / Lower Price
                 </Button>
 
                 <Button
                   onClick={() => handleUnifiedApprovalAction("approve")}
-                  disabled={
-                    isSubmittingRecommendations ||
-                    !approvalComments.trim() ||
-                    selectedVendors.size === 0
-                  }
-                  className="bg-green-600 hover:bg-green-700"
+                  disabled={isSubmittingRecommendations}
+                  className="bg-green-600 hover:bg-green-700 text-white"
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  Approve RFP
-                  {selectedVendors.size > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="ml-2 bg-white text-green-700"
-                    >
-                      +{selectedVendors.size} rec
-                      {selectedVendors.size > 1 ? "s" : ""}
-                    </Badge>
-                  )}
+                  Approve RFQ
                 </Button>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
-      {/* Standalone Recommendation Section - WITH LOCK CHECK */}
+
+      {/* Standalone Recommendation Section - Only for Buyer */}
       {isLoggedIn &&
         showRecommendationSection &&
-        (!isApproverMode || !isPendingApproval) &&
+        !isApproverMode &&
         !isBuyerActionsLocked && (
+
           <Card className="border-blue-200 bg-blue-50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-blue-900">
                 <Star className="h-5 w-5" />
-                Add Vendor Recommendations ({selectedVendors.size})
+                Vendor Recommendations & Send for Approval ({selectedVendors.size})
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -1105,7 +1171,7 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
                 <div className="flex items-center gap-2 mb-3">
                   <CheckCircle className="h-5 w-5 text-green-600" />
                   <span className="font-medium text-gray-900">
-                    Selected Vendors
+                    Selected Vendors to Recommend
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1122,31 +1188,180 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
               </div>
 
               {!isApproverMode && (
-                <div className="bg-white rounded-lg p-4 border border-blue-200">
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="global-comments"
-                      className="flex items-center gap-2"
-                    >
-                      <MessageSquare className="h-4 w-4" />
-                      Buyer Comments / Justification
-                    </Label>
-                    <Textarea
-                      id="global-comments"
-                      placeholder="Add overall justification for your buyer recommendations..."
-                      value={globalComments}
-                      onChange={(e) => setGlobalComments(e.target.value)}
-                      className="min-h-[100px]"
-                    />
+                <>
+                  {/* Approval Level Selection */}
+                  <div className="bg-white rounded-lg p-5 border border-blue-200 space-y-4">
+                    <div>
+                      <Label className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                        <Shield className="h-5 w-5 text-blue-600" />
+                        Select Approval Level Required
+                      </Label>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Please select whether you need Level 1 or Level 2 approval hierarchy.
+                      </p>
+                    </div>
+
+                    {/* Level Selection Radio-style Toggle Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div
+                        onClick={() => setApprovalLevel("level1")}
+                        className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${
+                          approvalLevel === "level1"
+                            ? "border-blue-600 bg-blue-50/50 shadow-sm"
+                            : "border-gray-200 bg-white hover:border-gray-300"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-sm text-gray-900">
+                            Level 1 Approval
+                          </span>
+                          <input
+                            type="radio"
+                            name="approvalLevel"
+                            checked={approvalLevel === "level1"}
+                            onChange={() => setApprovalLevel("level1")}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Single-level approval process. Approval request is sent directly to Level 1 Approver.
+                        </p>
+                      </div>
+
+                      <div
+                        onClick={() => setApprovalLevel("level2")}
+                        className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${
+                          approvalLevel === "level2"
+                            ? "border-blue-600 bg-blue-50/50 shadow-sm"
+                            : "border-gray-200 bg-white hover:border-gray-300"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-sm text-gray-900">
+                            Level 2 Approval
+                          </span>
+                          <input
+                            type="radio"
+                            name="approvalLevel"
+                            checked={approvalLevel === "level2"}
+                            onChange={() => setApprovalLevel("level2")}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Two-stage sequential approval workflow (Level 1 ➔ Level 2 ➔ Final Approval).
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Approver Email Inputs */}
+                    <div className="pt-3 border-t border-gray-100 space-y-4">
+                      {approvalLevel === "level1" ? (
+                        <div className="space-y-1.5">
+                          <Label htmlFor="level1-email" className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                            Level 1 Approver Email ID <span className="text-red-500">*</span>
+                          </Label>
+                          <Input
+                            id="level1-email"
+                            type="email"
+                            placeholder="Enter Level 1 approver's email address"
+                            value={level1Email}
+                            onChange={(e) => setLevel1Email(e.target.value)}
+                            className="bg-white"
+                          />
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="level1-email" className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                              Level 1 Approver Email ID <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                              id="level1-email"
+                              type="email"
+                              placeholder="Enter Level 1 approver's email address"
+                              value={level1Email}
+                              onChange={(e) => setLevel1Email(e.target.value)}
+                              className="bg-white"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="level2-email" className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                              Level 2 Approver Email ID <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                              id="level2-email"
+                              type="email"
+                              placeholder="Enter Level 2 approver's email address"
+                              value={level2Email}
+                              onChange={(e) => setLevel2Email(e.target.value)}
+                              className="bg-white"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Visual Sequential Flow Indicator */}
+                      <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                        <div className="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                          Approval Flow Hierarchy:
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="font-medium bg-white px-2.5 py-1 rounded border border-slate-300 text-slate-700">
+                            Buyer
+                          </span>
+                          <span className="text-slate-400">➔</span>
+                          <span className="font-medium bg-blue-100 text-blue-800 px-2.5 py-1 rounded border border-blue-200">
+                            Level 1: {level1Email.trim() || "(Pending Email)"}
+                          </span>
+                          {approvalLevel === "level2" && (
+                            <>
+                              <span className="text-slate-400">➔</span>
+                              <span className="font-medium bg-purple-100 text-purple-800 px-2.5 py-1 rounded border border-purple-200">
+                                Level 2: {level2Email.trim() || "(Pending Email)"}
+                              </span>
+                            </>
+                          )}
+                          <span className="text-slate-400">➔</span>
+                          <span className="font-medium bg-green-100 text-green-800 px-2.5 py-1 rounded border border-green-200">
+                            Final Approval
+                          </span>
+                        </div>
+                        {approvalLevel === "level2" && (
+                          <p className="text-[11px] text-slate-500 mt-2">
+                            • <strong>Sequential Approval:</strong> Level 2 will receive the approval request only after Level 1 has approved.
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
+
+                  <div className="bg-white rounded-lg p-4 border border-blue-200">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="global-comments"
+                        className="flex items-center gap-2"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        Buyer Comments / Justification
+                      </Label>
+                      <Textarea
+                        id="global-comments"
+                        placeholder="Add overall justification for your buyer recommendations..."
+                        value={globalComments}
+                        onChange={(e) => setGlobalComments(e.target.value)}
+                        className="min-h-[90px]"
+                      />
+                    </div>
+                  </div>
+                </>
               )}
 
               <div className="flex justify-between items-center pt-4 border-t border-blue-200">
                 <div className="text-sm text-blue-700">
-                  <p className="font-medium">Add Recommendations</p>
-                  <p>
-                    Selected vendors will be added to your recommendation list
+                  <p className="font-medium">Send for Approval</p>
+                  <p className="text-xs text-gray-500">
+                    Submit your selected recommendations for approval review
                   </p>
                 </div>
 
@@ -1157,6 +1372,8 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
                       setSelectedVendors(new Map());
                       setShowRecommendationSection(false);
                       setGlobalComments("");
+                      setLevel1Email("");
+                      setLevel2Email("");
                       setValidationErrors(new Map());
                     }}
                   >
@@ -1178,7 +1395,7 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
                     ) : (
                       <>
                         <Send className="h-4 w-4 mr-2" />
-                        Submit for Approval ({selectedVendors.size} Vendor
+                        Send for Approval ({selectedVendors.size} Vendor
                         {selectedVendors.size > 1 ? "s" : ""})
                       </>
                     )}
@@ -1213,7 +1430,7 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
       />
 
       {/* Footer */}
-      <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 text-xs text-gray-500">
+      <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 text-xs text-gray-500 rounded-b-lg mb-6">
         <div className="flex justify-between items-center">
           <div>Generated on {new Date().toLocaleDateString()}</div>
           <div>Confidential - For Internal Use Only</div>

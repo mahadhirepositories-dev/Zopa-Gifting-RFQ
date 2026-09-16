@@ -17,19 +17,19 @@ export const FinancialTerms: React.FC<FinancialTermsProps> = ({
     
     return (
       <div
-        className={`px-3 py-1 rounded-full text-xs font-medium flex items-center ${
+        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
           status === "agree"
-            ? "bg-green-100 text-green-800 p-2"
-            : "bg-red-100 text-red-800 p-2"
+            ? "bg-emerald-100/90 text-emerald-700 border border-emerald-200/60"
+            : "bg-red-100/90 text-red-700 border border-red-200/60"
         }`}
       >
         {status === "agree" ? (
           <>
-            <CheckCircleIcon className="h-4 w-4 mr-1" /> Agreed
+            <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-600" /> Agreed
           </>
         ) : (
           <>
-            <XCircleIcon className="h-4 w-4 mr-1" /> Disagreed
+            <XCircleIcon className="h-3.5 w-3.5 text-red-600" /> Disagreed
           </>
         )}
       </div>
@@ -37,15 +37,14 @@ export const FinancialTerms: React.FC<FinancialTermsProps> = ({
   };
 
   const renderVendorRemarks = (remarks: string | undefined, agreementStatus: string | undefined) => {
-    // Default to "agree" if the field is missing (for backward compatibility)
     const status = agreementStatus || "agree";
     
     if (!remarks || status !== "disagree") return null;
     
     return (
-      <div>
-        <h4 className="text-sm font-semibold text-gray-800 mb-1">Vendor Remarks:</h4>
-        <p className="text-sm text-gray-700">{remarks}</p>
+      <div className="mt-2">
+        <h4 className="text-xs font-semibold text-gray-700 mb-0.5">Vendor Remarks:</h4>
+        <p className="text-xs text-gray-600">{remarks}</p>
       </div>
     );
   };
@@ -58,144 +57,133 @@ export const FinancialTerms: React.FC<FinancialTermsProps> = ({
       case "fee": return "Time & Materials";
       case "cost": return "Cost Plus Fee";
       case "unspecified": return "Unspecified";
-      default: return <span className="text-gray-400">Not specified</span>;
+      default: return <span className="text-gray-400 italic font-normal">Not specified</span>;
     }
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-100 shadow-sm p-6">
-      <h2 className="text-xl font-semibold text-gray-700 border-b border-gray-100 pb-6 mb-6">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-xs p-6 mb-6">
+      <h2 className="text-lg font-bold text-gray-900 mb-6">
         5. Financial Terms
       </h2>
 
       {/* First Row: Cost Model and Currency - Equal Width */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         {/* Cost Model Card */}
-        <div className="bg-gray-50 p-4 rounded-lg border">
-          <h3 className="text-xs font-medium text-gray-800 mb-1">COST MODEL</h3>
-          <p className="text-sm font-medium text-gray-800">
+        <div className="bg-gray-50/80 p-4 rounded-lg border border-gray-200/70">
+          <h3 className="text-xs font-semibold text-gray-500 tracking-wider uppercase mb-1">
+            COST MODEL
+          </h3>
+          <p className="text-sm font-semibold text-gray-900">
             {getBudgetTypeLabel(buyerData?.financials?.budgetType)}
           </p>
         </div>
 
         {/* Currency Card */}
-        <div className="bg-gray-50 p-4 rounded-lg border">
-          <h3 className="text-xs font-medium text-gray-800 mb-1">CURRENCY</h3>
-          <p className="text-sm font-medium text-gray-800">
+        <div className="bg-gray-50/80 p-4 rounded-lg border border-gray-200/70">
+          <h3 className="text-xs font-semibold text-gray-500 tracking-wider uppercase mb-1">
+            CURRENCY
+          </h3>
+          <p className="text-sm font-semibold text-gray-900">
             {buyerData?.financials?.currency || (
-              <span className="text-gray-400">Not specified</span>
+              <span className="text-gray-400 italic font-normal">Not specified</span>
             )}
           </p>
         </div>
       </div>
 
       {/* Full Width Sections Below */}
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Payment Terms Card - Full Width */}
-        <div className="bg-gray-50 p-4 rounded-lg border shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-gray-800 tracking-wider">
+        <div className="bg-gray-50/80 p-4 rounded-lg border border-gray-200/70 flex items-center justify-between">
+          <div className="space-y-0.5">
+            <h3 className="text-sm font-semibold text-gray-900">
               Payment Terms
             </h3>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-700">
-                {buyerData?.financials?.paymentTerm || (
-                  <span className="text-gray-400 italic">Not specified</span>
-                )}
-              </p>
-              {renderAgreementStatus(
-                selectedVendor?.revisionData?.financialTerms?.paymentTermsAgreement
+            <p className="text-sm text-gray-600">
+              {buyerData?.financials?.paymentTerm || (
+                <span className="text-gray-400 italic font-normal">Not specified</span>
               )}
-            </div>
-
+            </p>
             {renderVendorRemarks(
               selectedVendor?.revisionData?.financialTerms?.paymentTermsRemarks,
               selectedVendor?.revisionData?.financialTerms?.paymentTermsAgreement
             )}
           </div>
+          {renderAgreementStatus(
+            selectedVendor?.revisionData?.financialTerms?.paymentTermsAgreement
+          )}
         </div>
 
         {/* PBG Amount Card - Full Width */}
-        <div className="bg-gray-50 p-3 rounded-lg border">
-          <h3 className="text-sm font-semibold text-gray-800 mb-1">
-            PBG Amount
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-gray-800">
-                {buyerData?.financials?.pbgAmount ? (
-                  `${buyerData.financials.currency} ${buyerData.financials.pbgAmount.toLocaleString()}`
-                ) : (
-                  <span className="text-gray-400">Not specified</span>
-                )}
-              </p>
-              {renderAgreementStatus(
-                selectedVendor?.revisionData?.financialTerms?.pbgAmountAgreement
+        <div className="bg-gray-50/80 p-4 rounded-lg border border-gray-200/70 flex items-center justify-between">
+          <div className="space-y-0.5">
+            <h3 className="text-sm font-semibold text-gray-900">
+              PBG Amount
+            </h3>
+            <p className="text-sm text-gray-600">
+              {buyerData?.financials?.pbgAmount ? (
+                `${buyerData.financials.currency} ${buyerData.financials.pbgAmount.toLocaleString()}`
+              ) : (
+                <span className="text-gray-400 italic font-normal">Not specified</span>
               )}
-            </div>
-
+            </p>
             {renderVendorRemarks(
               selectedVendor?.revisionData?.financialTerms?.pbgAmountRemarks,
               selectedVendor?.revisionData?.financialTerms?.pbgAmountAgreement
             )}
           </div>
+          {renderAgreementStatus(
+            selectedVendor?.revisionData?.financialTerms?.pbgAmountAgreement
+          )}
         </div>
 
         {/* PBG Notes */}
         {buyerData?.financials?.pbgNotes && (
-          <div className="bg-gray-50 p-3 rounded-lg border">
-            <h3 className="text-sm font-semibold text-gray-800 mb-1">
-              PBG Notes
-            </h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-gray-800">
-                  {buyerData.financials.pbgNotes}
-                </p>
-                {renderAgreementStatus(
-                  selectedVendor?.revisionData?.financialTerms?.pbgNotesAgreement
-                )}
-              </div>
-
+          <div className="bg-gray-50/80 p-4 rounded-lg border border-gray-200/70 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <h3 className="text-sm font-semibold text-gray-900">
+                PBG Notes
+              </h3>
+              <p className="text-sm text-gray-600">
+                {buyerData.financials.pbgNotes}
+              </p>
               {renderVendorRemarks(
                 selectedVendor?.revisionData?.financialTerms?.pbgNotesRemarks,
                 selectedVendor?.revisionData?.financialTerms?.pbgNotesAgreement
               )}
             </div>
+            {renderAgreementStatus(
+              selectedVendor?.revisionData?.financialTerms?.pbgNotesAgreement
+            )}
           </div>
         )}
 
         {/* Buyer Financial Notes */}
         {buyerData?.financials?.financialNotes && (
-          <div className="bg-gray-50 p-3 rounded-lg border">
-            <h3 className="text-sm font-semibold text-gray-800 mb-1">
-              Buyer Financial Notes
-            </h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-gray-800">
-                  {buyerData.financials.financialNotes}
-                </p>
-                {renderAgreementStatus(
-                  selectedVendor?.revisionData?.financialTerms?.financialNotesAgreement
-                )}
-              </div>
-
+          <div className="bg-gray-50/80 p-4 rounded-lg border border-gray-200/70 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <h3 className="text-sm font-semibold text-gray-900">
+                Buyer Financial Notes
+              </h3>
+              <p className="text-sm text-gray-600">
+                {buyerData.financials.financialNotes}
+              </p>
               {renderVendorRemarks(
                 selectedVendor?.revisionData?.financialTerms?.financialNotesRemarks,
                 selectedVendor?.revisionData?.financialTerms?.financialNotesAgreement
               )}
             </div>
+            {renderAgreementStatus(
+              selectedVendor?.revisionData?.financialTerms?.financialNotesAgreement
+            )}
           </div>
         )}
 
         {/* Additional Vendor Remarks */}
         {selectedVendor?.revisionData?.financialTerms?.remarks && (
-          <div className="bg-gray-50 p-4 rounded-lg border">
-            <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+          <div className="bg-gray-50/80 p-4 rounded-lg border border-gray-200/70">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">
               Additional Vendor Remarks
             </h3>
             <p className="text-sm text-gray-700 whitespace-pre-line">

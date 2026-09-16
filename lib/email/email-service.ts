@@ -8,6 +8,9 @@ import RfpMagicLinkEmail from "@/emails/templates/RfpMagicLinkEmail";
 import WelcomeEmail from "@/emails/templates/WelcomeEmail";
 import VendorSubmissionEmail from "@/emails/templates/VendorSubmissionEmail";
 import VendorPreviewEmail from "@/emails/templates/VendorPreviewEmail";
+import ApprovalRequestEmail from "@/emails/templates/ApprovalRequestEmail";
+import ApprovalDecisionEmail from "@/emails/templates/ApprovalDecisionEmail";
+
 
 export class EmailService {
   private static async renderAndSend({
@@ -228,20 +231,106 @@ export class EmailService {
     return { success: true };
   }
 
-  static async sendApprovalRequestEmail(data: any) {
+  static async sendApprovalRequestEmail(data: {
+    approverEmail: string;
+    rfqId?: string;
+    rfpId?: string;
+    approvalUrl: string;
+    projectName?: string;
+    buyerComments?: string;
+    comments?: string;
+    approverName?: string;
+    requesterName?: string;
+    buyerEmail?: string;
+    recommendedVendors?: Array<{ companyName: string; vendorResponseId?: string }>;
+    approvalLevel?: string;
+  }) {
     console.log("Approval request email triggered:", data);
+    const companyName = "ZOPA Gifting RFQ";
+    const targetRfqId = data.rfqId || data.rfpId || "RFQ";
+    await this.renderAndSend({
+      template: ApprovalRequestEmail,
+      props: {
+        projectName: data.projectName || "Gifting Project",
+        rfqId: targetRfqId,
+        approvalUrl: data.approvalUrl,
+        buyerComments: data.buyerComments || data.comments,
+        recommendedVendors: data.recommendedVendors || [],
+        approvalLevel: data.approvalLevel || "Level 1",
+      },
+      email: data.approverEmail,
+      subject: `Approval Required: Vendor Recommendation for ${data.projectName || "RFQ " + targetRfqId}`,
+      companyName,
+      buyerEmail: data.buyerEmail,
+    });
     return { success: true };
   }
 
-  static async sendApprovalDecisionEmail(data: any) {
+
+  static async sendApprovalDecisionEmail(data: {
+    buyerEmail?: string;
+    vendorEmail?: string;
+    rfqId?: string;
+    rfpId?: string;
+    status: string;
+    projectName?: string;
+    comments?: string;
+    requesterName?: string;
+    requesterEmail?: string;
+    approverName?: string;
+    rfpUrl?: string;
+  }) {
     console.log("Approval decision email triggered:", data);
+    const targetEmail = data.buyerEmail || data.requesterEmail || data.vendorEmail || process.env.ADMIN_EMAIL_TO || "buyer@zopapro.com";
+    const targetRfqId = data.rfqId || data.rfpId || "RFQ";
+    const companyName = "ZOPA Gifting RFQ";
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const rfqUrl = data.rfpUrl || `${baseUrl}/rfq/buyer_preview/${targetRfqId}`;
+
+    await this.renderAndSend({
+      template: ApprovalDecisionEmail,
+      props: {
+        projectName: data.projectName || "Gifting Project",
+        rfqId: targetRfqId,
+        status: data.status,
+        comments: data.comments,
+        rfqUrl,
+      },
+      email: targetEmail,
+      subject: `RFQ ${data.status}: Vendor Recommendation for ${data.projectName || "RFQ " + targetRfqId}`,
+      companyName,
+    });
     return { success: true };
   }
 
-  static async sendRevisionRequestEmail(data: any) {
-    console.log("Revision request email triggered:", data);
-    return { success: true };
+  static async sendRevisionRequestEmail(data: {
+    buyerEmail?: string;
+    vendorEmail?: string;
+    vendorCompanyName?: string;
+    buyerCompanyName?: string;
+    approverName?: string;
+    revisionComments?: string;
+    submissionDeadline?: string;
+    rfqUrl?: string;
+    rfpUrl?: string;
+    rfqId?: string;
+    rfpId?: string;
+    projectName?: string;
+    comments?: string;
+    requesterName?: string;
+    requesterEmail?: string;
+  }) {
+    return this.sendApprovalDecisionEmail({
+      buyerEmail: data.buyerEmail || data.vendorEmail || data.requesterEmail,
+      rfqId: data.rfqId || data.rfpId,
+      status: "Re-quote Requested",
+      projectName: data.projectName,
+      comments: data.comments || data.revisionComments,
+      rfpUrl: data.rfpUrl || data.rfqUrl,
+    });
   }
+
+
 
   static async sendVendorApprovalNotificationEmail(data: any) {
     console.log("Vendor proposal selected email triggered:", data);

@@ -74,10 +74,16 @@ export const getSectionPayload = (
     payload.vendors = formData.vendors || (formData as any).vendorSelection;
   } else if (
     section === "vendorcontacts" &&
-    (formData.vendorcontacts || (formData as any).vendorContacts)
+    ((Array.isArray((formData as any).vendorContacts) &&
+      (formData as any).vendorContacts.length > 0) ||
+      (Array.isArray(formData.vendorcontacts) &&
+        formData.vendorcontacts.length > 0))
   ) {
     payload.vendorcontacts =
-      formData.vendorcontacts || (formData as any).vendorContacts;
+      Array.isArray((formData as any).vendorContacts) &&
+      (formData as any).vendorContacts.length > 0
+        ? (formData as any).vendorContacts
+        : formData.vendorcontacts;
   } else if (
     section === "dates" &&
     ((formData as any).rfpDates || (formData as any).dates)
@@ -129,10 +135,10 @@ export const MainContent: React.FC<MainContentProps> = ({
   ];
 
   const saveSectionData = React.useCallback(
-    async (section: string, payload: Record<string, any>) => {
+    async (section: string, payload: Record<string, any>, force = false) => {
       if (!rfpId || Object.keys(payload).length === 0) return;
       const payloadStr = JSON.stringify(payload);
-      if (lastSavedPayloadMapRef.current[section] === payloadStr) return;
+      if (!force && lastSavedPayloadMapRef.current[section] === payloadStr) return;
 
       setSaveStatus("saving");
       try {
@@ -165,10 +171,7 @@ export const MainContent: React.FC<MainContentProps> = ({
     }
     const payload = getSectionPayload(currentSection, formData, selection);
     if (Object.keys(payload).length > 0) {
-      const payloadStr = JSON.stringify(payload);
-      if (lastSavedPayloadMapRef.current[currentSection] !== payloadStr) {
-        await saveSectionData(currentSection, payload);
-      }
+      await saveSectionData(currentSection, payload, true);
     }
   }, [currentSection, formData, selection, saveSectionData]);
 
@@ -182,7 +185,7 @@ export const MainContent: React.FC<MainContentProps> = ({
       if (rfpId) {
         const payload = getSectionPayload(prevSec, formData, selection);
         if (Object.keys(payload).length > 0) {
-          saveSectionData(prevSec, payload);
+          saveSectionData(prevSec, payload, true);
         }
       }
     }
@@ -202,7 +205,6 @@ export const MainContent: React.FC<MainContentProps> = ({
 
     if (!isInitialRenderRef.current[currentSection]) {
       isInitialRenderRef.current[currentSection] = true;
-      lastSavedPayloadMapRef.current[currentSection] = currentPayloadStr;
       return;
     }
 

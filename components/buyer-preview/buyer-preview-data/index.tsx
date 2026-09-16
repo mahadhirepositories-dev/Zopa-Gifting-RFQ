@@ -101,17 +101,20 @@ interface EnhancedBuyerPreviewProps extends BuyerPreviewProps {
     revisionRequestRecipient?: string | null;
 
     // General fields
-    requestedBy: string;
-    requestedAt: string;
+    requestedBy?: string;
+    requestedAt?: string;
+    createdAt?: string;
     reviewedAt?: string;
     buyerComments?: string;
-    requester: {
-      id: string;
-      name: string;
-      email: string;
-    };
+    requester?: {
+      id?: string;
+      name?: string;
+      email?: string;
+    } | null;
     history?: any[];
   };
+
+
 
   buyerRecommendations?: Array<{
     id: number;
@@ -425,61 +428,77 @@ export default function BuyerPreview({
   buyerRecommendations = [],
 }: EnhancedBuyerPreviewProps) {
   const router = useRouter();
-  const formattedResponses: VendorResponse[] = vendorResponses.map(
-    (response: RawVendorResponse) => {
-      return {
-        id: response.id?.toString() || response.vendorResponseId || "",
-        vendorResponseId: response.vendorResponseId || "",
-        vendorId: response.vendorId || "",
-        revisionNumber: response.revisionNumber,
-        status: response.status || "",
-        updatedAt: response.updatedAt || "",
-        companydetails: {
-          companyName:
-            response.companydetails?.companyName ||
-            response.companyDetails?.companyName ||
-            "",
-          addressLine1:
-            response.companydetails?.addressLine1 ||
-            response.companyDetails?.addressLine1 ||
-            "",
-          addressLine2:
-            response.companydetails?.addressLine2 ||
-            response.companyDetails?.addressLine2 ||
-            "",
-          city:
-            response.companydetails?.city ||
-            response.companyDetails?.city ||
-            "",
-          state:
-            response.companydetails?.state ||
-            response.companyDetails?.state ||
-            "",
-          country:
-            response.companydetails?.country ||
-            response.companyDetails?.country ||
-            "",
-          postalCode:
-            response.companydetails?.postalCode ||
-            response.companyDetails?.postalCode ||
-            "",
-          phone:
-            response.companydetails?.phone ||
-            response.companyDetails?.phone ||
-            "",
-          email:
-            response.companydetails?.email ||
-            response.companyDetails?.email ||
-            "",
-          businessType:
-            response.companydetails?.businessType ||
-            response.companyDetails?.businessType ||
-            "",
-        },
-        logoUrl: response.logoUrl || "",
-      };
-    },
-  );
+
+  const [localResponses, setLocalResponses] = useState<VendorResponse[]>([]);
+
+  // Sync vendorResponses from props into localResponses state with qualificationStatus
+  useEffect(() => {
+    if (Array.isArray(vendorResponses) && vendorResponses.length > 0) {
+      const formatted: VendorResponse[] = vendorResponses.map(
+        (response: RawVendorResponse) => ({
+          id: response.id?.toString() || response.vendorResponseId || "",
+          vendorResponseId: response.vendorResponseId || "",
+          vendorId: response.vendorId || "",
+          revisionNumber: response.revisionNumber,
+          revisions: response.revisions,
+          status: response.status || "",
+          isDraft: (response as any).isDraft || false,
+          updatedAt: response.updatedAt || "",
+          qualificationStatus:
+            response.qualificationStatus ||
+            (response as any).qualification_status ||
+            "qualified",
+          companydetails: {
+            companyName:
+              response.companydetails?.companyName ||
+              response.companyDetails?.companyName ||
+              "",
+            addressLine1:
+              response.companydetails?.addressLine1 ||
+              response.companyDetails?.addressLine1 ||
+              "",
+            addressLine2:
+              response.companydetails?.addressLine2 ||
+              response.companyDetails?.addressLine2 ||
+              "",
+            city:
+              response.companydetails?.city ||
+              response.companyDetails?.city ||
+              "",
+            state:
+              response.companydetails?.state ||
+              response.companyDetails?.state ||
+              "",
+            country:
+              response.companydetails?.country ||
+              response.companyDetails?.country ||
+              "",
+            postalCode:
+              response.companydetails?.postalCode ||
+              response.companyDetails?.postalCode ||
+              "",
+            phone:
+              response.companydetails?.phone ||
+              response.companyDetails?.phone ||
+              "",
+            email:
+              response.companydetails?.email ||
+              response.companyDetails?.email ||
+              "",
+            businessType:
+              response.companydetails?.businessType ||
+              response.companyDetails?.businessType ||
+              "",
+          },
+          logoUrl: response.logoUrl || "",
+        }),
+      );
+      setLocalResponses(formatted);
+    } else {
+      setLocalResponses([]);
+    }
+  }, [vendorResponses]);
+
   const [templateSettings, setTemplateSettings] = useState<TemplateSettings>(
     defaultTemplateSettings,
   );
@@ -493,31 +512,130 @@ export default function BuyerPreview({
   const [selectedVendor, setSelectedVendor] = useState<VendorRevision | null>(
     null,
   );
+  const [selectedDisqualifiedVendor, setSelectedDisqualifiedVendor] =
+    useState<VendorRevision | null>(null);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [activeMainTab, setActiveMainTab] = useState("vendor-responses");
   const [approvalLoading, setApprovalLoading] = useState(false);
   const [isNavigating, setIsNavigating] = React.useState(false);
   const [userId, setUserId] = useState<string | undefined>();
 
+  const qualifiedResponses = localResponses.filter(
+    (v) => v.qualificationStatus !== "disqualified",
+  );
+  const disqualifiedResponses = localResponses.filter(
+    (v) => v.qualificationStatus === "disqualified",
+  );
+
+  const handleQualificationChange = async (
+    vendorResponseId: string,
+    newStatus: "qualified" | "disqualified",
+  ) => {
+    try {
+      const updatedResponses = localResponses.map((v) =>
+        v.vendorResponseId === vendorResponseId
+          ? { ...v, qualificationStatus: newStatus }
+          : v,
+      );
+      setLocalResponses(updatedResponses);
+
+      // If currently selected qualified vendor gets disqualified
+      if (
+        selectedVendor &&
+        selectedVendor.vendorResponseId === vendorResponseId &&
+        newStatus === "disqualified"
+      ) {
+        const remainingQualified = updatedResponses.filter(
+          (v) =>
+            v.qualificationStatus !== "disqualified" &&
+            v.companydetails?.companyName,
+        );
+        if (remainingQualified.length > 0) {
+          const nextVendor = remainingQualified[0];
+          const { revisionData, revisionKey } =
+            getLatestRevisionForVendor(nextVendor);
+          setSelectedVendor({
+            ...nextVendor,
+            _revisionKey: revisionKey,
+            revisionData,
+            _originalVendorId: nextVendor.vendorId,
+            _uniqueId: `${nextVendor.id}-${revisionKey}`,
+          });
+        } else {
+          setSelectedVendor(null);
+        }
+      }
+
+      // If currently selected disqualified vendor gets qualified
+      if (
+        selectedDisqualifiedVendor &&
+        selectedDisqualifiedVendor.vendorResponseId === vendorResponseId &&
+        newStatus === "qualified"
+      ) {
+        const remainingDisqualified = updatedResponses.filter(
+          (v) =>
+            v.qualificationStatus === "disqualified" &&
+            v.companydetails?.companyName,
+        );
+        if (remainingDisqualified.length > 0) {
+          const nextVendor = remainingDisqualified[0];
+          const { revisionData, revisionKey } =
+            getLatestRevisionForVendor(nextVendor);
+          setSelectedDisqualifiedVendor({
+            ...nextVendor,
+            _revisionKey: revisionKey,
+            revisionData,
+            _originalVendorId: nextVendor.vendorId,
+            _uniqueId: `${nextVendor.id}-${revisionKey}`,
+          });
+        } else {
+          setSelectedDisqualifiedVendor(null);
+          // Auto switch back to qualified vendor responses tab if no disqualified vendors remain
+          setActiveMainTab("vendor-responses");
+        }
+      }
+
+      const res = await fetch("/api/vendor-response/qualification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vendorResponseId,
+          qualificationStatus: newStatus,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to update qualification status");
+      }
+
+      toast.success(
+        newStatus === "disqualified"
+          ? "Vendor response disqualified successfully"
+          : "Vendor response qualified successfully",
+      );
+    } catch (err: any) {
+      console.error("Error updating qualification status:", err);
+      toast.error("Failed to update qualification status");
+    }
+  };
+
   useEffect(() => {
-    if (formattedResponses?.length > 0 && !selectedVendor) {
+    if (qualifiedResponses?.length > 0 && !selectedVendor) {
       let targetVendor = null;
       if (urlResponseId) {
-        targetVendor = formattedResponses.find(
+        targetVendor = qualifiedResponses.find(
           (v) =>
             v.vendorResponseId === urlResponseId &&
             v.companydetails?.companyName,
         );
       }
       if (!targetVendor) {
-        targetVendor = formattedResponses.find(
+        targetVendor = qualifiedResponses.find(
           (v) => v.companydetails?.companyName,
         );
       }
 
       if (targetVendor) {
-        // Always default to the LATEST revision (highest revisionNumber),
-        // not just the first item in the array / object.
         const { revisionData, revisionKey } =
           getLatestRevisionForVendor(targetVendor);
 
@@ -531,7 +649,28 @@ export default function BuyerPreview({
         setSelectedVendor(selectedVendorData);
       }
     }
-  }, [formattedResponses, selectedVendor, urlResponseId]);
+  }, [qualifiedResponses, selectedVendor, urlResponseId]);
+
+  useEffect(() => {
+    if (disqualifiedResponses?.length > 0 && !selectedDisqualifiedVendor) {
+      const targetVendor = disqualifiedResponses.find(
+        (v) => v.companydetails?.companyName,
+      );
+      if (targetVendor) {
+        const { revisionData, revisionKey } =
+          getLatestRevisionForVendor(targetVendor);
+
+        const selectedVendorData = {
+          ...targetVendor,
+          _revisionKey: revisionKey,
+          revisionData,
+          _originalVendorId: targetVendor.vendorId,
+          _uniqueId: `${targetVendor.id}-${revisionKey}`,
+        };
+        setSelectedDisqualifiedVendor(selectedVendorData);
+      }
+    }
+  }, [disqualifiedResponses, selectedDisqualifiedVendor]);
 
   useEffect(() => {
     const fetchUserId = async () => {
@@ -555,7 +694,7 @@ export default function BuyerPreview({
     if (!rfpId) return;
 
     try {
-      const response = await fetch(`/api/rfp/${rfpId}/recommendations`);
+      const response = await fetch(`/api/rfq/${rfpId}/recommendations`);
       if (response.ok) {
         const data = await response.json();
         setRecommendations(data.recommendations || []);
@@ -577,27 +716,32 @@ export default function BuyerPreview({
         const response = await fetch(
           "/api/admin/global-defaults/template-settings",
         );
-        const data = await response.json();
-        if (data.success && data.templateSettings) {
-          setTemplateSettings({
-            ...defaultTemplateSettings,
-            ...data.templateSettings,
-            includeSections: {
-              ...defaultTemplateSettings.includeSections,
-              ...data.templateSettings.includeSections,
-            },
-            fontSize: {
-              ...defaultTemplateSettings.fontSize,
-              ...data.templateSettings.fontSize,
-            },
-            pageMargins: {
-              ...defaultTemplateSettings.pageMargins,
-              ...data.templateSettings.pageMargins,
-            },
-          });
+        if (response.ok) {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const data = await response.json();
+            if (data.success && data.templateSettings) {
+              setTemplateSettings({
+                ...defaultTemplateSettings,
+                ...data.templateSettings,
+                includeSections: {
+                  ...defaultTemplateSettings.includeSections,
+                  ...data.templateSettings.includeSections,
+                },
+                fontSize: {
+                  ...defaultTemplateSettings.fontSize,
+                  ...data.templateSettings.fontSize,
+                },
+                pageMargins: {
+                  ...defaultTemplateSettings.pageMargins,
+                  ...data.templateSettings.pageMargins,
+                },
+              });
+            }
+          }
         }
       } catch (error) {
-        console.error(error);
+        console.error("Error fetching template settings:", error);
       }
     };
 
@@ -650,34 +794,45 @@ export default function BuyerPreview({
     recommendedVendors: any[],
     revisionRecipient?: string,
   ) => {
-    if (!currentApproval || !isApprover) return;
+    if (!rfpId) return;
     setApprovalLoading(true);
     try {
-      if (recommendedVendors.length > 0) {
+      const buyerEmail =
+        buyerData?.contact?.contactEmail || buyerData?.contact?.email;
+      const targetApprovalId = currentApproval?.id || rfpId;
+
+      if (recommendedVendors.length > 0 && currentApproval?.id) {
         const recommendationPromises = recommendedVendors.map(
           async (vendor) => {
-            const res = await fetch(`/api/rfp/${rfpId}/recommend`, {
+            await fetch(`/api/rfq/${rfpId}/recommend`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 vendorResponseId: vendor.vendorResponseId,
-                reason: vendor.remarks.trim(),
+                reason: vendor.remarks?.trim() || "",
                 approvalId: currentApproval.id,
                 action,
               }),
             });
-            if (!res.ok) {
-              const err = await res.json();
-              throw new Error(
-                `Failed to recommend ${vendor.companyName}: ${err.error}`,
-              );
-            }
           },
         );
 
         await Promise.all(recommendationPromises);
       }
-      const response = await fetch(`/api/approvals/${currentApproval.id}`, {
+
+      // Always call /api/rfq/[id]/approve endpoint to update RFQ status and trigger buyer decision email
+      const approveRes = await fetch(`/api/rfq/${rfpId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          comments: comments.trim(),
+          buyerEmail,
+        }),
+      });
+
+      // Call /api/approvals/[id] endpoint to update approval history table
+      const response = await fetch(`/api/approvals/${targetApprovalId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -685,6 +840,7 @@ export default function BuyerPreview({
         body: JSON.stringify({
           action,
           comments: comments.trim(),
+          buyerEmail,
           revisionRecipient: revisionRecipient || "buyer",
           selectedVendor:
             recommendedVendors.length > 0
@@ -698,9 +854,14 @@ export default function BuyerPreview({
         }),
       });
 
-      const data = await response.json();
+      let data: any = {};
+      try {
+        data = await response.json();
+      } catch (err) {
+        console.warn("Response body non-JSON or empty:", err);
+      }
 
-      if (response.ok) {
+      if (response.ok || approveRes.ok) {
         const actionText =
           action === "approve"
             ? "approved"
@@ -708,30 +869,29 @@ export default function BuyerPreview({
               ? "rejected"
               : "revision requested";
 
-        const recommendationText =
-          recommendedVendors.length > 0
-            ? ` with ${recommendedVendors.length} vendor recommendation${
-                recommendedVendors.length > 1 ? "s" : ""
-              }`
-            : "";
-
-        toast.success(`RFP ${actionText} successfully${recommendationText}!`);
+        toast.success(`RFQ ${actionText} successfully! Email sent to buyer.`);
         if (orgSlug) {
           router.push(`/${orgSlug}/approver/approvals`);
         } else {
           fetchRecommendations();
+          if (typeof window !== "undefined") {
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
+          }
         }
       } else {
-        toast.error(data.error || `Failed to ${action} RFP`);
+        toast.error(data.error || `Failed to ${action} RFQ`);
       }
     } catch (error) {
-      console.error(`Error processing approval:`, error);
+      console.error(`Error processing approval decision:`, error);
+      toast.error("Failed to submit approval decision");
     } finally {
       setApprovalLoading(false);
     }
   };
 
-  if (formattedResponses?.length === 0) {
+  if (localResponses?.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
@@ -879,6 +1039,12 @@ export default function BuyerPreview({
         show: true,
       },
       {
+        value: "disqualified-responses",
+        label: `Disqualified Vendors (${disqualifiedResponses.length})`,
+        icon: <XCircle className="h-4 w-4 mr-2 text-red-500" />,
+        show: disqualifiedResponses.length > 0,
+      },
+      {
         value: "comparison",
         label: "Compare Vendors",
         icon: null,
@@ -898,14 +1064,14 @@ export default function BuyerPreview({
   const tabsList = getTabsList();
 
   return (
-    <div className="min-h-screen">
-      <header className="bg-gray-50 fixed top-0 left-0 right-0 z-10 w-full border-b">
-        <div className="container mx-auto py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-gray-50/30">
+      <header className="bg-gray-50 fixed top-0 left-0 right-0 z-20 w-full border-b shadow-xs">
+        <div className="container mx-auto px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-col">
             <h1 className="text-2xl font-bold text-blue-600">
               {isApprover ? "Approver Review" : "Buyer Response Preview"}
             </h1>
-            <p className="text-sm ">
+            <p className="text-sm">
               <span className="text-blue-600">Project: </span>
               {buyerData?.requirement?.projectName ||
                 "CMS : Content management Systems"}
@@ -927,15 +1093,39 @@ export default function BuyerPreview({
               </div>
             )}
 
-            <div className="bg-blue-600 px-3 py-1 rounded-full text-white text-sm font-medium">
-              <UniqueVendorCount responses={formattedResponses}>
+            <button
+              type="button"
+              onClick={() => setActiveMainTab("vendor-responses")}
+              className={`px-3 py-1 rounded-full text-sm font-medium transition-all cursor-pointer border ${
+                activeMainTab === "vendor-responses"
+                  ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                  : "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
+              }`}
+            >
+              <UniqueVendorCount responses={localResponses}>
                 {(count) => (
                   <>
                     RFQ Sent to {count} Vendor{count !== 1 ? "s" : ""}
                   </>
                 )}
               </UniqueVendorCount>
-            </div>
+            </button>
+
+            {/* Disqualified Pill Tab in Header */}
+            {disqualifiedResponses.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setActiveMainTab("disqualified-responses")}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeMainTab === "disqualified-responses"
+                    ? "bg-red-600 text-white shadow-sm"
+                    : "bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                }`}
+              >
+                <XCircle className="h-4 w-4 text-red-500" />
+                Disqualified ({disqualifiedResponses.length})
+              </button>
+            )}
 
             {/* Status Badges */}
             {isRevisionRequested && (
@@ -965,26 +1155,12 @@ export default function BuyerPreview({
               </div>
             )}
           </div>
-          {isLoggedIn && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleBackClick}
-              className="flex items-center gap-2 mb-3"
-              disabled={isNavigating}
-              isLoading={isNavigating}
-              loadingText="Loading..."
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to RFQ Management
-            </Button>
-          )}
         </div>
       </header>
 
       {/* Approver Alert Banner */}
       {canApprove && currentApproval && (
-        <div className="bg-purple-50 border-b border-purple-200 mt-20">
+        <div className="bg-purple-50 border-b border-purple-200 pt-24 pb-3 sm:pt-28">
           <div className="container mx-auto py-3 px-4">
             <div className="flex items-center gap-3">
               <Shield className="h-5 w-5 text-purple-600" />
@@ -1022,13 +1198,19 @@ export default function BuyerPreview({
 
       {/* Main Content */}
       <div
-        className={`container mx-auto py-6 space-y-6 mb-8 ${canApprove ? "mt-32" : "mt-24"}`}
+        className={`container mx-auto px-4 pb-36 space-y-6 ${
+          canApprove ? "pt-4" : "pt-28 sm:pt-32"
+        }`}
       >
         <Tabs value={activeMainTab} onValueChange={setActiveMainTab}>
-          {isLoggedIn && (
-            <TabsList className={`grid w-full grid-cols-${tabsList.length}`}>
+          {tabsList.length > 0 && (
+            <TabsList className="inline-flex h-auto w-full flex-wrap items-center justify-start gap-1.5 rounded-xl bg-gray-100/90 p-1.5 border border-gray-200 text-gray-500 mb-2">
               {tabsList.map((tab) => (
-                <TabsTrigger key={tab.value} value={tab.value}>
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className="h-10 px-4 text-sm font-medium rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm transition-all cursor-pointer"
+                >
                   {tab.icon}
                   {tab.label}
                 </TabsTrigger>
@@ -1038,7 +1220,7 @@ export default function BuyerPreview({
 
           <TabsContent value="vendor-responses" className="space-y-6">
             <VendorActions
-              formattedResponses={formattedResponses}
+              formattedResponses={localResponses}
               selectedVendor={selectedVendor}
               setSelectedVendor={setSelectedVendor}
               comparisonMode={false}
@@ -1057,10 +1239,11 @@ export default function BuyerPreview({
               showCompareButton={false}
               isLoggedIn={isLoggedIn}
               urlResponseId={urlResponseId}
+              onQualificationChange={handleQualificationChange}
             />
 
             <VendorContactDetails
-              formattedResponses={formattedResponses}
+              formattedResponses={localResponses}
               open={vendorContactDialogOpen}
               onOpenChange={setVendorContactDialogOpen}
             />
@@ -1124,9 +1307,121 @@ export default function BuyerPreview({
             />
           </TabsContent>
 
-          {isLoggedIn && (
+          <TabsContent value="disqualified-responses" className="space-y-6">
+            {disqualifiedResponses.length > 0 ? (
+              <>
+                <VendorActions
+                  formattedResponses={localResponses}
+                  selectedVendor={selectedDisqualifiedVendor}
+                  setSelectedVendor={setSelectedDisqualifiedVendor}
+                  comparisonMode={false}
+                  setComparisonMode={() => {}}
+                  setVendorContactDialogOpen={setVendorContactDialogOpen}
+                  setPremiumFeaturesDialogOpen={setPremiumFeaturesDialogOpen}
+                  handleDownload={handleDownload}
+                  shareMenuOpen={shareMenuOpen}
+                  setShareMenuOpen={setShareMenuOpen}
+                  shareToWhatsApp={shareToWhatsApp}
+                  rfpId={rfpId}
+                  projectName={buyerData?.requirement?.projectName}
+                  buyerData={buyerData}
+                  rfpData={rfpData}
+                  onRecommendationUpdate={fetchRecommendations}
+                  showCompareButton={false}
+                  isLoggedIn={isLoggedIn}
+                  urlResponseId={urlResponseId}
+                  onQualificationChange={handleQualificationChange}
+                  isDisqualifiedView={true}
+                  onBackToQualified={() => setActiveMainTab("vendor-responses")}
+                />
+
+                <VendorContactDetails
+                  formattedResponses={localResponses}
+                  open={vendorContactDialogOpen}
+                  onOpenChange={setVendorContactDialogOpen}
+                />
+
+                <PremiumFeaturesDialog
+                  open={premiumFeaturesDialogOpen}
+                  onOpenChange={setPremiumFeaturesDialogOpen}
+                  handleExpressInterest={handleExpressInterest}
+                  vendorName={buyerData?.company?.name}
+                  isSubmitting={isSubmitting}
+                  contactId={buyerData?.contact?.id}
+                />
+
+                {/* Complete vendor response details for selected disqualified vendor */}
+                <QuoteHeader
+                  buyerData={buyerData}
+                  rfpUniqueId={rfpUniqueId}
+                  selectedVendor={selectedDisqualifiedVendor}
+                  today={today}
+                />
+
+                <AddressCards
+                  buyerData={buyerData}
+                  selectedVendor={selectedDisqualifiedVendor}
+                />
+
+                <CompanyIntroduction selectedVendor={selectedDisqualifiedVendor} />
+
+                <ScopeOfWork
+                  buyerData={buyerData}
+                  selectedVendor={selectedDisqualifiedVendor}
+                />
+
+                <BOQ buyerData={buyerData} selectedVendor={selectedDisqualifiedVendor} />
+
+                <EvaluationCriteria
+                  buyerData={buyerData}
+                  selectedVendor={selectedDisqualifiedVendor}
+                />
+
+                <FinancialTerms
+                  buyerData={buyerData}
+                  selectedVendor={selectedDisqualifiedVendor}
+                />
+
+                <GeneralTerms
+                  buyerData={buyerData}
+                  selectedVendor={selectedDisqualifiedVendor}
+                />
+
+                <SpecialTerms
+                  buyerData={buyerData}
+                  selectedVendor={selectedDisqualifiedVendor}
+                />
+
+                <OtherInformation selectedVendor={selectedDisqualifiedVendor} />
+
+                <Attachments
+                  buyerData={buyerData}
+                  selectedVendor={selectedDisqualifiedVendor}
+                />
+              </>
+            ) : (
+              <div className="flex min-h-[40vh] flex-col items-center justify-center space-y-4 bg-white p-8 rounded-lg shadow-sm border border-gray-200">
+                <CheckCircle className="w-16 h-16 text-green-500" />
+                <h2 className="text-xl font-bold text-gray-800 text-center">
+                  No Disqualified Vendors
+                </h2>
+                <p className="text-sm text-gray-500 text-center">
+                  All vendor responses are currently qualified.
+                </p>
+                <Button
+                  onClick={() => setActiveMainTab("vendor-responses")}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  View Qualified Vendor Responses
+                </Button>
+              </div>
+            )}
+          </TabsContent>
+
+          {(isLoggedIn || userRole === "approver" || !!urlResponseId) && (
             <TabsContent value="comparison">
-              {formattedResponses?.some(
+
+              {localResponses?.some(
                 (res) =>
                   res.companydetails &&
                   Object.values(res.companydetails).some(
@@ -1134,7 +1429,7 @@ export default function BuyerPreview({
                   ),
               ) ? (
                 <VendorComparison
-                  formattedResponses={formattedResponses}
+                  formattedResponses={localResponses}
                   comparisonMode={true}
                   buyerInfo={{
                     company: buyerData?.company,
@@ -1198,22 +1493,33 @@ export default function BuyerPreview({
                           Requested By
                         </label>
                         <p className="text-sm text-gray-900">
-                          {currentApproval.requester.name}
+                          {currentApproval.requester?.name ||
+                            (currentApproval as any).requestedBy ||
+                            "Buyer"}
                         </p>
-                        <p className="text-xs text-gray-500">
-                          {currentApproval.requester.email}
-                        </p>
+                        {currentApproval.requester?.email && (
+                          <p className="text-xs text-gray-500">
+                            {currentApproval.requester.email}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-500">
                           Request Date
                         </label>
                         <p className="text-sm text-gray-900">
-                          {new Date(
-                            currentApproval.requestedAt,
-                          ).toLocaleDateString()}
+                          {currentApproval.requestedAt
+                            ? new Date(
+                                currentApproval.requestedAt,
+                              ).toLocaleDateString()
+                            : currentApproval.createdAt
+                            ? new Date(
+                                currentApproval.createdAt,
+                              ).toLocaleDateString()
+                            : "N/A"}
                         </p>
                       </div>
+
                       <div>
                         <label className="text-sm font-medium text-gray-500">
                           Overall Status

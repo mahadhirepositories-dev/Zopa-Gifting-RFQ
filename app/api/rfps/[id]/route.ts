@@ -89,35 +89,45 @@ export async function GET(
 ) {
   try {
     const user = await getSessionUser(request);
-    if (!user) {
-      return NextResponse.json(
-        { error: "Unauthorized. Please log in." },
-        { status: 401 },
-      );
-    }
-
     const { id } = await params;
     let targetRfpId = id;
     let targetRfq: typeof rfqs.$inferSelect | undefined;
 
-    // Check if RFQ exists for user in DB
-    const [rfq] = await db
-      .select()
-      .from(rfqs)
-      .where(and(eq(rfqs.id, id), eq(rfqs.userId, user.id)))
-      .limit(1);
+    if (user) {
+      // Check if RFQ exists for user in DB
+      const [rfq] = await db
+        .select()
+        .from(rfqs)
+        .where(and(eq(rfqs.id, id), eq(rfqs.userId, user.id)))
+        .limit(1);
 
-    if (rfq) {
-      targetRfq = rfq;
+      if (rfq) {
+        targetRfq = rfq;
+      } else {
+        await ensureRfqExists(id, user);
+        targetRfpId = id;
+        const [createdRfq] = await db
+          .select()
+          .from(rfqs)
+          .where(eq(rfqs.id, id))
+          .limit(1);
+        targetRfq = createdRfq;
+      }
     } else {
-      await ensureRfqExists(id, user);
-      targetRfpId = id;
-      const [createdRfq] = await db
+      // Guest access for preview
+      const [rfq] = await db
         .select()
         .from(rfqs)
         .where(eq(rfqs.id, id))
         .limit(1);
-      targetRfq = createdRfq;
+      targetRfq = rfq;
+    }
+
+    if (!targetRfq) {
+      return NextResponse.json(
+        { error: "RFQ not found" },
+        { status: 404 },
+      );
     }
 
     const safeSelect = async (queryFn: () => Promise<any[]>) => {
@@ -180,7 +190,7 @@ export async function GET(
       );
     }
 
-    if (!contactDetails && user.email) {
+    if (!contactDetails && user?.email) {
       contactDetails = await safeSelect(() =>
         db
           .select()
@@ -408,19 +418,19 @@ export async function GET(
           : null,
       ),
       company: company || {
-        name: user.companyName || user.name,
-        addressLine1: user.addressLine1 || "",
-        addressLine2: user.addressLine2 || "",
-        city: user.city || "",
-        state: user.state || "",
-        postalCode: user.postalCode || "",
-        country: user.country || "India",
+        name: user?.companyName || user?.name || "Company",
+        addressLine1: user?.addressLine1 || "",
+        addressLine2: user?.addressLine2 || "",
+        city: user?.city || "",
+        state: user?.state || "",
+        postalCode: user?.postalCode || "",
+        country: user?.country || "India",
         businessType: "",
       },
       contact: {
-        contactName: contactDetails?.contactName || user.name,
-        contactEmail: contactDetails?.contactEmail || user.email,
-        contactPhone: contactDetails?.contactPhone || user.mobileNumber || "",
+        contactName: contactDetails?.contactName || user?.name || "Contact",
+        contactEmail: contactDetails?.contactEmail || user?.email || "",
+        contactPhone: contactDetails?.contactPhone || user?.mobileNumber || "",
         contactTitle: contactDetails?.contactTitle || "",
         contactDepartment: contactDetails?.contactDepartment || "",
         logoUrl: contactDetails?.logoUrl || null,
@@ -548,10 +558,13 @@ export async function POST(
     }
 
     if (body.vendorcontacts || body.vendorContacts) {
-      await upsertRfpVendorContacts(
-        id,
-        body.vendorcontacts || body.vendorContacts,
-      );
+      const contactsToSave =
+        Array.isArray(body.vendorContacts) && body.vendorContacts.length > 0
+          ? body.vendorContacts
+          : Array.isArray(body.vendorcontacts) && body.vendorcontacts.length > 0
+            ? body.vendorcontacts
+            : body.vendorcontacts || body.vendorContacts || [];
+      await upsertRfpVendorContacts(id, contactsToSave);
     }
 
     if (body.dates || body.rfpDates) {

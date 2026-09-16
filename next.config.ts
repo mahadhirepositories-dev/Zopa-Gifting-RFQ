@@ -29,20 +29,51 @@ const nextConfig: NextConfig = {
     unoptimized: false,
   },
   reactStrictMode: false,
+  async redirects() {
+    return [
+      {
+        source: "/rfp/buyer_preview/:id*",
+        destination: "/rfq/buyer_preview/:id*",
+        permanent: false,
+      },
+      {
+        source: "/rfp/buyer-preview/:id*",
+        destination: "/rfq/buyer-preview/:id*",
+        permanent: false,
+      },
+      {
+        source: "/rfp/:path*",
+        destination: "/rfq/:path*",
+        permanent: false,
+      },
+    ];
+  },
   async rewrites() {
     return {
-      // `beforeFiles` runs ahead of the static-file check on purpose.
-      //
-      // Next snapshots the contents of public/ once at server startup, so a
-      // file uploaded into public/uploads afterwards is invisible to the static
-      // handler and 404s until the process restarts. Routing every /uploads
-      // request to a handler that reads from disk makes newly uploaded files
-      // available immediately, and keeps behaviour uniform rather than
-      // depending on whether a file predates the current boot.
       beforeFiles: [
         {
           source: "/uploads/:path*",
           destination: "/api/uploads/:path*",
+        },
+        {
+          source: "/rfp/buyer_preview/:id*",
+          destination: "/rfq/buyer-preview/:id*",
+        },
+        {
+          source: "/rfp/buyer-preview/:id*",
+          destination: "/rfq/buyer-preview/:id*",
+        },
+        {
+          source: "/rfp/:path*",
+          destination: "/rfq/:path*",
+        },
+        {
+          source: "/rfq/buyer_preview/:id*",
+          destination: "/rfq/buyer-preview/:id*",
+        },
+        {
+          source: "/rfq/buyer-preview/:id*",
+          destination: "/rfq/buyer-preview/:id*",
         },
       ],
       afterFiles: [],

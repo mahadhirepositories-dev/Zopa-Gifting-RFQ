@@ -95,6 +95,7 @@ export interface VendorResponse {
   specialTerms?: SpecialTerms;
   evaluationCriteria?: EvaluationCriteriaProps[];
   vendorId: string;
+  qualificationStatus?: string;
 }
 
 export interface RFPData {
@@ -141,6 +142,7 @@ export interface RawVendorResponse {
   evaluationCriteria?: EvaluationCriteriaProps[];
   generalTerms?: GeneralTerms;
   specialTerms?: SpecialTerms;
+  qualificationStatus?: string;
 }
 
 export interface BuyerBOQItem {

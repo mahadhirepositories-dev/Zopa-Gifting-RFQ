@@ -373,12 +373,21 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
         {activeSection === "vendorcontacts" && (
           <VendorContacts
             data={
-              Array.isArray(formData.vendorContacts)
+              Array.isArray(formData.vendorContacts) &&
+              formData.vendorContacts.length > 0
                 ? formData.vendorContacts
-                : []
+                : Array.isArray((formData as any).vendorcontacts)
+                  ? (formData as any).vendorcontacts
+                  : Array.isArray(formData.vendorContacts)
+                    ? formData.vendorContacts
+                    : []
             }
             onChange={(vendorContacts) => {
-              setFormData((prev: any) => ({ ...prev, vendorContacts }));
+              setFormData((prev: any) => ({
+                ...prev,
+                vendorContacts,
+                vendorcontacts: vendorContacts,
+              }));
             }}
             errors={errors}
             setErrors={() => {}}

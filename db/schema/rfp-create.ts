@@ -273,3 +273,38 @@ export const rfqApprovalStatus = {
   revision_requested: "revision_requested",
   sent: "sent",
 } as const;
+
+export const rfqApprovals = pgTable("rfq_approvals", {
+  id: serial("id").primaryKey(),
+  rfqId: text("rfq_id")
+    .references(() => rfqs.id, { onDelete: "cascade" })
+    .notNull(),
+  status: varchar("status", { length: 50 }).default("pending_approval").notNull(),
+  approvalLevel: varchar("approval_level", { length: 20 }).default("level1").notNull(),
+  level1ApproverEmail: varchar("level1_approver_email", { length: 255 }),
+  level2ApproverEmail: varchar("level2_approver_email", { length: 255 }),
+  level1Status: varchar("level1_status", { length: 50 }).default("pending"),
+  level2Status: varchar("level2_status", { length: 50 }).default("pending"),
+  buyerComments: text("buyer_comments"),
+  level1Comments: text("level1_comments"),
+  level2Comments: text("level2_comments"),
+  level1ReviewedAt: timestamp("level1_reviewed_at"),
+  level2ReviewedAt: timestamp("level2_reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const rfqApprovalRecommendations = pgTable("rfq_approval_recommendations", {
+  id: serial("id").primaryKey(),
+  rfqId: text("rfq_id")
+    .references(() => rfqs.id, { onDelete: "cascade" })
+    .notNull(),
+  approvalId: integer("approval_id")
+    .references(() => rfqApprovals.id, { onDelete: "cascade" }),
+  vendorResponseId: text("vendor_response_id").notNull(),
+  reason: text("reason"),
+  status: varchar("status", { length: 50 }).default("recommended").notNull(),
+  recommenderRole: varchar("recommender_role", { length: 50 }).default("buyer").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+

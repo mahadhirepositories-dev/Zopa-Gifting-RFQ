@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import { TermsAndCondition, TermsAndConditionsPopup } from "./terms_condition";
 // REMOVED: CCEmailOverride import
@@ -61,11 +61,13 @@ const updateRfpStatus = async (
     if (!rfpId) {
       throw new Error("RFQ ID is missing");
     }
-    const vendorContactsWithStatus = (
-      rfpData.vendorContacts ||
-      rfpData.vendorcontacts ||
-      []
-    ).map((vc: VendorContact) => ({
+    const contactsList =
+      Array.isArray(rfpData.vendorContacts) && rfpData.vendorContacts.length > 0
+        ? rfpData.vendorContacts
+        : Array.isArray(rfpData.vendorcontacts)
+          ? rfpData.vendorcontacts
+          : [];
+    const vendorContactsWithStatus = contactsList.map((vc: VendorContact) => ({
       ...vc,
       isNew: vc.isNew || false,
     }));
@@ -159,8 +161,6 @@ export const Preview: React.FC<PreviewProps> = ({
   >([]);
   const [, setEmailError] = useState("");
   const [, setLogoBase64] = useState<string | null>(null);
-  const [incompleteSections, setIncompleteSections] = useState<string[]>([]);
-  const [formComplete, setFormComplete] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -206,7 +206,9 @@ export const Preview: React.FC<PreviewProps> = ({
       });
     }
     if (data?.vendorContacts && data?.vendorContacts?.length > 0) {
-      const emails = data?.vendorContacts.map((contact: any) => contact?.email);
+      const emails = data?.vendorContacts
+        .filter((contact: any) => !contact?.email_sent && !contact?.emailSent)
+        .map((contact: any) => contact?.email);
       setSelectedEmailAddresses(emails);
     }
   }, [data?.contact?.logo, data?.vendorContacts, prepareLogoForPdf]);
@@ -329,15 +331,12 @@ export const Preview: React.FC<PreviewProps> = ({
         ? data.vendorContacts
         : Array.isArray(data?.vendorcontacts) && data.vendorcontacts.length > 0
         ? data.vendorcontacts
-        : safeDataRef.current?.vendorContacts) || [],
+        : []) || [],
     rfpDates: data?.rfpDates || {},
     logo: data?.contact?.logo || null,
   };
 
-  // Writing a ref during render is a React correctness violation — under
-  // concurrent rendering a discarded render can leave the ref holding data
-  // that was never committed. safeDataRef is only read from event handlers
-  // (getIncompleteSections), so syncing it after commit is equivalent and safe.
+
   useEffect(() => {
     safeDataRef.current = safeData;
   });
@@ -346,325 +345,6 @@ export const Preview: React.FC<PreviewProps> = ({
     const re = /\S+@\S+\.\S+/;
     return re.test(email);
   }, []);
-
-  const handleSendClick = useCallback(async () => {
-    if (!rfpId) {
-      toast.error("RFQ ID is missing. Please save your RFQ first.");
-      return;
-    }
-
-    if (!formComplete) {
-      toast.error("Please fill in all required sections before submitting.");
-      return;
-    }
-
-    if (!termsAccepted) {
-      setAcceptanceError("Please accept the terms and conditions");
-      return;
-    }
-
-    if (selectedEmailAddresses?.length === 0) {
-      setEmailError("At least one email address is required");
-      return;
-    }
-    for (const email of selectedEmailAddresses) {
-      if (!validateEmail(email)) {
-        setEmailError("Please ensure all email addresses are valid");
-        return;
-      }
-    }
-
-    // 1. Fetch CC Emails (Server Controlled)
-    const ccEmails = await getFinalCCEmails();
-
-    setEmailError("");
-    setSubmissionStatus("submitting");
-
-    try {
-      // Filter only vendors that haven't had emails sent yet
-      const vendorsToEmail = selectedEmailAddresses.filter((email) => {
-        const contact = data.vendorContacts.find(
-          (vc: VendorContact) => vc.email === email,
-        );
-        return !contact?.emailSent && !contact?.email_sent;
-      });
-
-      if (vendorsToEmail?.length === 0 && selectedEmailAddresses?.length > 0) {
-        // If all vendors have already received emails, offer to update RFP data only
-        const shouldUpdateOnly = window.confirm(
-          "All selected vendors have already received the RFQ. Would you like to update the RFP data (including dates) without sending new emails? This will extend the deadline for existing vendors.",
-        );
-
-        if (!shouldUpdateOnly) {
-          toast.info("All selected vendors have already received the RFQ");
-          setSubmissionStatus("idle");
-          return;
-        }
-
-        // Proceed with data update only (no emails will be sent)
-        toast.info("Updating RFP data without sending new emails...");
-      }
-
-      // Prepare RFP data
-      const contactData = {
-        ...data.contact,
-        logoData: data.contact?.logoData || null,
-        logoMimeType: data.contact?.logoMimeType || null,
-      };
-
-      const completeRfpData = {
-        ...data,
-        contact: contactData,
-        sendTo: selectedEmailAddresses,
-        sendMethod: "email",
-        submissionDate: new Date().toLocaleDateString("en-CA"),
-        status: "Submitted",
-        rfpId: rfpId,
-        rfpName: data?.requirement?.projectName,
-        contactName: data?.contact?.contactName,
-        buyerEmail: data?.contact?.contactEmail,
-      };
-
-      // Update RFP status
-      const updateResponse = await updateRfpStatus(
-        rfpId,
-        completeRfpData,
-        categorySelections,
-        rfpUniqueId,
-      );
-
-      if (!updateResponse.success) {
-        throw new Error(updateResponse.message || "Failed to update RFQ");
-      }
-
-      const baseUrl =
-        process.env.NEXT_PUBLIC_APP_URL || "https://staging-rfp.zopapro.com";
-
-      // Only process vendors if there are vendors to email
-      let vendorProcessingPromises: Promise<any>[] = [];
-
-      if (vendorsToEmail.length > 0) {
-        vendorProcessingPromises = vendorsToEmail.map(async (email) => {
-          try {
-            let vendorId;
-            let vendorData;
-            let isFromMaster = false;
-            let masterVendorId = null;
-            const contact = data.vendorContacts.find(
-              (vc: VendorContact) => vc.email === email,
-            );
-
-            if (!contact) {
-              throw new Error(`Contact not found for email: ${email}`);
-            }
-
-            // Step 2: Create vendor response
-            const responseRes = await fetch("/api/vendor-response", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                rfpId,
-                vendorId,
-                vendorEmail: email,
-                status: "draft",
-                isFromMaster,
-                masterVendorId,
-              }),
-            });
-
-            if (!responseRes.ok) {
-              const err = await responseRes.json();
-              throw new Error(err?.error || "Failed to create vendor response");
-            }
-
-            const { vendorResponseId } = await responseRes.json();
-            setVendorResponseID(vendorResponseId);
-
-            // Step 3: Send RFP email to vendor
-            const vendorUrl = `${baseUrl}/rfq/preview/${rfpId}?response=${vendorResponseId}`;
-
-            const emailRes = await fetch("/api/email", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                type: "rfp-magic-link",
-                data: {
-                  email,
-                  url: vendorUrl,
-                  rfpName: data?.requirement?.projectName,
-                  contactName: data?.contact?.contactName,
-                  companyName: data?.company?.name,
-                  expiredata: data.rfpDates?.endDate,
-                  rfpId,
-                  vendorResponseId,
-                  buyerEmail: data?.contact?.contactEmail,
-                },
-              }),
-            });
-
-            if (!emailRes.ok) {
-              const err = await emailRes.json();
-              throw new Error(err?.error || "Failed to send RFP email");
-            }
-
-            // ************Step 4: Update email sent status
-            // await fetch("/api/update-vendor-email-status", {
-            //   method: "POST",
-            //   headers: { "Content-Type": "application/json" },
-            //   body: JSON.stringify({
-            //     email,
-            //     rfpId,
-            //     emailSent: true,
-            //   }),
-            // });
-
-            // // Update local state
-            // const updatedContacts = data.vendorContacts.map(
-            //   (vc: VendorContact) =>
-            //     vc.email === email ? { ...vc, emailSent: true } : vc,
-            // );
-
-            // if (onChange) {
-            //   onChange({ ...data, vendorContacts: updatedContacts });
-            // }
-
-            return { email, success: true };
-          } catch (error) {
-            console.error(`Error processing vendor ${email}:`, error);
-            return { email, success: false, error: (error as Error).message };
-          }
-        });
-      } // End of if (vendorsToEmail.length > 0)
-
-      //*********** */ Send buyer thank-you email (should always be sent on successful submission)
-      // let buyerThankYouPromise: Promise<any> | null = null;
-      // const vendorsForEmail =
-      //   vendorsToEmail.length > 0
-      //     ? selectedEmailAddresses.map((email) => {
-      //         const contact = data.vendorContacts.find(
-      //           (vc: VendorContact) => vc.email === email,
-      //         );
-      //         return {
-      //           email,
-      //           companyName: contact?.companyName || "Unknown Company",
-      //         };
-      //       })
-      //     : (data.vendorContacts || []).map((vc: VendorContact) => ({
-      //         email: vc.email,
-      //         companyName: vc.companyName || "Unknown Company",
-      //       }));
-
-      // buyerThankYouPromise = fetch("/api/email", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({
-      //     type: "buyer-thank-you",
-      //     data: {
-      //       companyName: data?.company?.name || "ZOPA",
-      //       projectName: data?.requirement?.projectName,
-      //       vendors: vendorsForEmail,
-      //       buyerEmail: data?.contact?.contactEmail,
-      //       url: `${baseUrl}/rfq/${rfpId}`,
-      //     },
-      //   }),
-      // });
-
-      // const allPromises = [...vendorProcessingPromises];
-      // if (buyerThankYouPromise) {
-      //   allPromises.push(
-      //     buyerThankYouPromise.then((res) => ({
-      //       type: "buyer",
-      //       success: res.ok,
-      //     })),
-      //   );
-      // }
-
-      // const results = await Promise.all(allPromises);
-      // const failedVendors = results
-      //   .filter((result) => result && !("type" in result) && !result.success)
-      //   .map((result) => (result as any).email);
-
-      // const buyerEmailResult = results.find(
-      //   (result) => result && "type" in result && result.type === "buyer",
-      // );
-
-      // if (!buyerEmailResult?.success) {
-      //   console.error("Failed to send buyer thank-you email");
-      //   toast.warning(
-      //     "RFP submitted successfully, but confirmation email failed to send",
-      //   );
-      // }
-
-      // if (failedVendors.length > 0) {
-      //   throw new Error(
-      //     `Failed to process ${failedVendors.length} vendors: ${failedVendors.join(", ")}`,
-      //   );
-      // }
-
-      // NEW: Send CC emails automatically if Admin Configured
-      if (ccEmails.length > 0 && vendorsToEmail.length > 0) {
-        try {
-          await fetch("/api/email", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              type: "rfp-cc-notification",
-              data: {
-                ccEmails,
-                rfpName: data?.requirement?.projectName,
-                companyName: data?.company?.name,
-                contactName: data?.contact?.contactName,
-                expiredata: data.rfpDates?.endDate,
-                rfpId,
-                buyerEmail: data?.contact?.contactEmail,
-                vendors: vendorsToEmail.map((email) => {
-                  const contact = data.vendorContacts.find(
-                    (vc: VendorContact) => vc.email === email,
-                  );
-                  return {
-                    email,
-                    companyName: contact?.companyName || "Unknown Company",
-                  };
-                }),
-              },
-            }),
-          });
-        } catch (ccError) {
-          console.error("Failed to send CC emails:", ccError);
-          toast.warning("RFP sent successfully, but CC notifications failed");
-        }
-      }
-
-      setSubmissionStatus("success");
-
-      if (vendorsToEmail.length > 0) {
-        toast.success("RFQ submitted and emails sent successfully!");
-      } else {
-        toast.success(
-          "RFQ data updated successfully! Existing vendors can continue using their original links with the new deadline.",
-        );
-      }
-
-      setTimeout(() => {
-        route.push(`/rfq/confirmation/${rfpId}`);
-      }, 2000);
-    } catch (error: any) {
-      setSubmissionStatus("error");
-      setErrorMessage(error.message || "Failed to submit RFQ");
-      toast.error(error.message || "Failed to submit RFQ");
-    }
-  }, [
-    formComplete,
-    selectedEmailAddresses,
-    validateEmail,
-    rfpId,
-    termsAccepted,
-    data,
-    categorySelections,
-    rfpUniqueId,
-    onChange,
-    organizationId,
-  ]);
 
   const loggedIn = Boolean(isLoggedIn || session?.user || session?.user?.email);
 
@@ -830,11 +510,336 @@ export const Preview: React.FC<PreviewProps> = ({
     return sections.filter((s) => !s.isComplete);
   }, [data, loggedIn, submissionStatus]);
 
-  useEffect(() => {
-    const incomplete = getIncompleteSections();
-    setIncompleteSections(incomplete.map((s) => s.name));
-    setFormComplete(incomplete.length === 0);
-  }, [getIncompleteSections]);
+  const incompleteSections = useMemo(
+    () => getIncompleteSections(),
+    [getIncompleteSections],
+  );
+  const formComplete = incompleteSections.length === 0;
+
+  const handleSendClick = useCallback(async () => {
+    if (!rfpId) {
+      toast.error("RFQ ID is missing. Please save your RFQ first.");
+      return;
+    }
+
+    if (!formComplete) {
+      toast.error("Please fill in all required sections before submitting.");
+      return;
+    }
+
+    if (!termsAccepted) {
+      setAcceptanceError("Please accept the terms and conditions");
+      return;
+    }
+
+    if (selectedEmailAddresses?.length === 0) {
+      setEmailError("At least one email address is required");
+      return;
+    }
+    for (const email of selectedEmailAddresses) {
+      if (!validateEmail(email)) {
+        setEmailError("Please ensure all email addresses are valid");
+        return;
+      }
+    }
+
+    // 1. Fetch CC Emails (Server Controlled)
+    const ccEmails = await getFinalCCEmails();
+
+    setEmailError("");
+    setSubmissionStatus("submitting");
+
+    try {
+      // Filter only vendors that haven't had emails sent yet
+      const vendorsToEmail = selectedEmailAddresses.filter((email) => {
+        const contact = data.vendorContacts.find(
+          (vc: VendorContact) => vc.email === email,
+        );
+        return !contact?.emailSent && !contact?.email_sent;
+      });
+
+      if (vendorsToEmail?.length === 0 && selectedEmailAddresses?.length > 0) {
+        // If all vendors have already received emails, offer to update RFP data only
+        const shouldUpdateOnly = window.confirm(
+          "All selected vendors have already received the RFQ. Would you like to update the RFP data (including dates) without sending new emails? This will extend the deadline for existing vendors.",
+        );
+
+        if (!shouldUpdateOnly) {
+          toast.info("All selected vendors have already received the RFQ");
+          setSubmissionStatus("idle");
+          return;
+        }
+
+        // Proceed with data update only (no emails will be sent)
+        toast.info("Updating RFP data without sending new emails...");
+      }
+
+      // Prepare RFP data
+      const contactData = {
+        ...data.contact,
+        logoData: data.contact?.logoData || null,
+        logoMimeType: data.contact?.logoMimeType || null,
+      };
+
+      const completeRfpData = {
+        ...data,
+        contact: contactData,
+        sendTo: selectedEmailAddresses,
+        sendMethod: "email",
+        submissionDate: new Date().toLocaleDateString("en-CA"),
+        status: "Submitted",
+        rfpId: rfpId,
+        rfpName: data?.requirement?.projectName,
+        contactName: data?.contact?.contactName,
+        buyerEmail: data?.contact?.contactEmail,
+      };
+
+      // Update RFP status
+      const updateResponse = await updateRfpStatus(
+        rfpId,
+        completeRfpData,
+        categorySelections,
+        rfpUniqueId,
+      );
+
+      if (!updateResponse.success) {
+        throw new Error(updateResponse.message || "Failed to update RFQ");
+      }
+
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL || "https://staging-rfp.zopapro.com";
+
+      // Only process vendors if there are vendors to email
+      let vendorProcessingPromises: Promise<any>[] = [];
+
+      if (vendorsToEmail.length > 0) {
+        vendorProcessingPromises = vendorsToEmail.map(async (email) => {
+          try {
+            let vendorId;
+            let vendorData;
+            const isFromMaster = false;
+            const masterVendorId = null;
+            const contact = data.vendorContacts.find(
+              (vc: VendorContact) => vc.email === email,
+            );
+
+            if (!contact) {
+              throw new Error(`Contact not found for email: ${email}`);
+            }
+
+            // Step 2: Create vendor response
+            const responseRes = await fetch("/api/vendor-response", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                rfpId,
+                vendorId,
+                vendorEmail: email,
+                status: "draft",
+                isFromMaster,
+                masterVendorId,
+              }),
+            });
+
+            if (!responseRes.ok) {
+              const err = await responseRes.json();
+              throw new Error(err?.error || "Failed to create vendor response");
+            }
+
+            const { vendorResponseId } = await responseRes.json();
+            setVendorResponseID(vendorResponseId);
+
+            // Step 3: Send RFP email to vendor
+            const vendorUrl = `${baseUrl}/rfq/preview/${rfpId}?response=${vendorResponseId}`;
+
+            const emailRes = await fetch("/api/email", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                type: "rfp-magic-link",
+                data: {
+                  email,
+                  url: vendorUrl,
+                  rfpName: data?.requirement?.projectName,
+                  contactName: data?.contact?.contactName,
+                  companyName: data?.company?.name,
+                  expiredata: data.rfpDates?.endDate,
+                  rfpId,
+                  vendorResponseId,
+                  buyerEmail: data?.contact?.contactEmail,
+                },
+              }),
+            });
+
+            if (!emailRes.ok) {
+              const err = await emailRes.json();
+              throw new Error(err?.error || "Failed to send RFP email");
+            }
+
+            // Step 4: Update email sent status
+            await fetch("/api/update-vendor-email-status", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email,
+                rfpId,
+                emailSent: true,
+              }),
+            });
+
+            if (contact) {
+              contact.email_sent = true;
+              contact.emailSent = true;
+            }
+
+            const updatedContacts = data.vendorContacts.map(
+              (vc: VendorContact) =>
+                vc.email === email
+                  ? { ...vc, email_sent: true, emailSent: true }
+                  : vc,
+            );
+
+            if (onChange) {
+              onChange({ ...data, vendorContacts: updatedContacts });
+            }
+
+            return { email, success: true };
+          } catch (error) {
+            console.error(`Error processing vendor ${email}:`, error);
+            return { email, success: false, error: (error as Error).message };
+          }
+        });
+      } // End of if (vendorsToEmail.length > 0)
+
+      //*********** */ Send buyer thank-you email (should always be sent on successful submission)
+      // let buyerThankYouPromise: Promise<any> | null = null;
+      // const vendorsForEmail =
+      //   vendorsToEmail.length > 0
+      //     ? selectedEmailAddresses.map((email) => {
+      //         const contact = data.vendorContacts.find(
+      //           (vc: VendorContact) => vc.email === email,
+      //         );
+      //         return {
+      //           email,
+      //           companyName: contact?.companyName || "Unknown Company",
+      //         };
+      //       })
+      //     : (data.vendorContacts || []).map((vc: VendorContact) => ({
+      //         email: vc.email,
+      //         companyName: vc.companyName || "Unknown Company",
+      //       }));
+
+      // buyerThankYouPromise = fetch("/api/email", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({
+      //     type: "buyer-thank-you",
+      //     data: {
+      //       companyName: data?.company?.name || "ZOPA",
+      //       projectName: data?.requirement?.projectName,
+      //       vendors: vendorsForEmail,
+      //       buyerEmail: data?.contact?.contactEmail,
+      //       url: `${baseUrl}/rfq/${rfpId}`,
+      //     },
+      //   }),
+      // });
+
+      // const allPromises = [...vendorProcessingPromises];
+      // if (buyerThankYouPromise) {
+      //   allPromises.push(
+      //     buyerThankYouPromise.then((res) => ({
+      //       type: "buyer",
+      //       success: res.ok,
+      //     })),
+      //   );
+      // }
+
+      // const results = await Promise.all(allPromises);
+      // const failedVendors = results
+      //   .filter((result) => result && !("type" in result) && !result.success)
+      //   .map((result) => (result as any).email);
+
+      // const buyerEmailResult = results.find(
+      //   (result) => result && "type" in result && result.type === "buyer",
+      // );
+
+      // if (!buyerEmailResult?.success) {
+      //   console.error("Failed to send buyer thank-you email");
+      //   toast.warning(
+      //     "RFP submitted successfully, but confirmation email failed to send",
+      //   );
+      // }
+
+      // if (failedVendors.length > 0) {
+      //   throw new Error(
+      //     `Failed to process ${failedVendors.length} vendors: ${failedVendors.join(", ")}`,
+      //   );
+      // }
+
+      // NEW: Send CC emails automatically if Admin Configured
+      if (ccEmails.length > 0 && vendorsToEmail.length > 0) {
+        try {
+          await fetch("/api/email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "rfp-cc-notification",
+              data: {
+                ccEmails,
+                rfpName: data?.requirement?.projectName,
+                companyName: data?.company?.name,
+                contactName: data?.contact?.contactName,
+                expiredata: data.rfpDates?.endDate,
+                rfpId,
+                buyerEmail: data?.contact?.contactEmail,
+                vendors: vendorsToEmail.map((email) => {
+                  const contact = data.vendorContacts.find(
+                    (vc: VendorContact) => vc.email === email,
+                  );
+                  return {
+                    email,
+                    companyName: contact?.companyName || "",
+                  };
+                }),
+              },
+            }),
+          });
+        } catch (ccError) {
+          console.error("Failed to send CC emails:", ccError);
+          toast.warning("RFP sent successfully, but CC notifications failed");
+        }
+      }
+
+      setSubmissionStatus("success");
+
+      if (vendorsToEmail.length > 0) {
+        toast.success("RFQ submitted and emails sent successfully!");
+      } else {
+        toast.success(
+          "RFQ data updated successfully! Existing vendors can continue using their original links with the new deadline.",
+        );
+      }
+
+      setTimeout(() => {
+        route.push(`/rfq/confirmation/${rfpId}`);
+      }, 2000);
+    } catch (error: any) {
+      setSubmissionStatus("error");
+      setErrorMessage(error.message || "Failed to submit RFQ");
+      toast.error(error.message || "Failed to submit RFQ");
+    }
+  }, [
+    formComplete,
+    selectedEmailAddresses,
+    validateEmail,
+    rfpId,
+    termsAccepted,
+    data,
+    categorySelections,
+    rfpUniqueId,
+    onChange,
+    organizationId,
+  ]);
 
   const handleResendEmail = async (email: string) => {
     if (!rfpId) return;
@@ -924,6 +929,21 @@ export const Preview: React.FC<PreviewProps> = ({
         throw new Error(err?.error || "Failed to send RFP email");
       }
 
+      await fetch("/api/update-vendor-email-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          rfpId,
+          emailSent: true,
+        }),
+      });
+
+      if (contact) {
+        contact.email_sent = true;
+        contact.emailSent = true;
+      }
+
       toast.success(`Email resent successfully to ${email}`);
     } catch (error: any) {
       console.error("Resend error:", error);
@@ -958,7 +978,7 @@ export const Preview: React.FC<PreviewProps> = ({
     navigateTo("vendorcontacts");
   };
 
-  const currentIncompleteSections = getIncompleteSections();
+  const currentIncompleteSections = incompleteSections;
 
   return (
     <div className="space-y-6">
@@ -1072,22 +1092,9 @@ export const Preview: React.FC<PreviewProps> = ({
                         </td>
                         <td className="p-3 text-center">
                           {contact.email_sent || contact.emailSent ? (
-                            <div className="flex flex-col items-center gap-1.5 py-0.5">
-                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-800">
-                                Email Sent
-                              </span>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-6 text-[11px] px-2 font-mono"
-                                disabled={resendingEmail === contact.email}
-                                onClick={() => handleResendEmail(contact.email)}
-                              >
-                                {resendingEmail === contact.email
-                                  ? "Sending..."
-                                  : "Resend"}
-                              </Button>
-                            </div>
+                            <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-800">
+                              Email Sent
+                            </span>
                           ) : (
                             <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800">
                               Pending

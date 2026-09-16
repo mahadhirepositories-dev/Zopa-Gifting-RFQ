@@ -73,12 +73,26 @@ export const MasterVendorsTable: React.FC<MasterVendorsTableProps> = ({
   );
 
   const isVendorAdded = (vendor: Vendor) =>
-    addedContacts.some((contact) =>
-      contact.masterVendorId !== undefined
-        ? String(contact.masterVendorId) === String(vendor.id)
-        : contact.email === vendor.email &&
-          contact.companyName === vendor.companyName,
-    );
+    addedContacts.some((contact) => {
+      if (
+        contact.masterVendorId !== undefined &&
+        contact.masterVendorId !== null
+      ) {
+        if (String(contact.masterVendorId) === String(vendor.id)) return true;
+      }
+      const contactEmail = (contact.email || "").toLowerCase().trim();
+      const vendorEmail = (vendor.email || "").toLowerCase().trim();
+      if (contactEmail && vendorEmail && contactEmail === vendorEmail)
+        return true;
+
+      const contactCompany = (contact.companyName || "").toLowerCase().trim();
+      const vendorCompany = (vendor.companyName || "").toLowerCase().trim();
+      return (
+        contactCompany.length > 0 &&
+        vendorCompany.length > 0 &&
+        contactCompany === vendorCompany
+      );
+    });
 
   const handleVendorToggle = async (
     vendor: Vendor,

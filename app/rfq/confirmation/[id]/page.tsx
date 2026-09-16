@@ -52,14 +52,14 @@ export default function ThankYouPage() {
 
   const handleCreateNewRfp = () => {
     const newRfpId = window.crypto.randomUUID();
-    router.push(`/rfq/${newRfpId}/requirement`);
+    window.location.href = `/rfq/${newRfpId}/requirement`;
   };
 
   const handleViewRfp = () => {
     if (rfpId) {
-      router.push(`/rfq/${rfpId}/requirement`);
+      window.location.href = `/rfq/${rfpId}/requirement`;
     } else {
-      router.push("/");
+      window.location.href = "/";
     }
   };
 

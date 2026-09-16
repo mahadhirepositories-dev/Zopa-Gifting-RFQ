@@ -65,11 +65,20 @@ export const OrganizationVendorsTable: React.FC<
   const activeVendors = data.filter((vendor) => vendor.isActive !== false);
 
   const isVendorAdded = (vendor: OrganizationVendor) =>
-    addedContacts.some(
-      (contact) =>
-        contact.email === vendor.email &&
-        contact.companyName === vendor.companyName,
-    );
+    addedContacts.some((contact) => {
+      const contactEmail = (contact.email || "").toLowerCase().trim();
+      const vendorEmail = (vendor.email || "").toLowerCase().trim();
+      if (contactEmail && vendorEmail && contactEmail === vendorEmail)
+        return true;
+
+      const contactCompany = (contact.companyName || "").toLowerCase().trim();
+      const vendorCompany = (vendor.companyName || "").toLowerCase().trim();
+      return (
+        contactCompany.length > 0 &&
+        vendorCompany.length > 0 &&
+        contactCompany === vendorCompany
+      );
+    });
 
   const handleVendorToggle = async (
     vendor: OrganizationVendor,

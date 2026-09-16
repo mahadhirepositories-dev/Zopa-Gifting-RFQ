@@ -335,8 +335,8 @@ const PremiumFeaturesDialog: React.FC<PremiumFeaturesDialogProps> = ({
 
               <DialogFooter className="w-full mt-4 flex flex-col gap-2">
                 <Button
-                  variant="white"
-                  className="cursor-pointer transition-all w-full"
+                  variant="secondary"
+                  className="cursor-pointer transition-all w-full bg-white text-blue-600 hover:bg-gray-100 font-semibold"
                   onClick={handleExpressInterestClick}
                   disabled={isSubmitting}
                 >

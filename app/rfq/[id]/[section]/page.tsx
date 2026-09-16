@@ -223,11 +223,11 @@ function RfpCreatorPage({
     };
   }, [extractSectionFromURL]);
 
-  const [prevInitialSection, setPrevInitialSection] = useState(initialSection);
-  if (initialSection !== prevInitialSection) {
-    setPrevInitialSection(initialSection);
-    setCurrentSection(extractSectionFromURL());
-  }
+  useEffect(() => {
+    if (initialSection && validateSection(initialSection)) {
+      setCurrentSection(initialSection);
+    }
+  }, [initialSection]);
 
   console.log(currentSection, "currentSection2");
   useEffect(() => {
@@ -365,8 +365,20 @@ function RfpCreatorPage({
               vendorSelectionProcess: "",
               additionalRequirements: "",
             },
-            vendorContacts: rfpData.vendorContacts || rfpData.vendorcontacts || [],
-            vendorcontacts: rfpData.vendorContacts || rfpData.vendorcontacts || [],
+            vendorContacts:
+              Array.isArray(rfpData.vendorContacts) &&
+              rfpData.vendorContacts.length > 0
+                ? rfpData.vendorContacts
+                : Array.isArray(rfpData.vendorcontacts)
+                  ? rfpData.vendorcontacts
+                  : [],
+            vendorcontacts:
+              Array.isArray(rfpData.vendorContacts) &&
+              rfpData.vendorContacts.length > 0
+                ? rfpData.vendorContacts
+                : Array.isArray(rfpData.vendorcontacts)
+                  ? rfpData.vendorcontacts
+                  : [],
             rfpDates: rfpData.rfpDates || rfpData.dates || { startDate: "", endDate: "" },
           }));
           if (rfpData.organization?.slug && !storedOrgSlug) {

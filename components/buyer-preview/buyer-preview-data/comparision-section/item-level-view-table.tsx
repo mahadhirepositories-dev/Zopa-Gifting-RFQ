@@ -16,7 +16,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { SavingsAnalysis } from "./savings";
-import { Vendor } from "@/db/schema";
 import * as XLSX from "xlsx";
 
 interface BoqDetail {
@@ -246,7 +245,7 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
     }
   };
 
-  const getVendorRecommendationDetails = (vendor: Vendor) => {
+  const getVendorRecommendationDetails = (vendor: any) => {
     const vendorRecommendations = recommendations.filter((rec) => {
       return rec.vendorResponseId === vendor.vendorResponseId;
     });
