@@ -26,6 +26,74 @@ interface MainContentProps {
   role?: string | null;
 }
 
+export type SaveStatus = "idle" | "saving" | "saved" | "error";
+
+export const getSectionPayload = (
+  section: string,
+  formData: FormDataStructure,
+  selection: SelectionData | null,
+) => {
+  const payload: Record<string, any> = {};
+
+  if (section === "category" && selection) {
+    payload.categorySelection = selection;
+  } else if (section === "company" && formData.company) {
+    payload.company = formData.company;
+  } else if (section === "requirement" && formData.requirement) {
+    payload.requirement = formData.requirement;
+  } else if (section === "scope" && formData.scope) {
+    payload.scope = formData.scope;
+  } else if (section === "boq" && formData.boq) {
+    payload.boq = formData.boq;
+  } else if (
+    section === "evaluation" &&
+    (formData.evaluation || (formData as any).evaluationCriteria)
+  ) {
+    payload.evaluationCriteria =
+      Array.isArray(formData.evaluation) && formData.evaluation.length > 0
+        ? formData.evaluation
+        : Array.isArray((formData as any).evaluationCriteria) &&
+            (formData as any).evaluationCriteria.length > 0
+          ? (formData as any).evaluationCriteria
+          : formData.evaluation || (formData as any).evaluationCriteria;
+  } else if (section === "financials" && formData.financials) {
+    payload.financials = formData.financials;
+  } else if (section === "generalTerms" && formData.generalTerms) {
+    payload.generalTerms = formData.generalTerms;
+  } else if (section === "specialTerms" && formData.specialTerms) {
+    payload.specialTerms = formData.specialTerms;
+  } else if (
+    section === "documents" &&
+    (formData.documentsToShare || formData.documents)
+  ) {
+    payload.documents = formData.documentsToShare || formData.documents;
+  } else if (
+    section === "vendors" &&
+    (formData.vendors || (formData as any).vendorSelection)
+  ) {
+    payload.vendors = formData.vendors || (formData as any).vendorSelection;
+  } else if (
+    section === "vendorcontacts" &&
+    ((Array.isArray((formData as any).vendorContacts) &&
+      (formData as any).vendorContacts.length > 0) ||
+      (Array.isArray(formData.vendorcontacts) &&
+        formData.vendorcontacts.length > 0))
+  ) {
+    payload.vendorcontacts =
+      Array.isArray((formData as any).vendorContacts) &&
+      (formData as any).vendorContacts.length > 0
+        ? (formData as any).vendorContacts
+        : formData.vendorcontacts;
+  } else if (
+    section === "dates" &&
+    ((formData as any).rfpDates || (formData as any).dates)
+  ) {
+    payload.dates = (formData as any).rfpDates || (formData as any).dates;
+  }
+
+  return payload;
+};
+
 export const MainContent: React.FC<MainContentProps> = ({
   selection,
   setSelection,
@@ -43,6 +111,11 @@ export const MainContent: React.FC<MainContentProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading] = useState(false);
   const [isAutoFilling] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+
+  const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const lastSavedPayloadMapRef = React.useRef<Record<string, string>>({});
+  const isInitialRenderRef = React.useRef<Record<string, boolean>>({});
 
   const sectionsOrder = [
     "category",
@@ -61,32 +134,102 @@ export const MainContent: React.FC<MainContentProps> = ({
     "preview",
   ];
 
-  const submittedAllowedSections = ["vendorcontacts", "dates", "preview"];
+  const saveSectionData = React.useCallback(
+    async (section: string, payload: Record<string, any>, force = false) => {
+      if (!rfpId || Object.keys(payload).length === 0) return;
+      const payloadStr = JSON.stringify(payload);
+      if (!force && lastSavedPayloadMapRef.current[section] === payloadStr) return;
+
+      setSaveStatus("saving");
+      try {
+        const response = await fetch(`/api/rfps/${rfpId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: payloadStr,
+        });
+        if (response.ok) {
+          lastSavedPayloadMapRef.current[section] = payloadStr;
+          setSaveStatus("saved");
+          setTimeout(() => {
+            setSaveStatus((prev) => (prev === "saved" ? "idle" : prev));
+          }, 2500);
+        } else {
+          setSaveStatus("error");
+        }
+      } catch (err) {
+        console.warn(`Failed to auto-save ${section} data:`, err);
+        setSaveStatus("error");
+      }
+    },
+    [rfpId],
+  );
+
+  const flushPendingSave = React.useCallback(async () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    const payload = getSectionPayload(currentSection, formData, selection);
+    if (Object.keys(payload).length > 0) {
+      await saveSectionData(currentSection, payload, true);
+    }
+  }, [currentSection, formData, selection, saveSectionData]);
+
+  // Track section transitions to auto-save previous section when user leaves it
+  const prevSectionRef = React.useRef(currentSection);
+
+  React.useEffect(() => {
+    if (prevSectionRef.current !== currentSection) {
+      const prevSec = prevSectionRef.current;
+      prevSectionRef.current = currentSection;
+      if (rfpId) {
+        const payload = getSectionPayload(prevSec, formData, selection);
+        if (Object.keys(payload).length > 0) {
+          saveSectionData(prevSec, payload, true);
+        }
+      }
+    }
+  }, [currentSection, rfpId, formData, selection, saveSectionData]);
+
+  React.useEffect(() => {
+    if (!rfpId) return;
+
+    const currentPayload = getSectionPayload(
+      currentSection,
+      formData,
+      selection,
+    );
+    if (Object.keys(currentPayload).length === 0) return;
+
+    const currentPayloadStr = JSON.stringify(currentPayload);
+
+    if (!isInitialRenderRef.current[currentSection]) {
+      isInitialRenderRef.current[currentSection] = true;
+      return;
+    }
+
+    if (lastSavedPayloadMapRef.current[currentSection] === currentPayloadStr) {
+      return;
+    }
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      saveSectionData(currentSection, currentPayload);
+    }, 800);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [currentSection, formData, selection, rfpId, saveSectionData]);
 
   const handleClick = async (type: "previous" | "next") => {
-    if (type === "next" && rfpId) {
-      if (currentSection === "category" && selection) {
-        try {
-          await fetch(`/api/rfps/${rfpId}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ categorySelection: selection }),
-          });
-        } catch (err) {
-          console.warn("Failed to save category selection data:", err);
-        }
-      }
-      if (currentSection === "requirement" && formData.requirement) {
-        try {
-          await fetch(`/api/rfps/${rfpId}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ requirement: formData.requirement }),
-          });
-        } catch (err) {
-          console.warn("Failed to save requirement data:", err);
-        }
-      }
+    if (rfpId) {
+      await flushPendingSave();
     }
 
     const currentIndex = sectionsOrder.indexOf(currentSection);
@@ -95,14 +238,6 @@ export const MainContent: React.FC<MainContentProps> = ({
       if (sectionsOrder[nextIndex] === "company" && isLoggedIn) {
         nextIndex++;
       }
-      if (isSubmitted) {
-        while (
-          nextIndex < sectionsOrder.length &&
-          !submittedAllowedSections.includes(sectionsOrder[nextIndex])
-        ) {
-          nextIndex++;
-        }
-      }
       if (nextIndex < sectionsOrder.length) {
         navigateToSection(sectionsOrder[nextIndex]);
       }
@@ -110,14 +245,6 @@ export const MainContent: React.FC<MainContentProps> = ({
       let prevIndex = currentIndex - 1;
       if (sectionsOrder[prevIndex] === "company" && isLoggedIn) {
         prevIndex--;
-      }
-      if (isSubmitted) {
-        while (
-          prevIndex >= 0 &&
-          !submittedAllowedSections.includes(sectionsOrder[prevIndex])
-        ) {
-          prevIndex--;
-        }
       }
       if (prevIndex >= 0) {
         navigateToSection(sectionsOrder[prevIndex]);
@@ -173,7 +300,7 @@ export const MainContent: React.FC<MainContentProps> = ({
             handleDatesChange={handleDatesChange}
             handleUpdateSelection={handleUpdateSelection}
             handleClick={handleClick}
-            isFormDisabled={isSubmitted}
+            isFormDisabled={false}
             isLoading={isLoading}
             isAutoFilling={isAutoFilling}
             setErrors={setErrors}
@@ -184,6 +311,7 @@ export const MainContent: React.FC<MainContentProps> = ({
             onCloseContactFlow={() => {}}
             orgSlug={orgSlug}
             role={role || undefined}
+            saveStatus={saveStatus}
           />
         </div>
 

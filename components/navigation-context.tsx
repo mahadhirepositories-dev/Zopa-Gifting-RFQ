@@ -41,13 +41,10 @@ export const NavigationProvider: React.FC<{
 
   console.log(isLoggedIn, "dadada");
   const canNavigateToSection = useCallback(
-    (section: string) => {
-      if (initialIsSubmitted) {
-        return ["vendorcontacts", "dates", "preview"].includes(section);
-      }
+    (_section: string) => {
       return true;
     },
-    [initialIsSubmitted],
+    [],
   );
 
   const navigateToSection = useCallback(

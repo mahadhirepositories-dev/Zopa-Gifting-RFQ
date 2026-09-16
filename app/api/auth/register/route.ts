@@ -61,14 +61,17 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "This email address is already registered. Please log in instead.",
+            "This email is already registered. Please log in to continue.",
           isAlreadyRegistered: true,
+          email: emailClean,
         },
         { status: 400 },
       );
     }
+
     const userId = crypto.randomUUID();
-    const rfpId = crypto.randomUUID();
+    const rfpId = "074db83b-2fe4-4978-874c-a2d34e269a7c";
+
     try {
       const userValues = {
         name: nameClean,
@@ -89,8 +92,6 @@ export async function POST(request: Request) {
         ...userValues,
         emailVerified: true,
       });
-
-      // Also stage in pendingRegistrations table for Better Auth workflow
       const pendingValues = {
         email: emailClean,
         name: nameClean,
@@ -119,19 +120,23 @@ export async function POST(request: Request) {
           .where(eq(pendingRegistrations.email, emailClean));
       }
 
-      // Create new RFP entry linked to user
-      await db.insert(rfqs).values({
-        id: rfpId,
-        userId: userId,
-        title: `Gifting Requirement for ${companyClean}`,
-        category: "Corporate Gifting",
-        quantity: 500,
-        status: "draft",
-      });
+      const existingRfq = await db
+        .select()
+        .from(rfqs)
+        .where(eq(rfqs.id, rfpId))
+        .limit(1);
 
-      // Persist the company details entered during registration into
-      // rfpCompanies right away, so they're available for this RFP from
-      // the start rather than only appearing after a later login.
+      if (existingRfq.length === 0) {
+        await db.insert(rfqs).values({
+          id: rfpId,
+          userId: userId,
+          title: "",
+          category: "Corporate Gifting",
+          quantity: 500,
+          status: "draft",
+        });
+      }
+
       await upsertRfpCompany(rfpId, {
         companyName: companyClean,
         addressLine1: addressLine1Clean,
@@ -148,20 +153,25 @@ export async function POST(request: Request) {
       );
     }
 
-    const verifyUrl = `/auth/verify?token=demo_token_${Date.now()}&email=${encodeURIComponent(emailClean)}&name=${encodeURIComponent(nameClean)}&mobile=${encodeURIComponent(mobileClean || "")}&company=${encodeURIComponent(companyClean)}&rfpId=${rfpId}`;
-    const magicLinkUrl = `/rfp/${rfpId}/category`;
+    const requirementUrl = `/rfq/${rfpId}/requirement`;
 
-    await EmailService.sendMagicLinkEmail({
-      email: emailClean,
-      url: verifyUrl,
-    });
+    try {
+      await EmailService.sendWelcomeEmail({
+        email: emailClean,
+        name: nameClean,
+        url: requirementUrl,
+      });
+    } catch (emailErr) {
+      console.warn("Welcome email service warning during registration:", emailErr);
+    }
 
     const response = NextResponse.json({
-      message: `Magic link sent to ${emailClean}! Please check your inbox.`,
+      message: `Registration successful! Welcome email sent to ${emailClean}.`,
       email: emailClean,
       name: nameClean,
       company: companyClean,
-      magicLinkUrl,
+      magicLinkUrl: requirementUrl,
+      redirectUrl: requirementUrl,
     });
 
     // Set HTTP session cookies for instant client access

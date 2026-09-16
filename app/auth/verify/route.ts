@@ -7,10 +7,10 @@ export async function GET(request: Request) {
   const name = searchParams.get("name") || "";
   const mobile = searchParams.get("mobile") || "";
   const company = searchParams.get("company") || "";
-  const rfpId = searchParams.get("rfpId") || "09ed3409-08c3-4af6-96e8-3ea87eb451cf";
+  const rfpId = searchParams.get("rfpId") || "074db83b-2fe4-4978-874c-a2d34e269a7c";
 
   // Clean Target RFP creation URL without query strings
-  const targetUrl = new URL(`/rfp/${rfpId}/category`, request.url);
+  const targetUrl = new URL(`/rfq/${rfpId}/requirement`, request.url);
   const response = NextResponse.redirect(targetUrl);
 
   // Store session cookies for seamless user experience

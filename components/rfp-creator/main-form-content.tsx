@@ -2,16 +2,18 @@
 "use client";
 
 import React, { useRef } from "react";
-import { useRouter } from "next/navigation";
 import { CombinedCompanyContact } from "./combined-company";
 import {
   AboutRequirements,
   type AboutRequirementsHandle,
 } from "./about-requirements";
-import { ScopeOfWork } from "./scope-of-work";
-import { BOQ } from "./boq";
-import { EvaluationCriteria } from "./evaluation-criteria";
-import { Financials } from "./financial";
+import { ScopeOfWork, type ScopeOfWorkHandle } from "./scope-of-work";
+import { BOQ, type BOQHandle } from "./boq/index";
+import {
+  EvaluationCriteria,
+  type EvaluationCriteriaHandle,
+} from "./evaluation-criteria";
+import { Financials, type FinancialsHandle } from "./financial";
 import { GeneralTerms } from "./general-terms";
 import { SpecialTerms } from "./special-terms";
 import { DocumentsToShare } from "./document-share";
@@ -21,13 +23,13 @@ import { RFPDates } from "./rfp-dates";
 import { Preview } from "./rfp-preview";
 import { Button } from "@/components/ui/button";
 import { Category, type CategoryHandle } from "./category";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Lock, X } from "lucide-react";
+import { X, CloudUpload, CheckCircle2, AlertCircle } from "lucide-react";
 import {
   FormDataStructure,
   MainCustomFormDataStructure,
 } from "@/lib/types/rfp-main-content-types";
 import { useNavigation } from "@/components/navigation-context";
+import type { SaveStatus } from "./index";
 
 interface MainFormContentProps extends MainCustomFormDataStructure {
   handleChange: (
@@ -50,6 +52,7 @@ interface MainFormContentProps extends MainCustomFormDataStructure {
   onCloseContactFlow: () => void;
   orgSlug?: string;
   role?: string;
+  saveStatus?: SaveStatus;
 }
 
 export const MainFormContent: React.FC<MainFormContentProps> = ({
@@ -76,14 +79,15 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
   showContactFlowNavigation,
   onCloseContactFlow,
   orgSlug,
+  saveStatus = "idle",
 }) => {
   const { navigateToSection } = useNavigation();
   const categoryRef = useRef<CategoryHandle>(null);
   const requirementRef = useRef<AboutRequirementsHandle>(null);
-  const submittedAllowedSections = ["vendorcontacts", "dates", "preview"];
-  const isSectionAllowed =
-    !isSubmitted || submittedAllowedSections.includes(activeSection);
-
+  const scopeRef = useRef<ScopeOfWorkHandle>(null);
+  const boqRef = useRef<BOQHandle>(null);
+  const evaluationRef = useRef<EvaluationCriteriaHandle>(null);
+  const financialsRef = useRef<FinancialsHandle>(null);
   const sectionTitles: Record<string, string> = {
     category: "1. Category",
     company: "Company Introduction",
@@ -91,34 +95,25 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
     scope: "3. Scope of Work",
     boq: "4. BOQ/BOM",
     evaluation: "5. Evaluation Criteria",
-    financials: "6. Financials",
+    financials: "6. Financial Information",
     generalTerms: "7. General Terms & Conditions",
     specialTerms: "8. Special Terms & Conditions",
     documents: "9. Documents to Share",
-    vendors: "10. Vendor Selection",
-    vendorcontacts: "11. Add Vendors",
-    dates: "12. RFQ Start and End Date",
+    vendors: "10. Vendor Selection Process",
+    vendorcontacts: "11. Add Vendor Contacts",
+    dates: "12. RFQ Dates",
     preview: "13. Preview & Submit",
   };
 
   const shouldShowPrevious = () => {
     if (activeSection === "category") return false;
-    if (isSubmitted) {
-      const allowedIndex = submittedAllowedSections.indexOf(activeSection);
-      return allowedIndex > 0;
-    }
+    if (activeSection === "preview") return false;
     return true;
   };
 
   const shouldShowNext = () => {
     if (showContactFlowNavigation && activeSection === "preview") return false;
     if (activeSection === "preview") return false;
-    if (isSubmitted) {
-      const allowedIndex = submittedAllowedSections.indexOf(activeSection);
-      return (
-        allowedIndex >= 0 && allowedIndex < submittedAllowedSections.length - 1
-      );
-    }
     return true;
   };
 
@@ -131,45 +126,34 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
       const isValid = requirementRef.current?.validate() ?? true;
       if (!isValid) return;
     }
+    if (activeSection === "scope") {
+      const isValid = scopeRef.current?.validate() ?? true;
+      if (!isValid) return;
+    }
+    if (activeSection === "boq") {
+      const isValid = boqRef.current?.validate() ?? true;
+      if (!isValid) {
+        setErrors((prev: any) => ({
+          ...prev,
+          boq: "Please add at least one BOQ item before proceeding.",
+        }));
+        return;
+      }
+    }
+    if (activeSection === "evaluation") {
+      const isValid = evaluationRef.current?.validate() ?? true;
+      if (!isValid) return;
+    }
+    if (activeSection === "financials") {
+      const isValid = financialsRef.current?.validate() ?? true;
+      if (!isValid) return;
+    }
     handleClick("next");
   };
-
-  if (!isSectionAllowed) {
-    return (
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-        <Alert className="border-amber-200 bg-amber-50">
-          <Lock className="h-4 w-4 text-amber-600" />
-          <AlertDescription className="text-amber-800">
-            <div className="font-medium mb-2">Section Locked</div>
-            This section is no longer accessible because the RFP has been
-            submitted. You can only manage vendor contacts, RFP dates, and
-            preview the submitted RFP.
-          </AlertDescription>
-        </Alert>
-
-        <div className="mt-6 text-center">
-          <Button
-            variant="outline"
-            onClick={() => navigateToSection("vendorcontacts")}
-            className="mr-3"
-          >
-            Go to Vendor Management
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => navigateToSection("preview")}
-          >
-            View RFP Preview
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="bg-white rounded-xl border border-slate-200/80 p-6 shadow-sm flex flex-col justify-between min-h-[480px]">
       <div className="space-y-5">
-        {/* Close button for contact flow */}
         {showContactFlowNavigation && (
           <div className="flex justify-end">
             <Button
@@ -184,11 +168,30 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
           </div>
         )}
 
-        {/* Title Header */}
         {sectionTitles[activeSection] && (
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-            {sectionTitles[activeSection]}
-          </h2>
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+              {sectionTitles[activeSection]}
+            </h2>
+            {saveStatus === "saving" && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-blue-600 font-medium bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200 animate-pulse">
+                <CloudUpload className="w-3.5 h-3.5 animate-bounce" />
+                Auto-saving...
+              </span>
+            )}
+            {saveStatus === "saved" && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-medium bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 transition-all duration-300">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                Saved
+              </span>
+            )}
+            {saveStatus === "error" && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 font-medium bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                Save failed
+              </span>
+            )}
+          </div>
         )}
 
         {isAutoFilling && (
@@ -200,8 +203,7 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
           </div>
         )}
 
-        {/* Form Components */}
-        {activeSection === "category" && !isSubmitted && (
+        {activeSection === "category" && (
           <Category
             ref={categoryRef}
             selection={selection}
@@ -209,7 +211,7 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
             navigateTo={navigateToSection}
           />
         )}
-        {activeSection === "company" && !isLoggedIn && !isSubmitted && (
+        {activeSection === "company" && (
           <CombinedCompanyContact
             data={{
               ...formData.company,
@@ -242,7 +244,7 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
           />
         )}
 
-        {activeSection === "requirement" && !isSubmitted && (
+        {activeSection === "requirement" && (
           <AboutRequirements
             ref={requirementRef}
             data={formData.requirement || {}}
@@ -252,11 +254,13 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
             disabled={isFormDisabled}
             isLoggedIn={isLoggedIn}
             orgSlug={orgSlug}
+            companyName={formData.company?.name}
           />
         )}
 
-        {activeSection === "scope" && !isSubmitted && (
+        {activeSection === "scope" && (
           <ScopeOfWork
+            ref={scopeRef}
             data={formData?.scope}
             onChange={handleScopeChange}
             selectedSubCategory={selectedSubCategory ?? undefined}
@@ -277,18 +281,29 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
           />
         )}
 
-        {activeSection === "boq" && !isSubmitted && (
+        {activeSection === "boq" && (
           <BOQ
+            ref={boqRef}
             data={formData.boq || []}
-            onChange={handleBOQChange}
+            onChange={(boqItems) => {
+              handleBOQChange(boqItems);
+              if (boqItems && boqItems.length > 0) {
+                setErrors((prev: any) => {
+                  const newErrs = { ...prev };
+                  delete newErrs.boq;
+                  return newErrs;
+                });
+              }
+            }}
             errors={errors}
             disabled={isFormDisabled}
             secondaryQuestionId={0}
           />
         )}
 
-        {activeSection === "evaluation" && !isSubmitted && (
+        {activeSection === "evaluation" && (
           <EvaluationCriteria
+            ref={evaluationRef}
             data={formData?.evaluation}
             onChange={(data) => handleInputChange("evaluation", data)}
             errors={errors}
@@ -296,17 +311,18 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
           />
         )}
 
-        {activeSection === "financials" && !isSubmitted && (
+        {activeSection === "financials" && (
           <Financials
+            ref={financialsRef}
             data={formData?.financials || {}}
             onChange={(data) => handleInputChange("financials", data)}
             errors={errors}
-            setErrors={() => {}}
+            setErrors={setErrors}
             disabled={isFormDisabled}
           />
         )}
 
-        {activeSection === "generalTerms" && !isSubmitted && (
+        {activeSection === "generalTerms" && (
           <GeneralTerms
             data={formData.generalTerms}
             onChange={(updatedData) => {
@@ -324,7 +340,7 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
           />
         )}
 
-        {activeSection === "specialTerms" && !isSubmitted && (
+        {activeSection === "specialTerms" && (
           <SpecialTerms
             data={formData?.specialTerms}
             onChange={(data) => handleInputChange("specialTerms", data)}
@@ -336,7 +352,7 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
           />
         )}
 
-        {activeSection === "documents" && !isSubmitted && (
+        {activeSection === "documents" && (
           <DocumentsToShare
             data={formData?.documentsToShare}
             onChange={(data) => handleInputChange("documentsToShare", data)}
@@ -345,7 +361,7 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
           />
         )}
 
-        {activeSection === "vendors" && !isSubmitted && (
+        {activeSection === "vendors" && (
           <VendorSelection
             data={formData?.vendors}
             onChange={(data) => handleInputChange("vendors", data)}
@@ -357,12 +373,21 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
         {activeSection === "vendorcontacts" && (
           <VendorContacts
             data={
-              Array.isArray(formData.vendorContacts)
+              Array.isArray(formData.vendorContacts) &&
+              formData.vendorContacts.length > 0
                 ? formData.vendorContacts
-                : []
+                : Array.isArray((formData as any).vendorcontacts)
+                  ? (formData as any).vendorcontacts
+                  : Array.isArray(formData.vendorContacts)
+                    ? formData.vendorContacts
+                    : []
             }
             onChange={(vendorContacts) => {
-              setFormData((prev: any) => ({ ...prev, vendorContacts }));
+              setFormData((prev: any) => ({
+                ...prev,
+                vendorContacts,
+                vendorcontacts: vendorContacts,
+              }));
             }}
             errors={errors}
             setErrors={() => {}}
@@ -399,7 +424,6 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
         )}
       </div>
 
-      {/* Navigation Buttons (Previous / NEXT) */}
       {(shouldShowPrevious() || shouldShowNext()) && (
         <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-6">
           {shouldShowPrevious() ? (

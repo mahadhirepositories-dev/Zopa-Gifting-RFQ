@@ -26,38 +26,98 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
   const financials = data.financials || {};
   const generalTerms = data.generalTerms || {};
   const specialTerms = data.specialTerms || {};
-  const documentsToShare = data.documentsToShare || {};
   const vendors = data.vendors || {};
-  const rfpDates = data.rfpDates || {};
+  const vendorContacts =
+    Array.isArray(data.vendorContacts) && data.vendorContacts.length > 0
+      ? data.vendorContacts
+      : Array.isArray(data.vendorcontacts) && data.vendorcontacts.length > 0
+        ? data.vendorcontacts
+        : Array.isArray(data.vendorContacts)
+          ? data.vendorContacts
+          : Array.isArray(data.vendorcontacts)
+            ? data.vendorcontacts
+            : [];
+  const rfpDates = data.rfpDates || data.dates || {};
+  const rawDocuments = data.documentsToShare || data.documents;
+
+  const documentsList = React.useMemo(() => {
+    if (!rawDocuments) return [];
+    let raw = rawDocuments;
+    if (typeof raw === "object" && !Array.isArray(raw) && raw !== null) {
+      if (raw.documentsToShare !== undefined) raw = raw.documentsToShare;
+      else if (raw.documents !== undefined) raw = raw.documents;
+    }
+    if (typeof raw === "string") {
+      const trimmed = raw.trim();
+      if (!trimmed || trimmed === "[]" || trimmed === "{}") return [];
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item) => (typeof item === "string" ? item : item?.name || item?.label || "")).filter(Boolean);
+        }
+      } catch {
+        return trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+    }
+    if (Array.isArray(raw)) {
+      return raw.map((item) => (typeof item === "string" ? item : item?.name || item?.label || "")).filter(Boolean);
+    }
+    return [];
+  }, [rawDocuments]);
 
   useEffect(() => {
-    if (contact?.logoPreview) {
-      setLogoSrc(contact.logoPreview);
-      return;
-    }
+    // 1. Direct logo candidate properties
+    const directLogo =
+      contact?.logoUrl ||
+      contact?.logoPreview ||
+      contact?.logoPath ||
+      data?.logoUrl ||
+      data?.logoPreview ||
+      data?.logoPath ||
+      (typeof data?.logo === "string" ? data.logo : null);
 
-    if (contact?.logoPath) {
-      if (contact.logoPath.startsWith("data:")) {
-        setLogoSrc(contact.logoPath);
-      } else {
-        try {
-          const url = new URL(contact.logoPath);
-          setLogoSrc(url.toString());
-        } catch {
-          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-          const effectiveBaseUrl =
-            baseUrl ||
-            (typeof window !== "undefined" ? window.location.origin : "");
-
-          const cleanBaseUrl = effectiveBaseUrl.replace(/\/$/, "");
-          const cleanPath = contact.logoPath.startsWith("/")
-            ? contact.logoPath
-            : `/${contact.logoPath}`;
-          setLogoSrc(`${cleanBaseUrl}${cleanPath}`);
+    // 2. Check BOQ item attachments for image upload
+    let boqImageLogo: string | null = null;
+    if (Array.isArray(boq)) {
+      for (const item of boq) {
+        if (Array.isArray(item.attachments)) {
+          const img = item.attachments.find(
+            (a: any) =>
+              a.fileUrl &&
+              (a.fileType?.startsWith("image/") ||
+                /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(a.fileName || a.fileUrl))
+          );
+          if (img) {
+            boqImageLogo = img.fileUrl;
+            break;
+          }
         }
       }
     }
-  }, [contact?.logoPath, contact?.logoPreview]);
+
+    const candidate = directLogo || boqImageLogo;
+
+    if (!candidate) {
+      setLogoSrc(null);
+      return;
+    }
+
+    if (candidate.startsWith("data:") || candidate.startsWith("http://") || candidate.startsWith("https://")) {
+      setLogoSrc(candidate);
+    } else {
+      const cleanPath = candidate.startsWith("/") ? candidate : `/${candidate}`;
+      setLogoSrc(cleanPath);
+    }
+  }, [
+    contact?.logoUrl,
+    contact?.logoPreview,
+    contact?.logoPath,
+    data?.logoUrl,
+    data?.logoPreview,
+    data?.logoPath,
+    data?.logo,
+    boq,
+  ]);
 
   const handleImageError = () => {
     setLogoSrc(null);
@@ -160,12 +220,10 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
             {(company.postalCode || "600014") && ","}{" "}
             {company.country || "India"}
           </span>
-          , hereinafter referred to as &quot;Company&quot; which expression
-          shall unless repugnant to the context or meaning thereof and include
-          its administrators and successors in interest of the First Part.
+          , hereinafter referred to as &quot;Company&quot;.
           {company.businessType
             ? ` Company is in the business of ${company.businessType}`
-            : " Company is in the business of Retail"}
+            : " "}
         </p>
       </div>
 
@@ -223,20 +281,52 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
                   <th className="p-2 text-left">UOM</th>
                   <th className="p-2 text-left">Qty</th>
                   <th className="p-2 text-left">Target Price</th>
+                  <th className="p-2 text-left">Logo Req.</th>
                   <th className="p-2 text-left">Specification</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-mono">
-                {boq.map((item: any, index: number) => (
-                  <tr key={index}>
-                    <td className="p-2">{item.category}</td>
-                    <td className="p-2">{item.description}</td>
-                    <td className="p-2">{item.uom}</td>
-                    <td className="p-2">{item.qty}</td>
-                    <td className="p-2">{item.targetPrice}</td>
-                    <td className="p-2">{item.specification}</td>
-                  </tr>
-                ))}
+                {boq.map((item: any, index: number) => {
+                  const hasLogo = item.logoRequirement === "with_logo";
+                  const attachment =
+                    Array.isArray(item.attachments) && item.attachments.length > 0
+                      ? item.attachments[0]
+                      : null;
+
+                  return (
+                    <tr key={index}>
+                      <td className="p-2">{item.category}</td>
+                      <td className="p-2">{item.description}</td>
+                      <td className="p-2">{item.uom}</td>
+                      <td className="p-2">{item.qty}</td>
+                      <td className="p-2">₹{item.targetPrice}</td>
+                      <td className="p-2">
+                        <span
+                          className={
+                            hasLogo
+                              ? "text-emerald-700 font-bold"
+                              : "text-slate-500"
+                          }
+                        >
+                          {hasLogo ? "With Logo" : "Without Logo"}
+                        </span>
+                        {hasLogo && attachment?.fileUrl && (
+                          <div className="text-[10px] mt-0.5">
+                            <a
+                              href={attachment.fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 underline font-bold"
+                            >
+                              📎 {attachment.fileName || "View Logo"}
+                            </a>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-2">{item.specification}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -265,7 +355,7 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
         financials?.financialNotes) && (
         <div className="space-y-1 font-mono text-xs sm:text-sm text-slate-700">
           <h3 className="text-base font-bold text-slate-900 font-sans mb-2">
-            6. Financials
+            6. Financial Information
           </h3>
           {financials.budgetType && (
             <p>
@@ -289,44 +379,175 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
       )}
 
       {/* 7. General Terms */}
-      {generalTerms?.deliveryTimeValue && (
+      {(generalTerms?.deliveryTimeValue ||
+        (Array.isArray(generalTerms?.selectedTerms) && generalTerms.selectedTerms.length > 0) ||
+        (Array.isArray(generalTerms?.customTerms) && generalTerms.customTerms.length > 0) ||
+        (Array.isArray(generalTerms?.deliveryLocations) && generalTerms.deliveryLocations.length > 0)) && (
         <div className="space-y-2">
           <h3 className="text-base font-bold text-slate-900">
             7. General Terms & Conditions
           </h3>
           <ul className="list-disc pl-5 text-slate-700 space-y-1 font-mono text-xs sm:text-sm">
-            <li>
-              Delivery Lead Time: {generalTerms.deliveryTimeValue}{" "}
-              {generalTerms.deliveryTimeUnit || "days"}
-            </li>
+            {generalTerms.deliveryTimeValue && (
+              <li>
+                Delivery Lead Time: {generalTerms.deliveryTimeValue}{" "}
+                {generalTerms.deliveryTimeUnit || "days"}
+              </li>
+            )}
+            {Array.isArray(generalTerms.deliveryLocations) &&
+              generalTerms.deliveryLocations.length > 0 && (
+                <li>
+                  Delivery Locations:{" "}
+                  {generalTerms.deliveryLocations
+                    .map((loc: any) =>
+                      typeof loc === "string"
+                        ? loc
+                        : loc?.name && loc?.state
+                        ? `${loc.name}, ${loc.state}`
+                        : loc?.name || String(loc),
+                    )
+                    .join("; ")}
+                </li>
+              )}
+            {Array.isArray(generalTerms.selectedTerms) &&
+              generalTerms.selectedTerms.map((term: string, idx: number) => (
+                <li key={`gt-${idx}`}>{term}</li>
+              ))}
+            {Array.isArray(generalTerms.customTerms) &&
+              generalTerms.customTerms.map((term: string, idx: number) => (
+                <li key={`gtc-${idx}`}>{term}</li>
+              ))}
           </ul>
         </div>
       )}
 
-      {/* 10. Buyer Contacts */}
+      {/* 8. Special Terms */}
+      {((Array.isArray(specialTerms?.selectedTerms) && specialTerms.selectedTerms.length > 0) ||
+        (Array.isArray(specialTerms?.customTerms) && specialTerms.customTerms.length > 0) ||
+        (Array.isArray(specialTerms) && specialTerms.length > 0)) && (
+        <div className="space-y-2">
+          <h3 className="text-base font-bold text-slate-900">
+            8. Special Terms & Conditions
+          </h3>
+          <ul className="list-disc pl-5 text-slate-700 space-y-1 font-mono text-xs sm:text-sm">
+            {Array.isArray(specialTerms.selectedTerms) &&
+              specialTerms.selectedTerms.map((term: string, idx: number) => (
+                <li key={`st-${idx}`}>{term}</li>
+              ))}
+            {Array.isArray(specialTerms.customTerms) &&
+              specialTerms.customTerms.map((term: string, idx: number) => (
+                <li key={`stc-${idx}`}>{term}</li>
+              ))}
+            {Array.isArray(specialTerms) &&
+              specialTerms.map((term: any, idx: number) => (
+                <li key={`starr-${idx}`}>{typeof term === "string" ? term : term.text || String(term)}</li>
+              ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 9. Documents to Share */}
+      {documentsList.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-base font-bold text-slate-900">
+            9. Documents to Share
+          </h3>
+          <ul className="list-disc pl-5 text-slate-700 space-y-1 font-mono text-xs sm:text-sm">
+            {documentsList.map((docName: string, index: number) => (
+              <li key={index}>{docName}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 10. Vendor Selection Criteria */}
+      {(vendors?.selectionMethod || vendors?.vendorRequirements || vendors?.vendorSelectionProcess) && (
+        <div className="space-y-2">
+          <h3 className="text-base font-bold text-slate-900">
+            10. Vendor Selection Criteria
+          </h3>
+          <div className="space-y-1 font-mono text-xs sm:text-sm text-slate-700">
+            {vendors.selectionMethod && (
+              <p>
+                <strong className="font-sans text-slate-900">Selection Method:</strong>{" "}
+                {vendors.selectionMethod}
+              </p>
+            )}
+            {vendors.vendorRequirements && (
+              <p>
+                <strong className="font-sans text-slate-900">Requirements:</strong>{" "}
+                {typeof vendors.vendorRequirements === "string"
+                  ? vendors.vendorRequirements
+                  : JSON.stringify(vendors.vendorRequirements)}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 11. Vendor Contacts */}
+      {vendorContacts.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-base font-bold text-slate-900">
+            11. Vendor Contacts ({vendorContacts.length})
+          </h3>
+          <ul className="list-disc pl-5 text-slate-700 space-y-1 font-mono text-xs sm:text-sm">
+            {vendorContacts.map((vc: any, idx: number) => (
+              <li key={idx}>
+                <span className="font-bold text-slate-900">{vc.name || vc.companyName}</span> ({vc.email})
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 12. RFQ Timeline */}
+      {(rfpDates?.startDate || rfpDates?.endDate) && (
+        <div className="space-y-2">
+          <h3 className="text-base font-bold text-slate-900">
+            12. RFQ Timeline
+          </h3>
+          <div className="space-y-1 font-mono text-xs sm:text-sm text-slate-700">
+            {rfpDates.startDate && (
+              <p>
+                <strong className="font-sans text-slate-900">Release Date:</strong>{" "}
+                {rfpDates.startDate}
+              </p>
+            )}
+            {rfpDates.endDate && (
+              <p>
+                <strong className="font-sans text-slate-900">Submission Deadline:</strong>{" "}
+                {rfpDates.endDate}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 13. Buyer Contacts */}
       <div className="space-y-2 pt-2">
         <h3 className="text-base font-bold text-slate-900">
-          10. Buyer Contacts
+          13. Buyer Contacts
         </h3>
         <div className="space-y-1.5 font-mono text-xs sm:text-sm text-slate-700">
           <p>
             <strong className="font-sans text-slate-900">Contact Name:</strong>{" "}
-            {contact.contactName || "Devipriya Venkatesan"}
+            {contact.contactName || "Devipriya"}
           </p>
           <p>
             <strong className="font-sans text-slate-900">Email:</strong>{" "}
-            {contact.contactEmail || "devipriyavenkatesan.v@gmail.com"}
+            {contact.contactEmail || "priya@gmail.com"}
           </p>
           <p>
             <strong className="font-sans text-slate-900">Phone:</strong>{" "}
-            {contact.contactPhone || "+91 8521479630"}
+            {contact.contactPhone || "+91 8909876545"}
           </p>
           <p>
             <strong className="font-sans text-slate-900">Address:</strong>{" "}
-            {contact.contactAddressLine1 || "894, Sri Ram Colony"}
-            {contact.contactAddressLine2 ? `, ${contact.contactAddressLine2}` : " , Jai Ram Puram"}
-            , {contact.contactCity || "Chennai"}, {contact.contactState || "Tamil Nadu"}
-            , {contact.contactPostalCode || "600014"}, {contact.contactCountry || "India"}
+            {contact.contactAddressLine1 || company.addressLine1 || "894, Sri Ram Colony"}
+            {contact.contactAddressLine2 || company.addressLine2 ? `, ${contact.contactAddressLine2 || company.addressLine2}` : " , Jai Ram Puram"}
+            , {contact.contactCity || company.city || "Chennai"}, {contact.contactState || company.state || "Tamil Nadu"}
+            , {contact.contactPostalCode || company.postalCode || "600014"}, {contact.contactCountry || company.country || "India"}
           </p>
         </div>
       </div>

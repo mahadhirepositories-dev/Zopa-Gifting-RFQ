@@ -86,13 +86,19 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/auth/verify") ||
     pathname.startsWith("/vendor-registration") ||
     pathname.startsWith("/api/auth/") ||
-    pathname.startsWith("/api/public/");
+    pathname.startsWith("/api/public/") ||
+    pathname.startsWith("/api/rfq/") ||
+    pathname.startsWith("/rfq/buyer-preview/") ||
+    pathname.startsWith("/rfq/buyer_preview/");
 
   const isProtectedPage =
-    pathname.startsWith("/rfp") ||
+    (pathname.startsWith("/rfq") &&
+      !pathname.startsWith("/rfq/buyer-preview") &&
+      !pathname.startsWith("/rfq/buyer_preview")) ||
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/select-organization");
+
 
   const isProtectedApiRoute = pathname.startsWith("/api/") && !isPublicRoute;
 
@@ -119,18 +125,6 @@ export async function proxy(request: NextRequest) {
     loginUrl.searchParams.set("mode", "login");
     loginUrl.searchParams.set("callbackUrl", `${pathname}${search}`);
     return NextResponse.redirect(loginUrl);
-  }
-
-  // 7. Redirect Authenticated Users visiting homepage or login page directly to Category step
-  if (isAuthenticated && (pathname === "/" || pathname === "/login")) {
-    const callbackUrl = request.nextUrl.searchParams.get("callbackUrl");
-    if (callbackUrl && callbackUrl.startsWith("/") && callbackUrl !== "/") {
-      return NextResponse.redirect(new URL(callbackUrl, request.url));
-    }
-    const defaultRfpId = "09ed3409-08c3-4af6-96e8-3ea87eb451cf";
-    return NextResponse.redirect(
-      new URL(`/rfp/${defaultRfpId}/category`, request.url),
-    );
   }
 
   // 8. Forward request with tracking and security headers
