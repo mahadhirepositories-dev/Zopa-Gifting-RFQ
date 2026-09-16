@@ -128,7 +128,8 @@ export function getVendorBOQSubItems(
 
 export const calculateItemTotal = (
   item: BoqItem,
-  buyerQty?: number
+  buyerQty?: number,
+  selectedIndex: number = 0
 ): PriceCalculation => {
   if (!item) return { grossAmount: 0, actualPrice: 0 };
 
@@ -141,45 +142,41 @@ export const calculateItemTotal = (
     subItemsList = [item];
   }
 
-  let totalGross = 0;
-  let totalActual = 0;
+  if (subItemsList.length === 0) return { grossAmount: 0, actualPrice: 0 };
 
-  subItemsList.forEach((sub: any) => {
-    const price =
-      parseFloat(
-        String(
-          sub?.quotePrice ??
-            sub?.price ??
-            (item as any)?.quotePrice ??
-            (item as any)?.price ??
-            0
-        )
-      ) || 0;
+  const sub: any = subItemsList[selectedIndex] || subItemsList[0];
 
-    const quantity =
-      sub?.qty !== undefined && sub?.qty !== null && sub?.qty !== ""
-        ? parseFloat(String(sub.qty))
-        : buyerQty !== undefined
-        ? buyerQty
-        : parseFloat(String((item as any)?.qty)) || 0;
+  const price =
+    parseFloat(
+      String(
+        sub?.quotePrice ??
+          sub?.price ??
+          (item as any)?.quotePrice ??
+          (item as any)?.price ??
+          0
+      )
+    ) || 0;
 
-    const gst =
-      parseFloat(
-        String(
-          sub?.gstPercent ?? sub?.gst ?? (item as any)?.gst ?? 0
-        )
-      ) || 0;
+  const quantity =
+    sub?.qty !== undefined && sub?.qty !== null && sub?.qty !== ""
+      ? parseFloat(String(sub.qty))
+      : buyerQty !== undefined
+      ? buyerQty
+      : parseFloat(String((item as any)?.qty)) || 0;
 
-    const subtotal = price * quantity;
-    const totalWithTax = subtotal * (1 + gst / 100);
+  const gst =
+    parseFloat(
+      String(
+        sub?.gstPercent ?? sub?.gst ?? (item as any)?.gst ?? 0
+      )
+    ) || 0;
 
-    totalGross += subtotal;
-    totalActual += totalWithTax;
-  });
+  const subtotal = price * quantity;
+  const totalWithTax = subtotal * (1 + gst / 100);
 
   return {
-    grossAmount: totalGross,
-    actualPrice: totalActual,
+    grossAmount: subtotal,
+    actualPrice: totalWithTax,
   };
 };
 

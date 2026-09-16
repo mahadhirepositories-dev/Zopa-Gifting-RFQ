@@ -603,6 +603,32 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
     []
   );
 
+  const [selectedSubItems, setSelectedSubItems] = React.useState<
+    Record<string, number>
+  >({});
+
+  const getSelectedSubItemIndex = (
+    vendorId: string | number,
+    revIndex: number,
+    itemIndex: number
+  ): number => {
+    const key = `${vendorId}-rev-${revIndex}-item-${itemIndex}`;
+    return selectedSubItems[key] ?? 0;
+  };
+
+  const handleSelectSubItem = (
+    vendorId: string | number,
+    revIndex: number,
+    itemIndex: number,
+    subIdx: number
+  ) => {
+    const key = `${vendorId}-rev-${revIndex}-item-${itemIndex}`;
+    setSelectedSubItems((prev) => ({
+      ...prev,
+      [key]: subIdx,
+    }));
+  };
+
   const calculateCumulativeTotals = (): Record<string, number> => {
     const totals: Record<string, number> = {};
 
@@ -613,20 +639,28 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
           const boqSource = revision?.boqDetails || revision?.boqQuotes;
           if (boqSource) {
             const subItems = getVendorBOQSubItems(boqSource, index, item);
-            subItems.forEach((subItem: any) => {
-              if (subItem.quotePrice != null) {
-                const price = parseFloat(subItem.quotePrice?.toString() || "0");
-                const qty = parseFloat(
-                  subItem.qty?.toString() || item.qty?.toString() || "1"
+            if (subItems.length > 0) {
+              const selectedIdx = getSelectedSubItemIndex(
+                vendor.id,
+                revIndex,
+                index
+              );
+              const selectedSubItem = subItems[selectedIdx] || subItems[0];
+              if (selectedSubItem && selectedSubItem.quotePrice != null) {
+                const price = parseFloat(
+                  selectedSubItem.quotePrice?.toString() || "0"
                 );
-                const gst = parseFloat(subItem.gst?.toString() || "0");
+                const qty = parseFloat(
+                  selectedSubItem.qty?.toString() || item.qty?.toString() || "1"
+                );
+                const gst = parseFloat(selectedSubItem.gst?.toString() || "0");
                 const exclTax = price * qty;
                 const inclTax = exclTax * (1 + gst / 100);
 
                 const key = `${vendor.id}-rev-${revIndex}`;
                 totals[key] = (totals[key] || 0) + inclTax;
               }
-            });
+            }
           }
         });
       });
@@ -1627,12 +1661,62 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
                                   uLineTotal > 0 &&
                                   Math.abs(uLineTotal - lowestSubItemTotal) < 0.01;
 
+                                const selectedSubIdx = getSelectedSubItemIndex(
+                                  vendor.id,
+                                  revIndex,
+                                  index
+                                );
+                                const isSubItemSelected = subIdx === selectedSubIdx;
+
+                                const cellClass = `${tdClass} cursor-pointer hover:bg-blue-50/50 ${
+                                  isSubItemSelected && subItems.length > 1
+                                    ? "bg-blue-50/80 ring-1 ring-blue-300"
+                                    : ""
+                                }`;
+
                                 return (
                                   <td
                                     key={`${vendor.id}-${index}-${subIdx}-rev-${revIndex}`}
-                                    className={tdClass}
+                                    className={cellClass}
+                                    onClick={() =>
+                                      handleSelectSubItem(
+                                        vendor.id,
+                                        revIndex,
+                                        index,
+                                        subIdx
+                                      )
+                                    }
                                   >
                                     <div className="flex flex-col items-center justify-center space-y-1 text-center max-w-[200px] mx-auto font-mono text-xs">
+                                      {subItems.length > 1 && (
+                                        <div className="flex items-center gap-1.5 mb-1 font-sans">
+                                          <input
+                                            type="radio"
+                                            name={`select-${vendor.id}-rev-${revIndex}-item-${index}`}
+                                            checked={isSubItemSelected}
+                                            onChange={() =>
+                                              handleSelectSubItem(
+                                                vendor.id,
+                                                revIndex,
+                                                index,
+                                                subIdx
+                                              )
+                                            }
+                                            className="h-3 w-3 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                          />
+                                          <span
+                                            className={`text-[11px] ${
+                                              isSubItemSelected
+                                                ? "font-bold text-blue-700"
+                                                : "text-gray-600"
+                                            }`}
+                                          >
+                                            {isSubItemSelected
+                                              ? "Selected"
+                                              : "Select"}
+                                          </span>
+                                        </div>
+                                      )}
                                       {subItem.itemName && (
                                         <p className="font-semibold text-gray-900 text-xs mb-0.5 font-sans">
                                           {subItem.itemName}

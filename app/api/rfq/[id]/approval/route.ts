@@ -3,12 +3,14 @@ import { db } from "@/db";
 import { rfqs, rfqApprovals, rfqApprovalRecommendations } from "@/db/schema";
 import { EmailService } from "@/lib/email/email-service";
 import { eq } from "drizzle-orm";
+import { ensureApprovalTablesExist } from "@/lib/db-approval-init";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await ensureApprovalTablesExist();
     const resolvedParams = await params;
     const rfqId = resolvedParams.id;
     if (!rfqId) {

@@ -42,9 +42,17 @@ export const VendorRecommendationTable: React.FC<
 }) => {
   if (isRFPApproved) return null;
 
-  const filteredVendors = vendors.filter(
-    (vendor) => vendor.status === "submitted"
-  );
+  const filteredVendors = vendors.filter((vendor) => {
+    const st = (vendor.status || "").toLowerCase();
+    return (
+      st === "submitted" ||
+      st === "submitted_draft" ||
+      st === "draft" ||
+      st === "approved" ||
+      !st ||
+      (vendor.revisions && vendor.revisions.length > 0)
+    );
+  });
 
   if (filteredVendors.length === 0) return null;
 

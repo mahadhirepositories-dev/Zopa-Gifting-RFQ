@@ -182,15 +182,21 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
   }>({ isOpen: false, action: "approve" });
 
   const rfqStatusVal = (buyerData?.rfp?.status || currentApproval?.status || "").toLowerCase();
-  const isRFPApproved = rfqStatusVal === "approved";
-  const isRFPRejected = rfqStatusVal === "rejected";
-  const isRFPRequote = rfqStatusVal === "re-quote requested" || rfqStatusVal === "revision_requested";
+  const approvalStatus = (currentApproval?.status || "").toLowerCase();
+  const isRFPApproved = rfqStatusVal === "approved" || approvalStatus === "approved";
+  const isRFPRejected = rfqStatusVal === "rejected" || approvalStatus === "rejected";
+  const isRFPRequote = rfqStatusVal === "re-quote requested" || rfqStatusVal === "revision_requested" || isBuyerRevisionPending(currentApproval);
   const isRFQCompleted = isRFPApproved || isRFPRejected;
 
   const isPendingApproval =
-    !isRFQCompleted &&
     !isRFPRequote &&
-    !isBuyerRevisionPending(currentApproval);
+    !isRFQCompleted &&
+    (rfqStatusVal === "pending_approval" ||
+      rfqStatusVal === "pending" ||
+      rfqStatusVal === "under_review" ||
+      approvalStatus === "pending" ||
+      approvalStatus === "pending_approval" ||
+      approvalStatus === "under_review");
 
   // NEW: Check if current user is Level 2 approver
   const isLevel2Approver = useMemo(() => {

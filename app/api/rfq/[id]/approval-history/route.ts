@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { rfqApprovals, rfqApprovalRecommendations, vendorResponses, vendorCompanyDetails } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { ensureApprovalTablesExist } from "@/lib/db-approval-init";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await ensureApprovalTablesExist();
     const resolvedParams = await params;
     const rfqId = resolvedParams.id;
     if (!rfqId) {
