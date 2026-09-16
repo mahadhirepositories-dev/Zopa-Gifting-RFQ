@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
+import { writeFile, mkdir } from "fs/promises";
+import { join } from "path";
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,7 +38,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const fileUrl = `/uploads/${Date.now()}-${file.name}`;
+    const uploadDir = join(process.cwd(), "public", "uploads", "images");
+    await mkdir(uploadDir, { recursive: true });
+
+    const timePrefix = Date.now();
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+    const fileName = `${timePrefix}-${safeFileName}`;
+    const filePath = join(uploadDir, fileName);
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await writeFile(filePath, buffer);
+
+    const fileUrl = `/uploads/images/${fileName}`;
     const attachment = {
       id: Math.floor(Date.now() + Math.random() * 1000),
       fileName: file.name,

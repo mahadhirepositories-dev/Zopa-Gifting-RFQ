@@ -67,6 +67,91 @@ function FileLink({
   );
 }
 
+// Helper function to extract ALL vendor quote sub-items regardless of stored structure (array or keyed object)
+function getVendorBOQSubItems(
+  boqDetails: any,
+  index: number,
+  buyerItem: any
+) {
+  if (!boqDetails) return [];
+
+  let target: any = null;
+
+  if (Array.isArray(boqDetails)) {
+    target = boqDetails[index];
+  } else if (typeof boqDetails === "object") {
+    const key = buyerItem?.id || `boq_${index}`;
+    target =
+      boqDetails[key] ||
+      boqDetails[`boq_${index}`] ||
+      boqDetails[index] ||
+      boqDetails[String(index)] ||
+      boqDetails[buyerItem?.id] ||
+      Object.values(boqDetails)[index];
+  }
+
+  if (!target) return [];
+
+  let itemsList: any[] = [];
+  if (Array.isArray(target.items) && target.items.length > 0) {
+    itemsList = target.items;
+  } else if (Array.isArray(target) && target.length > 0) {
+    itemsList = target;
+  } else {
+    itemsList = [target];
+  }
+
+  return itemsList.map((sub: any, subIdx: number) => {
+    let atts: { url: string; name: string }[] = [];
+    if (Array.isArray(sub?.vendorAttachments) && sub.vendorAttachments.length > 0) {
+      atts = sub.vendorAttachments;
+    } else if (sub?.vendorAttachmentUrl) {
+      atts = [
+        {
+          url: sub.vendorAttachmentUrl,
+          name: sub.vendorAttachmentName || "Attachment",
+        },
+      ];
+    } else if (target?.vendorAttachmentUrl) {
+      atts = [
+        {
+          url: target.vendorAttachmentUrl,
+          name: target.vendorAttachmentName || "Attachment",
+        },
+      ];
+    }
+
+    const quotePrice =
+      sub?.quotePrice ??
+      sub?.price ??
+      target?.quotePrice ??
+      target?.price ??
+      null;
+
+    const gst =
+      sub?.gstPercent ??
+      sub?.gst ??
+      target?.gstPercent ??
+      target?.gst ??
+      null;
+
+    return {
+      id: sub?.id || `sub_${index}_${subIdx}`,
+      itemName: sub?.itemName || sub?.name || "",
+      qty: sub?.qty ?? buyerItem?.qty ?? 1,
+      quotePrice,
+      gst,
+      make: sub?.make ?? target?.make ?? "",
+      model: sub?.model ?? target?.model ?? "",
+      compliance: sub?.compliance ?? target?.compliance ?? "",
+      remarks: sub?.remarks ?? target?.remarks ?? "",
+      vendorAttachmentUrl: atts[0]?.url || "",
+      vendorAttachmentName: atts[0]?.name || "",
+      vendorAttachments: atts,
+    };
+  });
+}
+
 export const BOQ: React.FC<BOQProps> = ({ buyerData, selectedVendor }) => {
   const getCurrencySymbol = (currencyCode: any) => {
     switch (currencyCode) {
@@ -98,15 +183,13 @@ export const BOQ: React.FC<BOQProps> = ({ buyerData, selectedVendor }) => {
     Record<number, boolean>
   >({});
   const [expandedVendorRemarks, setExpandedVendorRemarks] = React.useState<
-    Record<number, boolean>
+    Record<string, boolean>
   >({});
 
   const toggleSpecification = (index: number) =>
     setExpandedSpecs((prev) => ({ ...prev, [index]: !prev[index] }));
   const toggleBuyerRemarks = (index: number) =>
     setExpandedBuyerRemarks((prev) => ({ ...prev, [index]: !prev[index] }));
-  const toggleVendorRemarks = (index: number) =>
-    setExpandedVendorRemarks((prev) => ({ ...prev, [index]: !prev[index] }));
 
   if (!buyerData?.boq?.length) {
     return (
@@ -134,16 +217,26 @@ export const BOQ: React.FC<BOQProps> = ({ buyerData, selectedVendor }) => {
     {},
   );
 
-  // Calculate grand total
+  const boqSource =
+    selectedVendor?.revisionData?.boqDetails ||
+    selectedVendor?.revisionData?.boqQuotes;
+
+  // Calculate grand total across all vendor sub-items
   let grandTotal = 0;
   buyerData.boq.forEach((buyerItem: BuyerBOQItem, index: number) => {
-    const vendorItem = selectedVendor?.revisionData?.boqDetails?.[index] || {};
-    const quantity = parseFloat(buyerItem.qty?.toString() || "0");
-    const unitPrice = parseFloat(vendorItem.quotePrice?.toString() || "0");
-    const gstPercentage = parseFloat(vendorItem.gst?.toString() || "0");
-    const lineTotalExclTax = quantity * unitPrice;
-    const gstAmount = lineTotalExclTax * (gstPercentage / 100);
-    grandTotal += lineTotalExclTax + gstAmount;
+    const subItems = getVendorBOQSubItems(boqSource, index, buyerItem);
+    if (subItems.length > 0) {
+      subItems.forEach((subItem: any) => {
+        const quantity = parseFloat(
+          subItem.qty?.toString() || buyerItem.qty?.toString() || "0"
+        );
+        const unitPrice = parseFloat(subItem.quotePrice?.toString() || "0");
+        const gstPercentage = parseFloat(subItem.gst?.toString() || "0");
+        const lineTotalExclTax = quantity * unitPrice;
+        const gstAmount = lineTotalExclTax * (gstPercentage / 100);
+        grandTotal += lineTotalExclTax + gstAmount;
+      });
+    }
   });
 
   const categoryKeys = Object.keys(groupedItems);
@@ -168,6 +261,9 @@ export const BOQ: React.FC<BOQProps> = ({ buyerData, selectedVendor }) => {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border border-gray-200 bg-gray-50">
                     Description
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border border-gray-200 bg-gray-50">
+                    Vendor Item
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border border-gray-200 bg-gray-50">
                     Qty
@@ -219,279 +315,358 @@ export const BOQ: React.FC<BOQProps> = ({ buyerData, selectedVendor }) => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {(items as ExtendedBuyerBOQItem[]).map((buyerItem) => {
                   const originalIndex = buyerItem.originalIndex;
-                  const vendorItem = (selectedVendor?.revisionData
-                    ?.boqDetails?.[originalIndex] ||
-                    {}) as ExtendedVendorBOQDetail;
-
-                  const quantity = parseFloat(buyerItem.qty?.toString() || "0");
-                  const unitPrice = parseFloat(
-                    vendorItem.quotePrice?.toString() || "0",
+                  const subItems = getVendorBOQSubItems(
+                    boqSource,
+                    originalIndex,
+                    buyerItem,
                   );
-                  const gstPercentage = parseFloat(
-                    vendorItem.gst?.toString() || "0",
-                  );
-                  const lineTotalExclTax = quantity * unitPrice;
-                  const gstAmount = lineTotalExclTax * (gstPercentage / 100);
-                  const lineTotalInclTax = lineTotalExclTax + gstAmount;
 
-                  // ── Attachment data ──────────────────────────────────────
-                  // Buyer attachment: comes from buyerData.boq[].attachmentUrl
+                  const displayItems =
+                    subItems.length > 0
+                      ? subItems
+                      : [
+                          {
+                            id: `sub_${originalIndex}_0`,
+                            itemName: "",
+                            qty: buyerItem.qty,
+                            quotePrice: null,
+                            gst: null,
+                            make: "",
+                            model: "",
+                            compliance: "",
+                            remarks: "",
+                            vendorAttachmentUrl: "",
+                            vendorAttachmentName: "",
+                          },
+                        ];
+
                   const buyerAttachmentUrl = buyerItem.attachmentUrl;
                   const buyerAttachmentName = buyerItem.attachmentName;
 
-                  // Vendor attachment: comes from vendorResponse.revisionNumber[0].boqDetails[].vendorAttachmentUrl
-                  const vendorAttachmentUrl = vendorItem.vendorAttachmentUrl;
-                  const vendorAttachmentName = vendorItem.vendorAttachmentName;
-                  // ────────────────────────────────────────────────────────
-
                   return (
                     <React.Fragment key={originalIndex}>
-                      <tr className="hover:bg-gray-50">
-                        {/* Description + Spec */}
-                        <td className="px-4 py-2 border border-gray-200">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">
-                              {buyerItem.description || "N/A"}
-                            </p>
-                            {typeof buyerItem.specification === "string" &&
-                            buyerItem.specification.length > 100 ? (
-                              <div>
-                                <p
-                                  className={`text-sm text-gray-500 ${
-                                    expandedSpecs[originalIndex]
-                                      ? "w-[250px]"
-                                      : "w-[150px]"
-                                  }`}
-                                >
-                                  {expandedSpecs[originalIndex]
-                                    ? buyerItem.specification
-                                    : `${buyerItem.specification.slice(0, 100)}...`}
-                                </p>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    toggleSpecification(originalIndex)
-                                  }
-                                  className="text-sm text-blue-600 hover:text-blue-800 mt-1 font-medium"
-                                >
-                                  {expandedSpecs[originalIndex]
-                                    ? "Show Less"
-                                    : "Show More"}
-                                </button>
-                              </div>
-                            ) : (
-                              <p className="text-sm text-gray-500">
-                                {buyerItem.specification}
-                              </p>
-                            )}
-                          </div>
-                        </td>
+                      {displayItems.map((vendorItem: any, subIdx: number) => {
+                        const quantity = parseFloat(
+                          vendorItem.qty?.toString() ||
+                            buyerItem.qty?.toString() ||
+                            "0",
+                        );
+                        const unitPrice = parseFloat(
+                          vendorItem.quotePrice?.toString() || "0",
+                        );
+                        const gstPercentage = parseFloat(
+                          vendorItem.gst?.toString() || "0",
+                        );
+                        const lineTotalExclTax = quantity * unitPrice;
+                        const gstAmount =
+                          lineTotalExclTax * (gstPercentage / 100);
+                        const lineTotalInclTax = lineTotalExclTax + gstAmount;
 
-                        {/* Qty + UOM */}
-                        <td className="px-4 py-2 border border-gray-200">
-                          <div className="space-y-1">
-                            <p className="text-sm text-gray-900">
-                              {buyerItem.qty || "0"}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {buyerItem.uom || "UOM"}
-                            </p>
-                          </div>
-                        </td>
+                        const vendorAttachmentUrl =
+                          vendorItem.vendorAttachmentUrl;
+                        const vendorAttachmentName =
+                          vendorItem.vendorAttachmentName;
 
-                        {/* Target Price */}
-                        <td className="px-4 py-2 border border-gray-200">
-                          <p className="text-sm text-gray-900">
-                            {getCurrencySymbol(buyerData?.financials?.currency)}{" "}
-                            {buyerItem.targetPrice
-                              ? Number(buyerItem.targetPrice).toLocaleString(
-                                  undefined,
-                                  {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  },
-                                )
-                              : "-"}
-                          </p>
-                        </td>
-
-                        {/* Quote Price */}
-                        <td className="px-4 py-2 border border-gray-200">
-                          <p className="text-sm text-gray-900">
-                            {getCurrencySymbol(buyerData?.financials?.currency)}{" "}
-                            {vendorItem.quotePrice
-                              ? Number(vendorItem.quotePrice).toLocaleString(
-                                  undefined,
-                                  {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  },
-                                )
-                              : "-"}
-                          </p>
-                        </td>
-
-                        {/* GST */}
-                        <td className="px-4 py-2 border border-gray-200">
-                          <p className="text-sm text-gray-900">
-                            {vendorItem.gst != null
-                              ? `${vendorItem.gst}%`
-                              : "-"}
-                          </p>
-                        </td>
-
-                        {/* Item Total */}
-                        <td className="px-4 py-2 border border-gray-200">
-                          <p className="text-sm font-semibold text-gray-900">
-                            {getCurrencySymbol(buyerData?.financials?.currency)}{" "}
-                            {lineTotalInclTax.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </p>
-                        </td>
-
-                        {/* Make / Model */}
-                        <td className="px-4 py-2 border border-gray-200">
-                          <div className="space-y-1">
-                            <div>
-                              <p className="text-xs text-gray-500">Make</p>
-                              <p className="text-sm text-gray-900">
-                                {vendorItem.make || "-"}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-500">Model</p>
-                              <p className="text-sm text-gray-900">
-                                {vendorItem.model || "-"}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Compliance */}
-                        <td className="px-4 py-2 border border-gray-200">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              vendorItem.compliance === "Yes"
-                                ? "bg-green-100 text-green-700"
-                                : vendorItem.compliance === "No"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-gray-100 text-gray-500"
-                            }`}
+                        return (
+                          <tr
+                            key={`${originalIndex}-${subIdx}`}
+                            className="hover:bg-gray-50 border-b border-gray-200"
                           >
-                            {vendorItem.compliance || "-"}
-                          </span>
-                        </td>
+                            {/* Description + Spec (RowSpan grouped) */}
+                            {subIdx === 0 && (
+                              <td
+                                rowSpan={displayItems.length}
+                                className="px-4 py-2 border border-gray-200 align-top bg-white"
+                              >
+                                <div>
+                                  <p className="text-sm font-semibold text-gray-900">
+                                    {buyerItem.description || "N/A"}
+                                  </p>
+                                  {typeof buyerItem.specification ===
+                                    "string" &&
+                                  buyerItem.specification.length > 100 ? (
+                                    <div>
+                                      <p
+                                        className={`text-sm text-gray-500 ${
+                                          expandedSpecs[originalIndex]
+                                            ? "w-[250px]"
+                                            : "w-[150px]"
+                                        }`}
+                                      >
+                                        {expandedSpecs[originalIndex]
+                                          ? buyerItem.specification
+                                          : `${buyerItem.specification.slice(0, 100)}...`}
+                                      </p>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          toggleSpecification(originalIndex)
+                                        }
+                                        className="text-sm text-blue-600 hover:text-blue-800 mt-1 font-medium"
+                                      >
+                                        {expandedSpecs[originalIndex]
+                                          ? "Show Less"
+                                          : "Show More"}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-gray-500">
+                                      {buyerItem.specification}
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+                            )}
 
-                        {/* Vendor Remarks / Deviation */}
-                        <td className="px-4 py-2 border border-gray-200">
-                          {typeof vendorItem.remarks === "string" &&
-                          vendorItem.remarks.length > 100 ? (
-                            <div>
-                              <p
-                                className={`text-sm text-gray-500 ${
-                                  expandedVendorRemarks[originalIndex]
-                                    ? "w-[250px]"
-                                    : "w-[150px]"
+                            {/* Vendor Item Name */}
+                            <td className="px-4 py-2 border border-gray-200 align-top">
+                              <p className="text-sm font-medium text-gray-900">
+                                {vendorItem.itemName || "-"}
+                              </p>
+                            </td>
+
+                            {/* Qty + UOM */}
+                            <td className="px-4 py-2 border border-gray-200 align-top">
+                              <div className="space-y-1">
+                                <p className="text-sm text-gray-900">
+                                  {vendorItem.qty || buyerItem.qty || "0"}
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                  {buyerItem.uom || "UOM"}
+                                </p>
+                              </div>
+                            </td>
+
+                            {/* Target Price (RowSpan grouped) */}
+                            {subIdx === 0 && (
+                              <td
+                                rowSpan={displayItems.length}
+                                className="px-4 py-2 border border-gray-200 align-top bg-white"
+                              >
+                                <p className="text-sm text-gray-900">
+                                  {getCurrencySymbol(
+                                    buyerData?.financials?.currency,
+                                  )}{" "}
+                                  {buyerItem.targetPrice
+                                    ? Number(
+                                        buyerItem.targetPrice,
+                                      ).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })
+                                    : "-"}
+                                </p>
+                              </td>
+                            )}
+
+                            {/* Quote Price */}
+                            <td className="px-4 py-2 border border-gray-200 align-top">
+                              <p className="text-sm text-gray-900 font-medium">
+                                {getCurrencySymbol(
+                                  buyerData?.financials?.currency,
+                                )}{" "}
+                                {vendorItem.quotePrice != null
+                                  ? Number(
+                                      vendorItem.quotePrice,
+                                    ).toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })
+                                  : "-"}
+                              </p>
+                            </td>
+
+                            {/* GST % */}
+                            <td className="px-4 py-2 border border-gray-200 align-top">
+                              <p className="text-sm text-gray-900">
+                                {vendorItem.gst != null
+                                  ? `${vendorItem.gst}%`
+                                  : "-"}
+                              </p>
+                            </td>
+
+                            {/* Item Total (Incl. GST) */}
+                            <td className="px-4 py-2 border border-gray-200 align-top">
+                              <p className="text-sm font-semibold text-gray-900">
+                                {getCurrencySymbol(
+                                  buyerData?.financials?.currency,
+                                )}{" "}
+                                {lineTotalInclTax.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </p>
+                            </td>
+
+                            {/* Details (Make / Model) */}
+                            <td className="px-4 py-2 border border-gray-200 align-top">
+                              <div className="space-y-1">
+                                <div>
+                                  <p className="text-xs text-gray-500">Make</p>
+                                  <p className="text-sm text-gray-900">
+                                    {vendorItem.make || "-"}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-500">Model</p>
+                                  <p className="text-sm text-gray-900">
+                                    {vendorItem.model || "-"}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Compliance */}
+                            <td className="px-4 py-2 border border-gray-200 align-top">
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                  vendorItem.compliance === "Complied" ||
+                                  vendorItem.compliance === "Yes"
+                                    ? "bg-green-100 text-green-700"
+                                    : vendorItem.compliance === "Not Complied" ||
+                                        vendorItem.compliance === "No"
+                                      ? "bg-red-100 text-red-700"
+                                      : "bg-gray-100 text-gray-500"
                                 }`}
                               >
-                                {expandedVendorRemarks[originalIndex]
-                                  ? vendorItem.remarks
-                                  : `${vendorItem.remarks.slice(0, 100)}...`}
-                              </p>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  toggleVendorRemarks(originalIndex)
-                                }
-                                className="text-sm text-blue-600 hover:text-blue-800 mt-1 font-medium"
-                              >
-                                {expandedVendorRemarks[originalIndex]
-                                  ? "Show Less"
-                                  : "Show More"}
-                              </button>
-                            </div>
-                          ) : (
-                            <p className="text-sm text-gray-500 whitespace-pre-line">
-                              {vendorItem.remarks || "-"}
-                            </p>
-                          )}
-                        </td>
+                                {vendorItem.compliance || "-"}
+                              </span>
+                            </td>
 
-                        {/* Buyer Remarks */}
-                        <td className="px-4 py-2 border border-gray-200">
-                          {typeof buyerItem.remarks === "string" &&
-                          buyerItem.remarks.length > 100 ? (
-                            <div>
-                              <p
-                                className={`text-sm text-gray-500 ${
-                                  expandedBuyerRemarks[originalIndex]
-                                    ? "w-[250px]"
-                                    : "w-[150px]"
-                                }`}
-                              >
-                                {expandedBuyerRemarks[originalIndex]
-                                  ? buyerItem.remarks
-                                  : `${buyerItem.remarks.slice(0, 100)}...`}
-                              </p>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  toggleBuyerRemarks(originalIndex)
-                                }
-                                className="text-sm text-blue-600 hover:text-blue-800 mt-1 font-medium"
-                              >
-                                {expandedBuyerRemarks[originalIndex]
-                                  ? "Show Less"
-                                  : "Show More"}
-                              </button>
-                            </div>
-                          ) : (
-                            <p className="text-sm text-gray-500 whitespace-pre-line">
-                              {buyerItem.remarks || "-"}
-                            </p>
-                          )}
-                        </td>
+                            {/* Vendor Remarks / Deviation */}
+                            <td className="px-4 py-2 border border-gray-200 align-top">
+                              {typeof vendorItem.remarks === "string" &&
+                              vendorItem.remarks.length > 100 ? (
+                                <div>
+                                  <p
+                                    className={`text-sm text-gray-500 ${
+                                      expandedVendorRemarks[
+                                        `${originalIndex}_${subIdx}`
+                                      ]
+                                        ? "w-[250px]"
+                                        : "w-[150px]"
+                                    }`}
+                                  >
+                                    {expandedVendorRemarks[
+                                      `${originalIndex}_${subIdx}`
+                                    ]
+                                      ? vendorItem.remarks
+                                      : `${vendorItem.remarks.slice(0, 100)}...`}
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setExpandedVendorRemarks((prev) => ({
+                                        ...prev,
+                                        [`${originalIndex}_${subIdx}`]:
+                                          !prev[`${originalIndex}_${subIdx}`],
+                                      }))
+                                    }
+                                    className="text-sm text-blue-600 hover:text-blue-800 mt-1 font-medium"
+                                  >
+                                    {expandedVendorRemarks[
+                                      `${originalIndex}_${subIdx}`
+                                    ]
+                                      ? "Show Less"
+                                      : "Show More"}
+                                  </button>
+                                </div>
+                              ) : (
+                                <p className="text-sm text-gray-500 whitespace-pre-line">
+                                  {vendorItem.remarks || "-"}
+                                </p>
+                              )}
+                            </td>
 
-                        {/* ── Buyer Attachment ── */}
-                        <td className="px-4 py-2 border border-gray-200">
-                          {buyerAttachmentUrl ? (
-                            <FileLink
-                              url={buyerAttachmentUrl}
-                              name={buyerAttachmentName}
-                              label="Buyer file"
-                              colorClass="text-gray-700"
-                              bgClass="bg-gray-50"
-                              borderClass="border-gray-200"
-                            />
-                          ) : (
-                            <span className="text-xs text-gray-400">—</span>
-                          )}
-                        </td>
+                            {/* Buyer Remarks (RowSpan grouped) */}
+                            {subIdx === 0 && (
+                              <td
+                                rowSpan={displayItems.length}
+                                className="px-4 py-2 border border-gray-200 align-top bg-white"
+                              >
+                                {typeof buyerItem.remarks === "string" &&
+                                buyerItem.remarks.length > 100 ? (
+                                  <div>
+                                    <p
+                                      className={`text-sm text-gray-500 ${
+                                        expandedBuyerRemarks[originalIndex]
+                                          ? "w-[250px]"
+                                          : "w-[150px]"
+                                      }`}
+                                    >
+                                      {expandedBuyerRemarks[originalIndex]
+                                        ? buyerItem.remarks
+                                        : `${buyerItem.remarks.slice(0, 100)}...`}
+                                    </p>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        toggleBuyerRemarks(originalIndex)
+                                      }
+                                      className="text-sm text-blue-600 hover:text-blue-800 mt-1 font-medium"
+                                    >
+                                      {expandedBuyerRemarks[originalIndex]
+                                        ? "Show Less"
+                                        : "Show More"}
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-gray-500 whitespace-pre-line">
+                                    {buyerItem.remarks || "-"}
+                                  </p>
+                                )}
+                              </td>
+                            )}
 
-                        {/* ── Vendor Attachment ── */}
-                        <td className="px-4 py-2 border border-gray-200">
-                          {vendorAttachmentUrl ? (
-                            <FileLink
-                              url={vendorAttachmentUrl}
-                              name={vendorAttachmentName}
-                              label="Vendor file"
-                              colorClass="text-blue-700"
-                              bgClass="bg-blue-50"
-                              borderClass="border-blue-200"
-                            />
-                          ) : (
-                            <span className="text-xs text-gray-400">—</span>
-                          )}
-                        </td>
-                      </tr>
+                            {/* Buyer Attachment (RowSpan grouped) */}
+                            {subIdx === 0 && (
+                              <td
+                                rowSpan={displayItems.length}
+                                className="px-4 py-2 border border-gray-200 align-top bg-white"
+                              >
+                                {buyerAttachmentUrl ? (
+                                  <FileLink
+                                    url={buyerAttachmentUrl}
+                                    name={buyerAttachmentName}
+                                    label="Buyer file"
+                                    colorClass="text-gray-700"
+                                    bgClass="bg-gray-50"
+                                    borderClass="border-gray-200"
+                                  />
+                                ) : (
+                                  <span className="text-xs text-gray-400">
+                                    —
+                                  </span>
+                                )}
+                              </td>
+                            )}
+
+                            {/* Vendor Attachment */}
+                            <td className="px-4 py-2 border border-gray-200 align-top">
+                              {vendorAttachmentUrl ? (
+                                <FileLink
+                                  url={vendorAttachmentUrl}
+                                  name={vendorAttachmentName}
+                                  label="Vendor file"
+                                  colorClass="text-blue-700"
+                                  bgClass="bg-blue-50"
+                                  borderClass="border-blue-200"
+                                />
+                              ) : (
+                                <span className="text-xs text-gray-400">
+                                  —
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
 
                       {/* Additional Specs Row */}
                       {buyerItem.additionalSpecs && (
                         <tr className="bg-gray-50">
                           <td
-                            colSpan={12}
+                            colSpan={13}
                             className="px-4 py-2 text-sm text-gray-500"
                           >
                             {buyerItem.additionalSpecs}
@@ -508,7 +683,7 @@ export const BOQ: React.FC<BOQProps> = ({ buyerData, selectedVendor }) => {
                 <tfoot className="bg-gray-50">
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="px-4 py-3 text-right font-semibold text-gray-800 border border-gray-200"
                     >
                       Grand Total:

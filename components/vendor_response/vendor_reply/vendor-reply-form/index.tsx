@@ -131,8 +131,15 @@ export const VendorReplyForm: React.FC<VendorReplyFormProps> = ({
   onAddSubItem,
   onRemoveSubItem,
 }) => {
+  const handleInvalidSubmit = () => {
+    validateDocuments();
+  };
+
   return (
-    <form onSubmit={handleSubmit(prepareSubmit)} className="space-y-8">
+    <form
+      onSubmit={handleSubmit(prepareSubmit, handleInvalidSubmit)}
+      className="space-y-8"
+    >
       <CompanyIntroduction
         register={register}
         watch={watch}

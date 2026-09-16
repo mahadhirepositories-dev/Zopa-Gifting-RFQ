@@ -28,7 +28,7 @@ export const DocumentAttachments = ({
   removeAttachment,
 }: DocumentAttachmentsProps) => {
   return (
-    <section className="bg-white rounded-lg border border-gray-100 shadow-sm p-6 space-y-6">
+    <section id="document-attachments-section" className="bg-white rounded-lg border border-gray-100 shadow-sm p-6 space-y-6">
       <h2 className="text-xl font-semibold text-gray-700 mb-4">
         9. Attach Required Documents
       </h2>
@@ -201,20 +201,20 @@ const DocumentItem = ({
       {submissionAttempted && (
         <div className="mt-2">
           {!watch(`attachments.${index}.hasDocument`) && (
-            <p className="text-red-500 text-sm flex items-center space-x-1">
-              <span className="h-4 w-4 rounded-full bg-red-100 flex items-center justify-center">
-                <span className="text-red-500 text-xs">!</span>
+            <p className="text-red-500 text-sm flex items-center space-x-1.5 font-medium">
+              <span className="h-4 w-4 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <span className="text-red-600 text-xs font-bold">!</span>
               </span>
-              <span>Please select Yes or No for {documentName}</span>
+              <span>Please select Yes or No.</span>
             </p>
           )}
 
           {watch(`attachments.${index}.hasDocument`) === "yes" &&
             (!documentAttachments[index]?.files ||
               documentAttachments[index]?.files.length === 0) && (
-              <p className="text-red-500 text-sm flex items-center space-x-1">
-                <span className="h-4 w-4 rounded-full bg-red-100 flex items-center justify-center">
-                  <span className="text-red-500 text-xs">!</span>
+              <p className="text-red-500 text-sm flex items-center space-x-1.5 font-medium">
+                <span className="h-4 w-4 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                  <span className="text-red-600 text-xs font-bold">!</span>
                 </span>
                 <span>Please upload documents for {documentName}</span>
               </p>

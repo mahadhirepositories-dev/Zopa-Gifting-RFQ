@@ -29,9 +29,7 @@ export const CompanyIntroduction: React.FC<CompanyIntroductionProps> = ({
           .filter(Boolean)
           .join(", ") || "Company Address"}
       </span>
-      , hereinafter referred to as &quot;Company&quot;.which expression shall
-      unless repugnant to the context or meaning thereof and include its
-      administrators and successors in interest of the First Part.
+      , hereinafter referred to as &quot;Company&quot;.
     </p>
     {selectedVendor?.companydetails?.businessType && (
       <p className="text-gray-700 mt-2">

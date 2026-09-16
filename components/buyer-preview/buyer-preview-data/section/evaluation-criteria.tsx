@@ -34,9 +34,25 @@ export const EvaluationCriteria: React.FC<EvaluationCriteriaProps> = ({
           <tbody className="bg-white divide-y divide-gray-200">
             {buyerData?.evaluation?.length > 0 ? (
               buyerData.evaluation.map((criteria: string, index: number) => {
-                // Find matching vendor response by index
-                const vendorResponse: any =
-                  selectedVendor?.revisionData?.evaluationCriteria?.[index] || {};
+                const evalSource =
+                  selectedVendor?.revisionData?.evaluationCriteria ||
+                  selectedVendor?.revisionData?.evalCompliance ||
+                  selectedVendor?.revisionData?.evaluation;
+
+                let vendorResponse: any = {};
+                if (Array.isArray(evalSource)) {
+                  vendorResponse = evalSource[index] || {};
+                } else if (typeof evalSource === "object" && evalSource !== null) {
+                  vendorResponse =
+                    evalSource[index] || evalSource[String(index)] || evalSource[criteria] || {};
+                }
+
+                if (typeof vendorResponse === "string") {
+                  vendorResponse = { value: vendorResponse, remarks: "" };
+                }
+
+                const valueDisplay =
+                  vendorResponse?.value || vendorResponse?.compliance || "-";
 
                 return (
                   <tr key={index}>
@@ -44,7 +60,7 @@ export const EvaluationCriteria: React.FC<EvaluationCriteriaProps> = ({
                       {criteria}
                       {criteria.toLowerCase() === "earliest delivery" ? (
                         <>
-                          {vendorResponse.value || "-"}
+                          {valueDisplay !== "-" ? valueDisplay : ""}
                           {"deliveryTimeValue" in vendorResponse &&
                             "deliveryTimeUnit" in vendorResponse && (
                               <span className="ml-1">
@@ -70,7 +86,7 @@ export const EvaluationCriteria: React.FC<EvaluationCriteriaProps> = ({
                     </td>
 
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {vendorResponse.value || "-"}
+                      {valueDisplay}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900 break-words">
                       {vendorResponse.remarks || "-"}

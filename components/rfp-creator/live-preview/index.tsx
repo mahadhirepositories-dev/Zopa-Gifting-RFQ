@@ -66,33 +66,58 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
   }, [rawDocuments]);
 
   useEffect(() => {
-    if (contact?.logoPreview) {
-      setLogoSrc(contact.logoPreview);
-      return;
-    }
+    // 1. Direct logo candidate properties
+    const directLogo =
+      contact?.logoUrl ||
+      contact?.logoPreview ||
+      contact?.logoPath ||
+      data?.logoUrl ||
+      data?.logoPreview ||
+      data?.logoPath ||
+      (typeof data?.logo === "string" ? data.logo : null);
 
-    if (contact?.logoPath) {
-      if (contact.logoPath.startsWith("data:")) {
-        setLogoSrc(contact.logoPath);
-      } else {
-        try {
-          const url = new URL(contact.logoPath);
-          setLogoSrc(url.toString());
-        } catch {
-          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-          const effectiveBaseUrl =
-            baseUrl ||
-            (typeof window !== "undefined" ? window.location.origin : "");
-
-          const cleanBaseUrl = effectiveBaseUrl.replace(/\/$/, "");
-          const cleanPath = contact.logoPath.startsWith("/")
-            ? contact.logoPath
-            : `/${contact.logoPath}`;
-          setLogoSrc(`${cleanBaseUrl}${cleanPath}`);
+    // 2. Check BOQ item attachments for image upload
+    let boqImageLogo: string | null = null;
+    if (Array.isArray(boq)) {
+      for (const item of boq) {
+        if (Array.isArray(item.attachments)) {
+          const img = item.attachments.find(
+            (a: any) =>
+              a.fileUrl &&
+              (a.fileType?.startsWith("image/") ||
+                /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(a.fileName || a.fileUrl))
+          );
+          if (img) {
+            boqImageLogo = img.fileUrl;
+            break;
+          }
         }
       }
     }
-  }, [contact?.logoPath, contact?.logoPreview]);
+
+    const candidate = directLogo || boqImageLogo;
+
+    if (!candidate) {
+      setLogoSrc(null);
+      return;
+    }
+
+    if (candidate.startsWith("data:") || candidate.startsWith("http://") || candidate.startsWith("https://")) {
+      setLogoSrc(candidate);
+    } else {
+      const cleanPath = candidate.startsWith("/") ? candidate : `/${candidate}`;
+      setLogoSrc(cleanPath);
+    }
+  }, [
+    contact?.logoUrl,
+    contact?.logoPreview,
+    contact?.logoPath,
+    data?.logoUrl,
+    data?.logoPreview,
+    data?.logoPath,
+    data?.logo,
+    boq,
+  ]);
 
   const handleImageError = () => {
     setLogoSrc(null);
@@ -195,9 +220,7 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
             {(company.postalCode || "600014") && ","}{" "}
             {company.country || "India"}
           </span>
-          , hereinafter referred to as &quot;Company&quot; which expression
-          shall unless repugnant to the context or meaning thereof and include
-          its administrators and successors in interest of the First Part.
+          , hereinafter referred to as &quot;Company&quot;.
           {company.businessType
             ? ` Company is in the business of ${company.businessType}`
             : " Company is in the business of Retail"}

@@ -459,9 +459,51 @@ export const ItemLevelComparison: React.FC<ItemLevelComparisonProps> = ({
             {vendorChunk.map(({ vendor, revIndex }) => {
               const vendorTotal = buyerData.reduce(
                 (sum: number, item: BuyerDataItem, itemIndex: number) => {
-                  const revItem = getRevisionItem(vendor, itemIndex, revIndex);
-                  const revTotal = calculateItemTotalForDisplay(revItem, item.qty || 0);
-                  return sum + (revTotal?.lineTotalInclTax || 0);
+                  const revision = vendor.revisions?.[revIndex];
+                  const boqSource = revision?.boqDetails || revision?.boqQuotes;
+                  if (!boqSource) return sum;
+
+                  let target: any = null;
+                  if (Array.isArray(boqSource)) {
+                    target = boqSource[itemIndex];
+                  } else if (typeof boqSource === "object") {
+                    const key = (item as any)?.id || `boq_${itemIndex}`;
+                    target =
+                      boqSource[key] ||
+                      boqSource[`boq_${itemIndex}`] ||
+                      boqSource[itemIndex] ||
+                      Object.values(boqSource)[itemIndex];
+                  }
+
+                  if (!target) return sum;
+
+                  let subList: any[] = [];
+                  if (Array.isArray(target.items) && target.items.length > 0) {
+                    subList = target.items;
+                  } else if (Array.isArray(target)) {
+                    subList = target;
+                  } else {
+                    subList = [target];
+                  }
+
+                  let subSum = 0;
+                  subList.forEach((sub: any) => {
+                    const price =
+                      parseFloat(
+                        String(sub?.quotePrice ?? sub?.price ?? target?.quotePrice ?? 0)
+                      ) || 0;
+                    const qty =
+                      sub?.qty !== undefined && sub?.qty !== null
+                        ? parseFloat(String(sub.qty))
+                        : parseFloat(String(item.qty || 1)) || 1;
+                    const gst =
+                      parseFloat(
+                        String(sub?.gstPercent ?? sub?.gst ?? target?.gst ?? 0)
+                      ) || 0;
+                    subSum += price * qty * (1 + gst / 100);
+                  });
+
+                  return sum + subSum;
                 },
                 0
               );

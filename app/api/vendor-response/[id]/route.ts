@@ -109,15 +109,15 @@ export async function PUT(
     const formattedCompanyDetails = {
       vendorResponseInternalId: internalId,
       companyName: companyData.companyName || "",
-      addressLine1: companyData.addressLine1 || "Address 1",
+      addressLine1: companyData.addressLine1 || "",
       addressLine2: companyData.addressLine2 || "",
-      city: companyData.city || "Unknown",
-      state: companyData.state || "Unknown",
-      postalCode: companyData.postalCode || "000000",
+      city: companyData.city || "",
+      state: companyData.state || "",
+      postalCode: companyData.postalCode || "",
       country: companyData.country || "India",
-      phone: companyData.phone || "0000000000",
+      phone: companyData.phone || "",
       email: companyData.email || existingResponse.vendorEmail,
-      businessType: companyData.businessType || "General",
+      businessType: companyData.businessType || "",
       logoUrl: companyData.logoUrl || body.logoUrl || null,
       updatedAt: new Date(),
     };
@@ -131,22 +131,47 @@ export async function PUT(
       await db.insert(vendorCompanyDetails).values(formattedCompanyDetails);
     }
 
-    // 3. Create new revision
-    const nextRevNum =
-      existingResponse.revisions.length > 0
-        ? existingResponse.revisions[0].revisionNumber + 1
-        : 0;
+    // 3. Upsert revision record
+    const revisions = await db.query.vendorResponseRevisions.findMany({
+      where: eq(
+        vendorResponseRevisions.vendorResponseInternalId,
+        internalId
+      ),
+      orderBy: [desc(vendorResponseRevisions.revisionNumber)],
+    });
 
-    await db
-      .update(vendorResponseRevisions)
-      .set({ isCurrent: false })
-      .where(
-        eq(vendorResponseRevisions.vendorResponseInternalId, internalId)
-      );
+    let currentRev = revisions.find((r) => r.isCurrent);
+    if (!currentRev && revisions.length > 0) {
+      currentRev = revisions[0];
+    }
 
-    const newRevision = {
+    let revNumToSave = 0;
+    const isExplicitNewRevision =
+      body.isNewRevision === true || body.action === "new_revision";
+
+    if (!currentRev || revisions.length === 0) {
+      revNumToSave = 0;
+      currentRev = undefined;
+    } else if (isExplicitNewRevision) {
+      const maxRevNum = Math.max(...revisions.map((r) => r.revisionNumber));
+      revNumToSave = maxRevNum + 1;
+      await db
+        .update(vendorResponseRevisions)
+        .set({ isCurrent: false })
+        .where(
+          eq(
+            vendorResponseRevisions.vendorResponseInternalId,
+            internalId
+          )
+        );
+      currentRev = undefined;
+    } else {
+      revNumToSave = currentRev.revisionNumber;
+    }
+
+    const revisionData = {
       vendorResponseInternalId: internalId,
-      revisionNumber: nextRevNum,
+      revisionNumber: revNumToSave,
       isCurrent: true,
       scopeOfWork: body.scopeOfWork || { agreement: body.scopeAgreement || "agree", remarks: body.scopeRemarks || "" },
       boqDetails: body.boqDetails || body.boqQuotes || [],
@@ -160,12 +185,20 @@ export async function PUT(
       updatedAt: new Date(),
     };
 
-    await db.insert(vendorResponseRevisions).values(newRevision);
+    if (currentRev) {
+      await db
+        .update(vendorResponseRevisions)
+        .set(revisionData)
+        .where(eq(vendorResponseRevisions.id, currentRev.id));
+    } else {
+      await db.insert(vendorResponseRevisions).values(revisionData);
+    }
 
     return NextResponse.json({
       success: true,
       message: "Vendor response updated successfully.",
       vendorResponseId: existingResponse.vendorResponseId,
+      revisionNumber: revNumToSave,
     });
   } catch (error: any) {
     console.error("Error in PUT /api/vendor-response/[id]:", error);

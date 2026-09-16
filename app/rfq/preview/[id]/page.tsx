@@ -276,7 +276,7 @@ export default function RFQVendorPreviewPage({
                   ].filter(Boolean).join(", ")}
                 </span>
                 , hereinafter referred to as &quot;Company&quot; 
-                {/* which expression shall unless repugnant to the context or meaning thereof and include its administrators and successors in interest of the First Part. */}
+             
               </p>
               <p>
                 Company is in the business of{" "}

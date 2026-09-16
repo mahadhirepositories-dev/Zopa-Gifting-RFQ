@@ -117,15 +117,15 @@ export async function POST(request: NextRequest) {
     const formattedCompanyDetails = {
       vendorResponseInternalId: internalId,
       companyName: companyData.companyName || "",
-      addressLine1: companyData.addressLine1 || "Address 1",
+      addressLine1: companyData.addressLine1 || "",
       addressLine2: companyData.addressLine2 || "",
-      city: companyData.city || "Unknown",
-      state: companyData.state || "Unknown",
-      postalCode: companyData.postalCode || "000000",
+      city: companyData.city || "",
+      state: companyData.state || "",
+      postalCode: companyData.postalCode || "",
       country: companyData.country || "India",
-      phone: companyData.phone || "0000000000",
+      phone: companyData.phone || "",
       email: companyData.email || email,
-      businessType: companyData.businessType || "General",
+      businessType: companyData.businessType || "",
       logoUrl: companyData.logoUrl || body.logoUrl || null,
       updatedAt: new Date(),
     };
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
       await db.insert(vendorCompanyDetails).values(formattedCompanyDetails);
     }
 
-    // 3. Insert Revision Record (Always increment max revision if previous status was submitted)
+    // 3. Upsert Revision Record (R-0 for first submission, R-1, R-2... for explicit new revisions)
     const revisions = await db.query.vendorResponseRevisions.findMany({
       where: eq(
         vendorResponseRevisions.vendorResponseInternalId,
@@ -148,30 +148,39 @@ export async function POST(request: NextRequest) {
       orderBy: [desc(vendorResponseRevisions.revisionNumber)],
     });
 
-    let nextRevNum = 0;
-    if (revisions.length > 0) {
-      const maxRevNum = Math.max(...revisions.map((r) => r.revisionNumber));
-      if (existingResponse?.status === "submitted" || status === "submitted") {
-        nextRevNum = maxRevNum + 1;
-      } else {
-        nextRevNum = maxRevNum;
-      }
+    let currentRev = revisions.find((r) => r.isCurrent);
+    if (!currentRev && revisions.length > 0) {
+      currentRev = revisions[0];
     }
 
-    // Mark previous revisions as not current
-    await db
-      .update(vendorResponseRevisions)
-      .set({ isCurrent: false })
-      .where(
-        eq(
-          vendorResponseRevisions.vendorResponseInternalId,
-          internalId
-        )
-      );
+    let revNumToSave = 0;
+    const isExplicitNewRevision = body.isNewRevision === true || body.action === "new_revision";
+
+    if (!currentRev) {
+      // First submission ever -> Revision 0 (R-0)
+      revNumToSave = 0;
+    } else if (isExplicitNewRevision) {
+      // Explicit new revision cycle (R-1, R-2, etc.)
+      const maxRevNum = Math.max(...revisions.map((r) => r.revisionNumber));
+      revNumToSave = maxRevNum + 1;
+      await db
+        .update(vendorResponseRevisions)
+        .set({ isCurrent: false })
+        .where(
+          eq(
+            vendorResponseRevisions.vendorResponseInternalId,
+            internalId
+          )
+        );
+      currentRev = undefined; // Force insertion of new row
+    } else {
+      // Update existing active revision in place
+      revNumToSave = currentRev.revisionNumber;
+    }
 
     const revisionData = {
       vendorResponseInternalId: internalId,
-      revisionNumber: nextRevNum,
+      revisionNumber: revNumToSave,
       isCurrent: true,
       scopeOfWork: { agreement: scopeAgreement || "agree", remarks: scopeRemarks || "" },
       boqDetails: boqQuotes || body.boqDetails || [],
@@ -185,19 +194,26 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     };
 
-    await db.insert(vendorResponseRevisions).values(revisionData);
+    if (currentRev) {
+      await db
+        .update(vendorResponseRevisions)
+        .set(revisionData)
+        .where(eq(vendorResponseRevisions.id, currentRev.id));
+    } else {
+      await db.insert(vendorResponseRevisions).values(revisionData);
+    }
 
     return NextResponse.json({
       success: true,
       message: "Vendor response stored in database successfully.",
       vendorResponseId: actualVendorResponseId,
-      revisionNumber: nextRevNum,
+      revisionNumber: revNumToSave,
       data: {
         id: internalId,
         vendorResponseId: actualVendorResponseId,
         rfpId,
         status,
-        revisionNumber: nextRevNum,
+        revisionNumber: revNumToSave,
         companyInfo: formattedCompanyDetails,
         boqQuotes,
         grandTotal,

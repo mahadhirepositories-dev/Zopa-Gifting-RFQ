@@ -345,7 +345,7 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
         const respData = data?.data;
         if (!respData) return;
 
-        if (respData?.status === "submitted") {
+        if (respData?.status === "submitted" && Array.isArray(respData?.revisions) && respData.revisions.length > 0) {
           setHasSubmittedPast(true);
         }
         if (respData?.revisions) {
@@ -360,12 +360,25 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
         }
         if (respData?.companyInfo) {
           Object.entries(respData.companyInfo).forEach(([k, v]) => {
-            setValue(`companydetails.${k}` as any, v);
+            const strVal = String(v || "");
+            if (
+              strVal === "Address 1" ||
+              strVal === "Unknown" ||
+              strVal === "000000" ||
+              strVal === "0000000000"
+            ) {
+              setValue(`companydetails.${k}` as any, "");
+            } else {
+              setValue(`companydetails.${k}` as any, v);
+            }
           });
           if (respData.companyInfo.logoUrl) {
             setLogoPreview(respData.companyInfo.logoUrl);
           }
-          if (respData.companyInfo.phone) {
+          if (
+            respData.companyInfo.phone &&
+            respData.companyInfo.phone !== "0000000000"
+          ) {
             setContact((prev) => ({
               ...prev,
               mobileNo: respData.companyInfo.phone,
@@ -650,6 +663,11 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
   }, []);
 
   const handleDocumentSelection = (index: number, hasDocument: boolean) => {
+    const valueStr = hasDocument ? "yes" : "no";
+    setValue(`attachments.${index}.hasDocument`, valueStr as "yes" | "no", {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
     setDocumentAttachments((prev) => ({
       ...prev,
       [index]: {
@@ -659,6 +677,9 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
         documentName: requiredDocuments[index] || `Document ${index}`,
       },
     }));
+    setTimeout(() => {
+      validateDocuments();
+    }, 0);
   };
 
   const handleDocumentFileChange = (
@@ -668,15 +689,68 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
   ) => {
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files);
-      setValue(`attachments.${documentIndex}.files`, files);
+      setValue(`attachments.${documentIndex}.files`, files, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
       setDocumentAttachments((prev) => ({
         ...prev,
         [documentIndex]: { hasDocument: true, documentName, files },
       }));
+      setTimeout(() => {
+        validateDocuments();
+      }, 0);
     }
   };
 
-  const validateDocuments = () => true;
+  const validateDocuments = useCallback(() => {
+    let allValid = true;
+    const newValidation: Record<
+      number,
+      { message: ReactNode; valid?: boolean; selected?: boolean }
+    > = {};
+
+    requiredDocuments.forEach((docName, index) => {
+      const hasDocVal = getValues(`attachments.${index}.hasDocument`);
+
+      if (!hasDocVal) {
+        allValid = false;
+        newValidation[index] = {
+          valid: false,
+          selected: false,
+          message: "Please select Yes or No.",
+        };
+      } else if (hasDocVal === "yes") {
+        const files =
+          documentAttachments[index]?.files ||
+          getValues(`attachments.${index}.files`) ||
+          [];
+        if (!files || files.length === 0) {
+          allValid = false;
+          newValidation[index] = {
+            valid: false,
+            selected: true,
+            message: `Please upload documents for ${docName}`,
+          };
+        } else {
+          newValidation[index] = {
+            valid: true,
+            selected: true,
+            message: "",
+          };
+        }
+      } else {
+        newValidation[index] = {
+          valid: true,
+          selected: true,
+          message: "",
+        };
+      }
+    });
+
+    setDocumentValidation(newValidation);
+    return allValid;
+  }, [requiredDocuments, getValues, documentAttachments]);
 
   const removeDocumentAttachment = (
     documentIndex: number,
@@ -686,11 +760,17 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
     const updatedFiles = Array.isArray(currentFiles)
       ? currentFiles.filter((_, i) => i !== fileIndex)
       : [];
-    setValue(`attachments.${documentIndex}.files`, updatedFiles);
+    setValue(`attachments.${documentIndex}.files`, updatedFiles, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
     setDocumentAttachments((prev) => ({
       ...prev,
       [documentIndex]: { ...prev[documentIndex], files: updatedFiles },
     }));
+    setTimeout(() => {
+      validateDocuments();
+    }, 0);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -732,10 +812,23 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
   const [pendingFormData, setPendingFormData] =
     useState<VendorReplyFormData | null>(null);
 
-  const prepareSubmit = useCallback((data: VendorReplyFormData) => {
-    setPendingFormData(data);
-    setShowConfirmation(true);
-  }, []);
+  const prepareSubmit = useCallback(
+    (data: VendorReplyFormData) => {
+      setSubmissionAttempted(true);
+      const isDocsValid = validateDocuments();
+      if (!isDocsValid) {
+        toast.error("Please select Yes or No for all required documents.");
+        const elem = document.getElementById("document-attachments-section");
+        if (elem) {
+          elem.scrollIntoView({ behavior: "smooth" });
+        }
+        return;
+      }
+      setPendingFormData(data);
+      setShowConfirmation(true);
+    },
+    [validateDocuments],
+  );
 
   const handleConfirmedSubmit = useCallback(async () => {
     if (!pendingFormData) return;
@@ -808,6 +901,7 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
         grandTotal: overallTotals.grandTotal.toFixed(2),
         status: "submitted",
         submittedAt: new Date().toISOString(),
+        isNewRevision: hasSubmittedPast,
       };
 
       const res = await fetch("/api/vendor-response", {
@@ -818,11 +912,14 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
 
       if (res.ok) {
         const jsonRes = await res.json();
+        const returnedRevNum = jsonRes?.revisionNumber ?? jsonRes?.data?.revisionNumber;
         if (
-          jsonRes?.revisionNumber !== undefined &&
-          jsonRes?.revisionNumber !== null
+          returnedRevNum !== undefined &&
+          returnedRevNum !== null
         ) {
-          setRevisionNumber(jsonRes.revisionNumber);
+          setRevisionNumber(returnedRevNum);
+          setLatestRevisionNumber(returnedRevNum);
+          setSelectedRevisionNumber(returnedRevNum);
         }
         setHasSubmittedPast(true);
         setIsSubmitted(true);

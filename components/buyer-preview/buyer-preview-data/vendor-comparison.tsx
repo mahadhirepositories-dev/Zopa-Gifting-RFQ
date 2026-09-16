@@ -204,7 +204,17 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
 
   const processedVendors = useMemo(() => {
     const vendors = processVendors(formattedResponses || [], buyerData).filter(
-      (vendor) => vendor.status === "submitted" && vendor.name !== "Unknown Vendor"
+      (vendor) => {
+        const st = (vendor.status || "").toLowerCase();
+        return (
+          st === "submitted" ||
+          st === "submitted_draft" ||
+          st === "draft" ||
+          st === "approved" ||
+          !st ||
+          (vendor.revisions && vendor.revisions.length > 0)
+        );
+      }
     );
 
     return vendors.sort(

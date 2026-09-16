@@ -75,13 +75,24 @@ export const BuyerSection: React.FC<BuyerSectionProps> = ({
                   watch("companydetails.country"),
                   watch("companydetails.postalCode"),
                 ]
-                  .filter(Boolean)
+                  .filter(
+                    (val) =>
+                      val &&
+                      val !== "Address 1" &&
+                      val !== "Unknown" &&
+                      val !== "000000"
+                  )
                   .join(", ")}
               </td>
             </tr>
             <tr>
               <td className="font-bold p-2">Phone</td>
-              <td className="p-2">{watch("companydetails.phone") || ""}</td>
+              <td className="p-2">
+                {watch("companydetails.phone") &&
+                watch("companydetails.phone") !== "0000000000"
+                  ? watch("companydetails.phone")
+                  : ""}
+              </td>
             </tr>
             <tr>
               <td className="font-bold p-2">Email</td>

@@ -12,11 +12,13 @@ import {
   Loader2,
   Download,
   AlertCircle,
+  Lock,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { SavingsAnalysis } from "./savings";
 import * as XLSX from "xlsx";
+import { getVendorBOQSubItems } from "./vendor-comparison-helpers";
 
 interface BoqDetail {
   quotePrice?: string | number;
@@ -413,14 +415,33 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
     (a, b) => (a.actualPrice ?? Infinity) - (b.actualPrice ?? Infinity)
   );
 
+  const hasRevisionBoqData = (revision: any): boolean => {
+    if (!revision) return false;
+    const boq = revision.boqDetails || revision.boqQuotes;
+    if (!boq) return false;
+    if (Array.isArray(boq)) return boq.length > 0;
+    if (typeof boq === "object") return Object.keys(boq).length > 0;
+    return false;
+  };
+
   const getRevisionItem = (
     vendor: ProcessedVendor,
     itemIndex: number,
     revisionIndex: number
   ): BoqDetail | null => {
     const revision = vendor.revisions?.[revisionIndex];
-    if (!revision?.boqDetails?.length) return null;
-    return revision.boqDetails[itemIndex] || revision.boqDetails[0] || null;
+    if (!revision) return null;
+    const boq = revision.boqDetails || revision.boqQuotes;
+    if (!boq) return null;
+    if (Array.isArray(boq)) {
+      return boq[itemIndex] || boq[0] || null;
+    }
+    if (typeof boq === "object") {
+      const keys = Object.keys(boq);
+      const targetKey = keys[itemIndex] || keys[0];
+      return boq[targetKey] || null;
+    }
+    return null;
   };
 
   // NEW: Function to get lowest non-zero price for an item across all vendors and revisions
@@ -572,7 +593,7 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
           (sum, v) =>
             sum +
             allRevisionIndices.filter(
-              (r) => v.revisions?.[r]?.boqDetails?.length
+              (r) => hasRevisionBoqData(v.revisions?.[r])
             ).length,
           0
         );
@@ -586,23 +607,26 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
     const totals: Record<string, number> = {};
 
     buyerData.forEach((item, index) => {
-      const displayQty = item.qty || 0;
-
       sortedVendors.forEach((vendor) => {
         allRevisionIndices.forEach((revIndex) => {
-          const revItem = getRevisionItem(vendor, index, revIndex);
-          if (revItem) {
-            const revTotal = calculateItemTotal(
-              revItem,
-              displayQty,
-              index,
-              vendor.id,
-              revIndex
-            );
-            if (revTotal) {
-              const key = `${vendor.id}-rev-${revIndex}`;
-              totals[key] = (totals[key] || 0) + revTotal.lineTotalInclTax;
-            }
+          const revision = vendor.revisions?.[revIndex];
+          const boqSource = revision?.boqDetails || revision?.boqQuotes;
+          if (boqSource) {
+            const subItems = getVendorBOQSubItems(boqSource, index, item);
+            subItems.forEach((subItem: any) => {
+              if (subItem.quotePrice != null) {
+                const price = parseFloat(subItem.quotePrice?.toString() || "0");
+                const qty = parseFloat(
+                  subItem.qty?.toString() || item.qty?.toString() || "1"
+                );
+                const gst = parseFloat(subItem.gst?.toString() || "0");
+                const exclTax = price * qty;
+                const inclTax = exclTax * (1 + gst / 100);
+
+                const key = `${vendor.id}-rev-${revIndex}`;
+                totals[key] = (totals[key] || 0) + inclTax;
+              }
+            });
           }
         });
       });
@@ -787,7 +811,7 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
 
       sortedVendors.forEach((vendor) => {
         const activeRevisions = allRevisionIndices.filter(
-          (revIndex) => vendor.revisions?.[revIndex]?.boqDetails?.length
+          (revIndex) => hasRevisionBoqData(vendor.revisions?.[revIndex])
         );
         if (activeRevisions.length > 0) {
           activeRevisions.forEach((revIndex) => {
@@ -801,7 +825,7 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
       const headerRow2: any[] = ["", "", "", "", "", "", "", ""];
       sortedVendors.forEach((vendor) => {
         const activeRevisions = allRevisionIndices.filter(
-          (revIndex) => vendor.revisions?.[revIndex]?.boqDetails?.length
+          (revIndex) => hasRevisionBoqData(vendor.revisions?.[revIndex])
         );
         if (activeRevisions.length > 0) {
           activeRevisions.forEach(() => {
@@ -825,7 +849,7 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
 
       sortedVendors.forEach((vendor) => {
         const activeRevisions = allRevisionIndices.filter(
-          (revIndex) => vendor.revisions?.[revIndex]?.boqDetails?.length
+          (revIndex) => hasRevisionBoqData(vendor.revisions?.[revIndex])
         );
         if (activeRevisions.length > 0) {
           activeRevisions.forEach((revIndex) => {
@@ -857,39 +881,66 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
         const gstAmount = lineTotalExclTax * (gst / 100);
         const lineTotalInclTax = lineTotalExclTax + gstAmount;
 
-        const row: any[] = [
-          item.description,
-          item.uom,
-          item.specification || "",
-          displayQty,
-          parseFloat(String(item.targetPrice || 0)),
-          price || "",
-          gst || "",
-          lineTotalInclTax || "",
-        ];
-
+        const vendorSubItemsMap: Record<string, any[]> = {};
         sortedVendors.forEach((vendor) => {
           allRevisionIndices.forEach((revIndex) => {
-            const revItem = getRevisionItem(vendor, index, revIndex);
-            if (revItem) {
-              const revTotal = calculateItemTotal(
-                revItem,
-                displayQty,
-                index,
-                vendor.id,
-                revIndex
-              );
-              const displayPrice = revTotal?.isReplacedPrice
-                ? `${revTotal.quotePrice} (Auto)`
-                : revTotal?.quotePrice || "";
-              row.push(displayPrice);
-              row.push(revItem.gst || 0);
-              row.push(revTotal?.lineTotalInclTax || "");
-            }
+            const revision = vendor.revisions?.[revIndex];
+            const boqSource = revision?.boqDetails || revision?.boqQuotes;
+            const subs = getVendorBOQSubItems(boqSource, index, item);
+            vendorSubItemsMap[`${vendor.id}-rev-${revIndex}`] = subs;
           });
         });
 
-        excelData.push(row);
+        const maxSubItems = Math.max(
+          1,
+          ...Object.values(vendorSubItemsMap).map((subs) => subs.length)
+        );
+
+        for (let subIdx = 0; subIdx < maxSubItems; subIdx++) {
+          const row: any[] = [
+            subIdx === 0 ? item.description : "",
+            subIdx === 0 ? item.uom : "",
+            subIdx === 0 ? item.specification || "" : "",
+            subIdx === 0 ? displayQty : "",
+            subIdx === 0 ? parseFloat(String(item.targetPrice || 0)) : "",
+            subIdx === 0 ? price || "" : "",
+            subIdx === 0 ? gst || "" : "",
+            subIdx === 0 ? lineTotalInclTax || "" : "",
+          ];
+
+          sortedVendors.forEach((vendor) => {
+            allRevisionIndices.forEach((revIndex) => {
+              const hasData = hasRevisionBoqData(vendor.revisions?.[revIndex]);
+              if (hasData) {
+                const subItems =
+                  vendorSubItemsMap[`${vendor.id}-rev-${revIndex}`] || [];
+                const subItem = subItems[subIdx];
+                if (subItem && subItem.quotePrice != null) {
+                  const uPrice = parseFloat(
+                    subItem.quotePrice.toString() || "0"
+                  );
+                  const uQty = parseFloat(
+                    subItem.qty?.toString() || item.qty?.toString() || "1"
+                  );
+                  const uGst = parseFloat(subItem.gst?.toString() || "0");
+                  const uTotal = uPrice * uQty * (1 + uGst / 100);
+                  const labelStr = subItem.itemName
+                    ? `${subItem.itemName}: ₹${uPrice}`
+                    : uPrice;
+                  row.push(labelStr);
+                  row.push(uGst);
+                  row.push(uTotal);
+                } else {
+                  row.push("");
+                  row.push("");
+                  row.push("");
+                }
+              }
+            });
+          });
+
+          excelData.push(row);
+        }
       });
 
       const totalsRow: any[] = [
@@ -905,7 +956,7 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
 
       sortedVendors.forEach((vendor) => {
         allRevisionIndices.forEach((revIndex) => {
-          const hasData = vendor.revisions?.[revIndex]?.boqDetails?.length;
+          const hasData = hasRevisionBoqData(vendor.revisions?.[revIndex]);
           if (hasData) {
             const key = `${vendor.id}-rev-${revIndex}`;
             const total = cumulativeTotals[key] || 0;
@@ -933,7 +984,7 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
 
       sortedVendors.forEach((vendor) => {
         const activeRevisions = allRevisionIndices.filter(
-          (revIndex) => vendor.revisions?.[revIndex]?.boqDetails?.length
+          (revIndex) => hasRevisionBoqData(vendor.revisions?.[revIndex])
         );
         activeRevisions.forEach(() => {
           colWidths.push({ wch: 12 });
@@ -1058,7 +1109,7 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
                 {sortedVendors.map((vendor) => {
                   const activeRevisions = allRevisionIndices.filter(
                     (revIndex) =>
-                      vendor.revisions?.[revIndex]?.boqDetails?.length
+                      hasRevisionBoqData(vendor.revisions?.[revIndex])
                   );
                   if (!activeRevisions.length) return null;
                   const isSelected = selectedVendors?.has(
@@ -1178,7 +1229,7 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
                   return sortedVendors.flatMap((vendor) =>
                     allRevisionIndices.map((revIndex) => {
                       const hasData =
-                        vendor.revisions?.[revIndex]?.boqDetails?.length;
+                        hasRevisionBoqData(vendor.revisions?.[revIndex]);
                       if (!hasData) return null;
 
                       const isSelected = selectedVendors?.has(
@@ -1237,320 +1288,399 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
                 const gstAmount = lineTotalExclTax * (gst / 100);
                 const lineTotalInclTax = lineTotalExclTax + gstAmount;
 
-                const totals = sortedVendors.flatMap((vendor) =>
-                  allRevisionIndices.map((revIndex) => {
-                    const revItem = getRevisionItem(vendor, index, revIndex);
-                    const revTotal = calculateItemTotal(
-                      revItem,
-                      displayQty,
-                      index,
-                      vendor.id,
-                      revIndex
-                    );
-                    return { vendor, revIndex, revItem, revTotal };
-                  })
+                const vendorSubItemsMap: Record<string, any[]> = {};
+                sortedVendors.forEach((vendor) => {
+                  allRevisionIndices.forEach((revIndex) => {
+                    const revision = vendor.revisions?.[revIndex];
+                    const boqSource = revision?.boqDetails || revision?.boqQuotes;
+                    const subs = getVendorBOQSubItems(boqSource, index, item);
+                    vendorSubItemsMap[`${vendor.id}-rev-${revIndex}`] = subs;
+                  });
+                });
+
+                const maxSubItems = Math.max(
+                  1,
+                  ...Object.values(vendorSubItemsMap).map((subs) => subs.length)
                 );
 
-                const validTotals = totals.filter((t) => t.revTotal !== null);
-                const minPrice =
-                  validTotals.length > 0
-                    ? Math.min(
-                        ...validTotals.map(
-                          (t) => t.revTotal?.lineTotalInclTax ?? 0
-                        )
-                      )
-                    : null;
+                const subIndices = Array.from({ length: maxSubItems }, (_, i) => i);
 
                 return (
-                  <tr
-                    key={index}
-                    className={`hover:bg-gray-50 ${expandedItems[index] ? "bg-gray-50" : ""}`}
-                  >
-                    <td className="px-6 py-4 text-sm text-gray-900 w-[300px]">
-                      <div className="flex flex-col gap-2">
-                        <div>
-                          <div className="flex items-start">
-                            <span className="font-semibold text-gray-800 mr-1">
-                              Description:
-                            </span>
-                            <div className="flex-1">
-                              {expandedDescriptions[index] ? (
-                                <span>{item.description}</span>
-                              ) : (
-                                <span className="line-clamp-2">
-                                  {item.description}
-                                </span>
-                              )}
-                              {item.description.length > 50 && (
-                                <button
-                                  className="ml-1 text-blue-600 text-xs flex items-center mt-1"
-                                  onClick={() =>
-                                    toggleDescriptionExpansion(index)
-                                  }
-                                >
-                                  {expandedDescriptions[index] ? (
-                                    <>
-                                      Show less{" "}
-                                      <ChevronUp className="h-3 w-3 ml-1" />
-                                    </>
+                  <React.Fragment key={index}>
+                    {subIndices.map((subIdx) => {
+                      return (
+                        <tr
+                          key={`${index}-${subIdx}`}
+                          className={`hover:bg-gray-50 border-b border-gray-200 ${
+                            expandedItems[index] ? "bg-gray-50" : ""
+                          }`}
+                        >
+                          {/* Buyer Description Columns (rowSpan grouped) */}
+                          {subIdx === 0 && (
+                            <>
+                              <td
+                                rowSpan={maxSubItems}
+                                className="px-6 py-4 text-sm text-gray-900 w-[300px] align-top bg-white border-r border-gray-200"
+                              >
+                                <div className="flex flex-col gap-2">
+                                  <div>
+                                    <div className="flex items-start">
+                                      <span className="font-semibold text-gray-800 mr-1">
+                                        Description:
+                                      </span>
+                                      <div className="flex-1">
+                                        {expandedDescriptions[index] ? (
+                                          <span>{item.description}</span>
+                                        ) : (
+                                          <span className="line-clamp-2">
+                                            {item.description}
+                                          </span>
+                                        )}
+                                        {item.description.length > 50 && (
+                                          <button
+                                            className="ml-1 text-blue-600 text-xs flex items-center mt-1 font-medium"
+                                            onClick={() =>
+                                              toggleDescriptionExpansion(index)
+                                            }
+                                          >
+                                            {expandedDescriptions[index] ? (
+                                              <>
+                                                Show less{" "}
+                                                <ChevronUp className="h-3 w-3 ml-1" />
+                                              </>
+                                            ) : (
+                                              <>
+                                                Show more{" "}
+                                                <ChevronDown className="h-3 w-3 ml-1" />
+                                              </>
+                                            )}
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <div className="flex items-start">
+                                      <span className="font-semibold text-gray-800 mr-1">
+                                        Remarks:
+                                      </span>
+                                      <div className="flex-1">
+                                        {expandedRemarks[index] ? (
+                                          <span>{item.remarks || "N/A"}</span>
+                                        ) : (
+                                          <span className="line-clamp-1">
+                                            {item.remarks || "N/A"}
+                                          </span>
+                                        )}
+                                        {(item.remarks || "").length > 50 && (
+                                          <button
+                                            className="ml-1 text-blue-600 text-xs flex items-center mt-1 font-medium"
+                                            onClick={() =>
+                                              toggleRemarksExpansion(index)
+                                            }
+                                          >
+                                            {expandedRemarks[index] ? (
+                                              <>
+                                                Show less{" "}
+                                                <ChevronUp className="h-3 w-3 ml-1" />
+                                              </>
+                                            ) : (
+                                              <>
+                                                Show more{" "}
+                                                <ChevronDown className="h-3 w-3 ml-1" />
+                                              </>
+                                            )}
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center">
+                                    <span className="font-semibold text-gray-800 mr-1">
+                                      Category:
+                                    </span>
+                                    <span>{item.category || "N/A"}</span>
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td
+                                rowSpan={maxSubItems}
+                                className="px-3 py-4 text-center text-sm text-gray-500 align-top bg-white border-r border-gray-200"
+                              >
+                                {item.uom}
+                              </td>
+
+                              <td
+                                rowSpan={maxSubItems}
+                                className="px-3 py-4 text-sm text-gray-500 w-[200px] align-top bg-white border-r border-gray-200"
+                              >
+                                <div className="flex flex-col">
+                                  {expandedSpecs[index] ? (
+                                    <div>{spec}</div>
                                   ) : (
-                                    <>
-                                      Show more{" "}
-                                      <ChevronDown className="h-3 w-3 ml-1" />
-                                    </>
+                                    <div className="line-clamp-3">{spec}</div>
                                   )}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div>
-                          <div className="flex items-start">
-                            <span className="font-semibold text-gray-800 mr-1">
-                              Remarks:
-                            </span>
-                            <div className="flex-1">
-                              {expandedRemarks[index] ? (
-                                <span>{item.remarks || "N/A"}</span>
-                              ) : (
-                                <span className="line-clamp-1">
-                                  {item.remarks || "N/A"}
-                                </span>
-                              )}
-                              {(item.remarks || "").length > 50 && (
-                                <button
-                                  className="ml-1 text-blue-600 text-xs flex items-center mt-1"
-                                  onClick={() => toggleRemarksExpansion(index)}
-                                >
-                                  {expandedRemarks[index] ? (
-                                    <>
-                                      Show less{" "}
-                                      <ChevronUp className="h-3 w-3 ml-1" />
-                                    </>
-                                  ) : (
-                                    <>
-                                      Show more{" "}
-                                      <ChevronDown className="h-3 w-3 ml-1" />
-                                    </>
-                                  )}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center">
-                          <span className="font-semibold text-gray-800 mr-1">
-                            Category:
-                          </span>
-                          <span>{item.category || "N/A"}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-4 text-center text-sm text-gray-500">
-                      {item.uom}
-                    </td>
-                    <td className="px-3 py-4 text-sm text-gray-500 w-[200px]">
-                      <div className="flex flex-col">
-                        {expandedSpecs[index] ? (
-                          <div>{spec}</div>
-                        ) : (
-                          <div className="line-clamp-3">{spec}</div>
-                        )}
-                        {spec.length > 100 && (
-                          <button
-                            className="mt-1 text-blue-600 text-xs flex items-center self-start"
-                            onClick={() => toggleSpecExpansion(index)}
-                          >
-                            {expandedSpecs[index] ? (
-                              <>
-                                Show less <ChevronUp className="h-3 w-3 ml-1" />
-                              </>
-                            ) : (
-                              <>
-                                Show more{" "}
-                                <ChevronDown className="h-3 w-3 ml-1" />
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-4 text-center text-sm text-gray-500">
-                      {displayQty}
-                    </td>
-                    <td className="px-3 py-4 text-sm text-gray-500">
-                      {getCurrencySymbol()}
-                      {parseFloat(String(item.targetPrice || 0)).toLocaleString(
-                        undefined,
-                        {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        }
-                      )}
-                    </td>
-                    <td className="px-3 py-4 text-center border-l-2 border-gray-200">
-                      <div className="flex flex-col gap-2">
-                        <div>
-                          <label className="text-xs text-gray-500 block mb-1">
-                            LOP Price
-                          </label>
-                          <input
-                            type="text"
-                            value={lopData.price}
-                            onChange={(e) =>
-                              handleLopPriceChange(index, e.target.value)
-                            }
-                            disabled={!isLopFieldEditable(index, "price")}
-                            className={`w-24 px-2 py-1 border rounded text-sm text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                              !isLopFieldEditable(index, "price")
-                                ? "bg-gray-100 border-gray-200 cursor-not-allowed text-gray-500"
-                                : "border-gray-300 bg-white"
-                            }`}
-                            placeholder="Enter Price"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-500 block mb-1">
-                            GST (%)
-                          </label>
-                          <input
-                            type="text"
-                            value={lopData.gst}
-                            onChange={(e) =>
-                              handleLopGstChange(index, e.target.value)
-                            }
-                            disabled={!isLopFieldEditable(index, "gst")}
-                            className={`w-24 px-2 py-1 border rounded text-sm text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                              !isLopFieldEditable(index, "gst")
-                                ? "bg-gray-100 border-gray-200 cursor-not-allowed text-gray-500"
-                                : "border-gray-300 bg-white"
-                            }`}
-                            placeholder="Enter GST %"
-                            onClick={(e) => e.stopPropagation()}
-                            max={100}
-                          />
-                        </div>
-                        <SaveStatusIndicator itemIndex={index} />
-
-                        <div className="mt-1 text-xs text-gray-500">
-                          <div>
-                            Excl. Tax: {getCurrencySymbol()}
-                            {lineTotalExclTax.toFixed(2)}
-                          </div>
-                          <div>
-                            GST: {getCurrencySymbol()}
-                            {gstAmount.toFixed(2)}
-                          </div>
-                          <div className="font-semibold">
-                            Total: {getCurrencySymbol()}
-                            {lineTotalInclTax.toFixed(2)}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    {(() => {
-                      let flatIndex = 0;
-                      return totals.map(
-                        ({ vendor, revIndex, revItem, revTotal }) => {
-                          if (!revItem) return null;
-
-                          const isLowest =
-                            minPrice !== null &&
-                            revTotal !== null &&
-                            Math.abs(revTotal.lineTotalInclTax - minPrice) <
-                              0.01;
-
-                          const isSelected = selectedVendors?.has(
-                            vendor.vendorResponseId
-                          );
-
-                          const highlight = getVendorHighlight(
-                            vendor.vendorResponseId
-                          );
-                          const isHighlighted = !!highlight;
-
-                          const addLeftBorder =
-                            vendorRevisionStartIndices.includes(flatIndex);
-
-                          let highlightClass = "";
-
-                          if (isHighlighted) {
-                            highlightClass = highlight.colorClass;
-                          } else if (isSelected) {
-                            highlightClass = "bg-blue-50";
-                          }
-
-                          const tdClass = `px-4 py-4 text-center text-sm text-gray-700 transition-colors ${
-                            addLeftBorder ? "border-l-2 border-gray-200" : ""
-                          } ${highlightClass}`;
-
-                          flatIndex++;
-
-                          return (
-                            <td
-                              key={`${vendor.id}-${index}-rev-${revIndex}`}
-                              className={tdClass}
-                            >
-                              <div className="flex flex-col items-center">
-                                <div className="flex items-center gap-1">
-                                  <span className="font-medium">
-                                    {getCurrencySymbol()}
-                                    {revTotal?.quotePrice.toLocaleString(
-                                      undefined,
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      }
-                                    )}
-                                  </span>
-                                  {revTotal?.isReplacedPrice && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[9px] bg-amber-50 text-amber-700 border-amber-300 px-1 py-0"
+                                  {spec.length > 100 && (
+                                    <button
+                                      className="mt-1 text-blue-600 text-xs flex items-center self-start font-medium"
+                                      onClick={() => toggleSpecExpansion(index)}
                                     >
-                                      Auto
-                                    </Badge>
+                                      {expandedSpecs[index] ? (
+                                        <>
+                                          Show less{" "}
+                                          <ChevronUp className="h-3 w-3 ml-1" />
+                                        </>
+                                      ) : (
+                                        <>
+                                          Show more{" "}
+                                          <ChevronDown className="h-3 w-3 ml-1" />
+                                        </>
+                                      )}
+                                    </button>
                                   )}
                                 </div>
-                                <span className="text-xs text-gray-500">
-                                  GST: {revItem.gst || 0}%
-                                </span>
-                                <span className="text-xs font-semibold">
-                                  {getCurrencySymbol()}
-                                  {revTotal?.lineTotalInclTax.toLocaleString(
-                                    undefined,
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    }
-                                  )}
-                                </span>
-                                {isLowest && (
-                                  <div className="flex items-center justify-center bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium mt-1">
-                                    <Award className="h-3 w-3 mr-1" /> Lowest
+                              </td>
+
+                              <td
+                                rowSpan={maxSubItems}
+                                className="px-3 py-4 text-center text-sm text-gray-500 align-top bg-white border-r border-gray-200"
+                              >
+                                {displayQty}
+                              </td>
+
+                              <td
+                                rowSpan={maxSubItems}
+                                className="px-3 py-4 text-sm text-gray-500 align-top bg-white border-r border-gray-200"
+                              >
+                                {getCurrencySymbol()}
+                                {parseFloat(
+                                  String(item.targetPrice || 0)
+                                ).toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </td>
+
+                              <td
+                                rowSpan={maxSubItems}
+                                className="px-3 py-4 text-center border-l-2 border-r border-gray-200 align-top bg-white"
+                              >
+                                <div className="flex flex-col gap-2">
+                                  <div>
+                                    <label className="text-xs text-gray-500 block mb-1">
+                                      LOP Price
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={lopData.price}
+                                      onChange={(e) =>
+                                        handleLopPriceChange(
+                                          index,
+                                          e.target.value
+                                        )
+                                      }
+                                      disabled={
+                                        !isLopFieldEditable(index, "price")
+                                      }
+                                      className={`w-24 px-2 py-1 border rounded text-sm text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                                        !isLopFieldEditable(index, "price")
+                                          ? "bg-gray-100 border-gray-200 cursor-not-allowed text-gray-500"
+                                          : "border-gray-300 bg-white"
+                                      }`}
+                                      placeholder="Enter Price"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
                                   </div>
-                                )}
-                              </div>
-                            </td>
-                          );
-                        }
+                                  <div>
+                                    <label className="text-xs text-gray-500 block mb-1">
+                                      GST (%)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={lopData.gst}
+                                      onChange={(e) =>
+                                        handleLopGstChange(index, e.target.value)
+                                      }
+                                      disabled={!isLopFieldEditable(index, "gst")}
+                                      className={`w-24 px-2 py-1 border rounded text-sm text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                                        !isLopFieldEditable(index, "gst")
+                                          ? "bg-gray-100 border-gray-200 cursor-not-allowed text-gray-500"
+                                          : "border-gray-300 bg-white"
+                                      }`}
+                                      placeholder="Enter GST %"
+                                      onClick={(e) => e.stopPropagation()}
+                                      max={100}
+                                    />
+                                  </div>
+                                  <SaveStatusIndicator itemIndex={index} />
+
+                                  <div className="mt-1 text-xs text-gray-500">
+                                    <div>
+                                      Excl. Tax: {getCurrencySymbol()}
+                                      {lineTotalExclTax.toFixed(2)}
+                                    </div>
+                                    <div>
+                                      GST: {getCurrencySymbol()}
+                                      {gstAmount.toFixed(2)}
+                                    </div>
+                                    <div className="font-semibold">
+                                      Total: {getCurrencySymbol()}
+                                      {lineTotalInclTax.toFixed(2)}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            </>
+                          )}
+
+                          {/* Vendor Sub-Item Columns */}
+                          {(() => {
+                            // Compute lowest line total for this sub-item row across all vendor revisions
+                            const activeTotalsForSubItem = sortedVendors.flatMap((v) =>
+                              allRevisionIndices.map((r) => {
+                                const revObj = v.revisions?.[r];
+                                if (!hasRevisionBoqData(revObj)) return null;
+                                const bSrc = revObj?.boqDetails || revObj?.boqQuotes;
+                                const sList = getVendorBOQSubItems(bSrc, index, item);
+                                const s = sList[subIdx];
+                                if (!s || s.quotePrice === null || s.quotePrice === undefined) return null;
+                                const p = parseFloat(s.quotePrice.toString() || "0");
+                                const q = parseFloat(s.qty?.toString() || item.qty?.toString() || "1");
+                                const g = parseFloat(s.gst?.toString() || "0");
+                                const t = p * q * (1 + g / 100);
+                                return t > 0 ? t : null;
+                              })
+                            ).filter((t): t is number => t !== null);
+
+                            const lowestSubItemTotal = activeTotalsForSubItem.length > 0 ? Math.min(...activeTotalsForSubItem) : null;
+
+                            let flatIndex = 0;
+                            return sortedVendors.flatMap((vendor) =>
+                              allRevisionIndices.map((revIndex) => {
+                                const revision = vendor.revisions?.[revIndex];
+                                const hasData = hasRevisionBoqData(revision);
+                                if (!hasData) return null;
+
+                                const subItems =
+                                  vendorSubItemsMap[
+                                    `${vendor.id}-rev-${revIndex}`
+                                  ] || [];
+                                const subItem = subItems[subIdx];
+
+                                const isSelected = selectedVendors?.has(
+                                  vendor.vendorResponseId
+                                );
+
+                                const highlight = getVendorHighlight(
+                                  vendor.vendorResponseId
+                                );
+                                const isHighlighted = !!highlight;
+
+                                const addLeftBorder =
+                                  vendorRevisionStartIndices.includes(flatIndex);
+
+                                let highlightClass = "";
+
+                                if (isHighlighted) {
+                                  highlightClass = highlight.colorClass;
+                                } else if (isSelected) {
+                                  highlightClass = "bg-blue-50";
+                                }
+
+                                const tdClass = `px-3 py-4 text-center text-xs text-gray-700 transition-colors border-r border-gray-200 align-middle ${
+                                  addLeftBorder ? "border-l-2 border-gray-200" : ""
+                                } ${highlightClass}`;
+
+                                flatIndex++;
+
+                                if (!subItem || subItem.quotePrice === null) {
+                                  return (
+                                    <td
+                                      key={`${vendor.id}-${index}-${subIdx}-rev-${revIndex}`}
+                                      className={tdClass}
+                                    >
+                                      <span className="text-gray-400">—</span>
+                                    </td>
+                                  );
+                                }
+
+                                const uPrice = parseFloat(
+                                  subItem.quotePrice?.toString() || "0"
+                                );
+                                const uQty = parseFloat(
+                                  subItem.qty?.toString() ||
+                                    item.qty?.toString() ||
+                                    "1"
+                                );
+                                const uGst = parseFloat(
+                                  subItem.gst?.toString() || "0"
+                                );
+                                const uLineExcl = uPrice * uQty;
+                                const uLineGst = uLineExcl * (uGst / 100);
+                                const uLineTotal = uLineExcl + uLineGst;
+
+                                const isSubItemLowest =
+                                  lowestSubItemTotal !== null &&
+                                  uLineTotal > 0 &&
+                                  Math.abs(uLineTotal - lowestSubItemTotal) < 0.01;
+
+                                return (
+                                  <td
+                                    key={`${vendor.id}-${index}-${subIdx}-rev-${revIndex}`}
+                                    className={tdClass}
+                                  >
+                                    <div className="flex flex-col items-center justify-center space-y-1 text-center max-w-[200px] mx-auto font-mono text-xs">
+                                      {subItem.itemName && (
+                                        <p className="font-semibold text-gray-900 text-xs mb-0.5 font-sans">
+                                          {subItem.itemName}
+                                        </p>
+                                      )}
+                                      <div className="font-semibold text-gray-900 text-sm">
+                                        {getCurrencySymbol()}
+                                        {uPrice.toLocaleString(undefined, {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        })}
+                                      </div>
+                                      <div className="text-[11px] text-gray-500 font-sans">
+                                        GST: {uGst}%
+                                      </div>
+                                      <div className="font-bold text-gray-900 text-sm">
+                                        {getCurrencySymbol()}
+                                        {uLineTotal.toLocaleString(undefined, {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        })}
+                                      </div>
+                                      {isSubItemLowest && (
+                                        <div className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-0.5 rounded text-[11px] font-medium font-sans mt-0.5">
+                                          <Lock className="w-3 h-3" /> Lowest
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                );
+                              })
+                            );
+                          })()}
+                        </tr>
                       );
-                    })()}
-                  </tr>
+                    })}
+                  </React.Fragment>
                 );
               })}
 
-              <tr className="border-t-2 border-blue-200 bg-gray-50">
-                <td className="px-6 py-4 text-sm font-bold text-gray-900">
+              <tr className="border-t-2 border-gray-200 bg-white">
+                <td className="px-6 py-4 text-sm font-bold text-gray-900 uppercase">
                   TOTAL
                 </td>
                 <td className="px-3 py-4"></td>
                 <td className="px-3 py-4"></td>
                 <td className="px-3 py-4"></td>
-                <td className="px-3 py-4 text-center font-bold text-lg">
+                <td className="px-3 py-4 text-center font-bold text-base font-mono">
                   <div className="text-gray-900">
                     {getCurrencySymbol()}
                     {targetPriceTotal.toLocaleString(undefined, {
@@ -1559,15 +1689,13 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
                     })}
                   </div>
                 </td>
-                <td className="px-3 py-4 text-center font-bold text-lg border-l-2 border-gray-200">
-                  <div className=" text-center font-bold text-lg">
-                    <div className="font-bold">
-                      {getCurrencySymbol()}
-                      {lopTotals.totalInclTax.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </div>
+                <td className="px-3 py-4 text-center font-bold text-base font-mono border-l-2 border-gray-200">
+                  <div className="text-gray-900">
+                    {getCurrencySymbol()}
+                    {lopTotals.totalInclTax.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </div>
                 </td>
                 {(() => {
@@ -1575,7 +1703,7 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
                   return sortedVendors.flatMap((vendor) =>
                     allRevisionIndices.map((revIndex) => {
                       const hasData =
-                        vendor.revisions?.[revIndex]?.boqDetails?.length;
+                        hasRevisionBoqData(vendor.revisions?.[revIndex]);
                       if (!hasData) return null;
 
                       const key = `${vendor.id}-rev-${revIndex}`;
@@ -1606,7 +1734,7 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
                         highlightClass = "bg-blue-50";
                       }
 
-                      const tdClass = `px-4 py-4 text-center font-bold text-lg transition-colors ${
+                      const tdClass = `px-4 py-4 text-center font-bold text-base font-mono transition-colors ${
                         addLeftBorder ? "border-l-2 border-gray-200" : ""
                       } ${highlightClass}`;
 
@@ -1614,8 +1742,8 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
 
                       return (
                         <td key={key} className={tdClass}>
-                          <div className="flex flex-col items-center">
-                            <div className="font-bold">
+                          <div className="flex flex-col items-center justify-center text-center">
+                            <div className="font-bold text-gray-900">
                               {getCurrencySymbol()}
                               {total.toLocaleString(undefined, {
                                 minimumFractionDigits: 2,
@@ -1623,8 +1751,8 @@ export const ItemLevelViewTable: React.FC<ItemLevelViewTableProps> = ({
                               })}
                             </div>
                             {isLowest && (
-                              <div className="flex items-center justify-center bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium mt-1">
-                                <Award className="h-3 w-3 mr-1" /> Lowest{" "}
+                              <div className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-0.5 rounded text-[11px] font-medium font-sans mt-1">
+                                <Lock className="w-3 h-3" /> Lowest
                               </div>
                             )}
                           </div>

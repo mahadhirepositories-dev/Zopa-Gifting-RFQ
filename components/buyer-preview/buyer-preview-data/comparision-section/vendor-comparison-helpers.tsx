@@ -42,33 +42,163 @@ export interface ProcessedVendor {
   revisions?: any[];
 }
 
+export function getVendorBOQSubItems(
+  boqDetails: any,
+  index: number,
+  buyerItem?: any
+) {
+  if (!boqDetails) return [];
+
+  let target: any = null;
+
+  if (Array.isArray(boqDetails)) {
+    target = boqDetails[index];
+  } else if (typeof boqDetails === "object") {
+    const key = buyerItem?.id || `boq_${index}`;
+    target =
+      boqDetails[key] ||
+      boqDetails[`boq_${index}`] ||
+      boqDetails[index] ||
+      boqDetails[String(index)] ||
+      boqDetails[buyerItem?.id] ||
+      Object.values(boqDetails)[index];
+  }
+
+  if (!target) return [];
+
+  let itemsList: any[] = [];
+  if (Array.isArray(target.items) && target.items.length > 0) {
+    itemsList = target.items;
+  } else if (Array.isArray(target) && target.length > 0) {
+    itemsList = target;
+  } else {
+    itemsList = [target];
+  }
+
+  return itemsList.map((sub: any, subIdx: number) => {
+    const atts =
+      Array.isArray(sub?.vendorAttachments) && sub.vendorAttachments.length > 0
+        ? sub.vendorAttachments
+        : sub?.vendorAttachmentUrl
+        ? [
+            {
+              url: sub.vendorAttachmentUrl,
+              name: sub.vendorAttachmentName || "Attachment",
+            },
+          ]
+        : target?.vendorAttachmentUrl
+        ? [
+            {
+              url: target.vendorAttachmentUrl,
+              name: target.vendorAttachmentName || "Attachment",
+            },
+          ]
+        : [];
+
+    const quotePrice =
+      sub?.quotePrice ??
+      sub?.price ??
+      target?.quotePrice ??
+      target?.price ??
+      null;
+
+    const gst =
+      sub?.gstPercent ??
+      sub?.gst ??
+      target?.gstPercent ??
+      target?.gst ??
+      null;
+
+    return {
+      id: sub?.id || `sub_${index}_${subIdx}`,
+      itemName: sub?.itemName || sub?.name || "",
+      qty: sub?.qty ?? buyerItem?.qty ?? 1,
+      quotePrice,
+      gst,
+      make: sub?.make ?? target?.make ?? "",
+      model: sub?.model ?? target?.model ?? "",
+      compliance: sub?.compliance ?? target?.compliance ?? "",
+      remarks: sub?.remarks ?? target?.remarks ?? "",
+      vendorAttachmentUrl: atts[0]?.url || "",
+      vendorAttachmentName: atts[0]?.name || "",
+      vendorAttachments: atts,
+    };
+  });
+}
+
 export const calculateItemTotal = (
   item: BoqItem,
   buyerQty?: number
 ): PriceCalculation => {
-  const price = parseFloat(String(item.quotePrice)) || 0;
-  const quantity =
-    buyerQty !== undefined ? buyerQty : parseFloat(String(item.qty)) || 0;
-  const gst = parseFloat(String(item.gst)) || 0;
+  if (!item) return { grossAmount: 0, actualPrice: 0 };
 
-  const subtotal = price * quantity;
-  const totalWithTax = subtotal * (1 + gst / 100);
+  let subItemsList: any[] = [];
+  if (Array.isArray((item as any).items) && (item as any).items.length > 0) {
+    subItemsList = (item as any).items;
+  } else if (Array.isArray(item)) {
+    subItemsList = item;
+  } else {
+    subItemsList = [item];
+  }
+
+  let totalGross = 0;
+  let totalActual = 0;
+
+  subItemsList.forEach((sub: any) => {
+    const price =
+      parseFloat(
+        String(
+          sub?.quotePrice ??
+            sub?.price ??
+            (item as any)?.quotePrice ??
+            (item as any)?.price ??
+            0
+        )
+      ) || 0;
+
+    const quantity =
+      sub?.qty !== undefined && sub?.qty !== null && sub?.qty !== ""
+        ? parseFloat(String(sub.qty))
+        : buyerQty !== undefined
+        ? buyerQty
+        : parseFloat(String((item as any)?.qty)) || 0;
+
+    const gst =
+      parseFloat(
+        String(
+          sub?.gstPercent ?? sub?.gst ?? (item as any)?.gst ?? 0
+        )
+      ) || 0;
+
+    const subtotal = price * quantity;
+    const totalWithTax = subtotal * (1 + gst / 100);
+
+    totalGross += subtotal;
+    totalActual += totalWithTax;
+  });
 
   return {
-    grossAmount: subtotal,
-    actualPrice: totalWithTax,
+    grossAmount: totalGross,
+    actualPrice: totalActual,
   };
 };
 
 export const calculateTotal = (
-  boqDetails: BoqItem[],
+  boqDetails: BoqItem[] | Record<string, any>,
   buyerData?: any[]
 ): PriceCalculation => {
-  if (!boqDetails || !Array.isArray(boqDetails)) {
+  if (!boqDetails) {
     return { grossAmount: 0, actualPrice: 0 };
   }
 
-  return boqDetails.reduce(
+  let itemsArray: any[] = [];
+  if (Array.isArray(boqDetails)) {
+    itemsArray = boqDetails;
+  } else if (typeof boqDetails === "object") {
+    itemsArray = Object.values(boqDetails);
+  }
+
+  return itemsArray.reduce(
     (acc, item, index) => {
       const buyerQty = buyerData?.[index]?.qty
         ? parseFloat(String(buyerData[index].qty))
@@ -172,7 +302,7 @@ export const processVendors = (
     const latestRevision = revisions.find((r) => r.isCurrent === true) 
       || revisions[revisionCount - 1] 
       || {};
-    const latestBoq = latestRevision.boqDetails || [];
+    const latestBoq = latestRevision.boqDetails || latestRevision.boqQuotes || [];
 
     // Calculate latest totals
     const latestTotal = calculateTotal(latestBoq, buyerData).actualPrice;
@@ -181,31 +311,47 @@ export const processVendors = (
     let priceDifference = 0;
     if (revisionCount > 1) {
       const firstRevision = revisions[0];
-      const firstBoq = firstRevision?.boqDetails || [];
+      const firstBoq = firstRevision?.boqDetails || firstRevision?.boqQuotes || [];
       const firstTotal = calculateTotal(firstBoq, buyerData).actualPrice;
       priceDifference = firstTotal - latestTotal; // R0 - R1 (positive means discount)
     }
 
+    const comp =
+      vendor.companydetails ||
+      vendor.companyDetails ||
+      vendor.companyInfo ||
+      vendor.vendorCompanyDetails ||
+      {};
+
+    const companyName =
+      comp.companyName ||
+      comp.name ||
+      vendor.companyName ||
+      vendor.vendorName ||
+      vendor.company_name ||
+      vendor.vendorResponseId ||
+      "Vendor";
+
     return {
-      id: vendor.id,
+      id: vendor.id || vendor.vendorResponseId,
       vendorResponseId: vendor.vendorResponseId || "N/A",
-      name: vendor.companydetails?.companyName || "Unknown Vendor",
-      email: vendor.companydetails?.email || "N/A",
-      phone: vendor.companydetails?.phone || "N/A",
-      location: formatAddress(vendor.companydetails),
+      name: companyName,
+      email: comp.email || vendor.vendorEmail || "N/A",
+      phone: comp.phone || "N/A",
+      location: formatAddress(comp),
       quoteRefId: vendor.vendorResponseId || "N/A",
       revision: revisionCount > 0 ? `R${revisionCount - 1}` : "R0",
       overallScore: vendor.evaluationScore || 0,
       deliveryTime: latestRevision?.generalTerms?.deliveryTimeValue || "N/A",
       complianceScore: calculateComplianceScore(latestRevision),
-      logoUrl: vendor.logoUrl,
+      logoUrl: comp.logoUrl || vendor.logoUrl,
       boqDetails: latestBoq,
       grossAmount: calculateTotal(latestBoq, buyerData).grossAmount,
       actualPrice: latestTotal,
       priceDifference,
       revisionCount,
       exclusions: latestRevision?.exclusions || "None",
-      status: vendor.status,
+      status: vendor.status || "submitted",
       revisions,
       otherInformation: latestRevision?.otherInformation,
     };

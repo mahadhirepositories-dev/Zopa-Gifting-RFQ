@@ -459,32 +459,8 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
       fetchData();
     }, [processRawData]);
 
-    // Auto-add 1 default BOQ row if data is completely empty on initial load
+    // Do not auto-populate default dummy BOQ row
     const initialDefaultAddedRef = useRef(false);
-    useEffect(() => {
-      if (
-        !isLoading &&
-        data &&
-        data.length === 0 &&
-        !initialDefaultAddedRef.current
-      ) {
-        initialDefaultAddedRef.current = true;
-        const defaultRow: BOQItem = {
-          category: localCategories[0] || "Indoor Plants",
-          description: "Desk Plant",
-          uom: "Nos",
-          qty: "1",
-          targetPrice: "200",
-          logoRequirement: "without_logo",
-          specification: "Standard specification",
-          remarks: "",
-          isVisible: true,
-          itemRef: uuidv4(),
-          attachments: [],
-        };
-        onChange([defaultRow]);
-      }
-    }, [data, isLoading, localCategories, onChange]);
 
     const availableCategories = useMemo(() => {
       return localCategories;
@@ -583,8 +559,8 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
         category: categoryName,
         description: "",
         uom: "Nos",
-        qty: "10",
-        targetPrice: "200",
+        qty: "",
+        targetPrice: "",
         logoRequirement: "without_logo",
         specification: "",
         remarks: "",
@@ -599,12 +575,12 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
     const handleAddSpreadsheetRow = () => {
       const newRow: BOQItem = {
         category: availableCategories[0] || "General",
-        description: "New Description Item",
+        description: "",
         uom: "Nos",
-        qty: "10",
-        targetPrice: "200",
+        qty: "",
+        targetPrice: "",
         logoRequirement: "without_logo",
-        specification: "Standard specification",
+        specification: "",
         remarks: "",
         isVisible: true,
         itemRef: uuidv4(),
@@ -1807,7 +1783,7 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
                   >
                     Specification
                   </Label>
-                  <Button
+                  {/* <Button
                     type="button"
                     variant="ghost"
                     size="sm"
@@ -1817,7 +1793,7 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
                   >
                     <Sparkles className="w-3 h-3 text-blue-600" />
                     GENERATE WITH AI
-                  </Button>
+                  </Button> */}
                 </div>
                 <Textarea
                   id="specification"

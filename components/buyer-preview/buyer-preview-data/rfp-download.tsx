@@ -1111,100 +1111,137 @@ export const VendorResponseDocument = ({
               </View>
 
               {/* Table Rows */}
-              {(buyerData?.boq || []).map((item: any, index: number) => {
-                const vendorItem =
-                  selectedVendor?.revisionData?.boqDetails?.[index] || {};
-                const qty = parseFloat(item.qty || 0);
-                const quotePrice = parseFloat(vendorItem.quotePrice || 0);
-                const gst = parseFloat(vendorItem.gst || 0);
-                const itemTotal = qty * quotePrice * (1 + gst / 100);
+              {(buyerData?.boq || []).flatMap((item: any, index: number) => {
+                const boqSource =
+                  selectedVendor?.revisionData?.boqDetails ||
+                  selectedVendor?.revisionData?.boqQuotes;
 
-                return (
-                  <View
-                    key={item.id}
-                    style={[
-                      styles.tableRow,
-                      index % 2 === 0
-                        ? { backgroundColor: "#ffffff" }
-                        : { backgroundColor: "#f8f9fa" },
-                    ]}
-                  >
-                    {/* Description */}
-                    <Text style={[styles.tableCell, { width: "16%" }]}>
-                      <Text style={styles.boldText}>{item.description}</Text>
-                      {"\n"}
-                      <Text
-                        style={{
-                          fontSize: templateSettings.fontSize.body,
-                          color: "#666",
-                        }}
-                      >
-                        {item.specification}
-                      </Text>
-                    </Text>
+                let target: any = null;
+                if (Array.isArray(boqSource)) {
+                  target = boqSource[index];
+                } else if (typeof boqSource === "object" && boqSource !== null) {
+                  const key = item?.id || `boq_${index}`;
+                  target =
+                    boqSource[key] ||
+                    boqSource[`boq_${index}`] ||
+                    boqSource[index] ||
+                    boqSource[String(index)] ||
+                    Object.values(boqSource)[index];
+                }
 
-                    {/* Qty */}
-                    <Text style={[styles.tableCell, { width: "8%" }]}>
-                      {item.qty}
-                      <Text
-                        style={{
-                          fontSize: templateSettings.fontSize.body,
-                          color: "#666",
-                        }}
-                      >
-                        {item.uom || "Nos"}
-                      </Text>
-                    </Text>
+                let subItems: any[] = [];
+                if (target && Array.isArray(target.items) && target.items.length > 0) {
+                  subItems = target.items;
+                } else if (target) {
+                  subItems = [target];
+                }
 
-                    {/* Target Price */}
-                    <Text style={[styles.tableCell, { width: "10%" }]}>
-                      {item.targetPrice}
-                    </Text>
+                if (subItems.length === 0) {
+                  subItems = [{}];
+                }
 
-                    {/* Your Quote */}
-                    <Text style={[styles.tableCell, { width: "10%" }]}>
-                      {vendorItem.quotePrice ? `${vendorItem.quotePrice}` : "-"}
-                    </Text>
+                return subItems.map((vendorItem: any, subIdx: number) => {
+                  const qty = parseFloat(vendorItem.qty || item.qty || 0);
+                  const quotePrice = parseFloat(vendorItem.quotePrice || vendorItem.price || 0);
+                  const gst = parseFloat(vendorItem.gstPercent || vendorItem.gst || 0);
+                  const itemTotal = qty * quotePrice * (1 + gst / 100);
 
-                    {/* GST */}
-                    <Text style={[styles.tableCell, { width: "8%" }]}>
-                      {vendorItem.gst ? `${vendorItem.gst}%` : "-"}
-                    </Text>
+                  const displayDesc =
+                    subIdx === 0
+                      ? `${item.description || ""}${vendorItem.itemName ? ` (${vendorItem.itemName})` : ""}`
+                      : vendorItem.itemName || `Item ${subIdx + 1}`;
 
-                    {/* Item Total */}
-                    <Text style={[styles.tableCell, { width: "12%" }]}>
-                      {vendorItem.quotePrice ? `${itemTotal.toFixed(2)}` : "-"}
-                    </Text>
-
-                    {/* Details */}
-                    <Text style={[styles.tableCell, { width: "13%" }]}>
-                      {[vendorItem.make, vendorItem.model]
-                        .filter(Boolean)
-                        .join("\n")}
-                    </Text>
-
-                    {/* Compliance */}
-                    <Text style={[styles.tableCell, { width: "8%" }]}>
-                      {vendorItem.compliance || "-"}
-                    </Text>
-
-                    {/* Deviation/Remarks */}
-                    <Text style={[styles.tableCell, { width: "13%" }]}>
-                      {vendorItem.remarks || "-"}
-                    </Text>
-
-                    {/* Remarks */}
-                    <Text
+                  return (
+                    <View
+                      key={`${item.id || index}-${subIdx}`}
                       style={[
-                        styles.tableCell,
-                        styles.lastCell,
-                        { width: "8%" },
+                        styles.tableRow,
+                        (index + subIdx) % 2 === 0
+                          ? { backgroundColor: "#ffffff" }
+                          : { backgroundColor: "#f8f9fa" },
                       ]}
                     >
-                      {item.remarks || "-"}
-                    </Text>
-                  </View>
-                );
+                      {/* Description */}
+                      <Text style={[styles.tableCell, { width: "16%" }]}>
+                        <Text style={styles.boldText}>{displayDesc}</Text>
+                        {subIdx === 0 && item.specification && (
+                          <>
+                            {"\n"}
+                            <Text
+                              style={{
+                                fontSize: templateSettings.fontSize.body,
+                                color: "#666",
+                              }}
+                            >
+                              {item.specification}
+                            </Text>
+                          </>
+                        )}
+                      </Text>
+
+                      {/* Qty */}
+                      <Text style={[styles.tableCell, { width: "8%" }]}>
+                        {qty || item.qty}
+                        <Text
+                          style={{
+                            fontSize: templateSettings.fontSize.body,
+                            color: "#666",
+                          }}
+                        >
+                          {item.uom || "Nos"}
+                        </Text>
+                      </Text>
+
+                      {/* Target Price */}
+                      <Text style={[styles.tableCell, { width: "10%" }]}>
+                        {subIdx === 0 ? item.targetPrice || "-" : "-"}
+                      </Text>
+
+                      {/* Your Quote */}
+                      <Text style={[styles.tableCell, { width: "10%" }]}>
+                        {quotePrice > 0 ? `${quotePrice}` : "-"}
+                      </Text>
+
+                      {/* GST */}
+                      <Text style={[styles.tableCell, { width: "8%" }]}>
+                        {gst > 0 ? `${gst}%` : "0%"}
+                      </Text>
+
+                      {/* Item Total */}
+                      <Text style={[styles.tableCell, { width: "12%" }]}>
+                        {quotePrice > 0 ? `${itemTotal.toFixed(2)}` : "-"}
+                      </Text>
+
+                      {/* Details */}
+                      <Text style={[styles.tableCell, { width: "13%" }]}>
+                        {[vendorItem.make, vendorItem.model]
+                          .filter(Boolean)
+                          .join("\n") || "-"}
+                      </Text>
+
+                      {/* Compliance */}
+                      <Text style={[styles.tableCell, { width: "8%" }]}>
+                        {vendorItem.compliance || "-"}
+                      </Text>
+
+                      {/* Deviation/Remarks */}
+                      <Text style={[styles.tableCell, { width: "13%" }]}>
+                        {vendorItem.remarks || "-"}
+                      </Text>
+
+                      {/* Remarks */}
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          styles.lastCell,
+                          { width: "8%" },
+                        ]}
+                      >
+                        {subIdx === 0 ? item.remarks || "-" : "-"}
+                      </Text>
+                    </View>
+                  );
+                });
               })}
 
               {/* Grand Total Row */}
@@ -1235,15 +1272,38 @@ export const VendorResponseDocument = ({
                   >
                     {(buyerData.boq || [])
                       .reduce((total: number, item: any, index: number) => {
-                        const vendorItem =
-                          selectedVendor?.revisionData?.boqDetails?.[index] ||
-                          {};
-                        const qty = parseFloat(item.qty || 0);
-                        const quotePrice = parseFloat(
-                          vendorItem.quotePrice || 0
-                        );
-                        const gst = parseFloat(vendorItem.gst || 0);
-                        return total + qty * quotePrice * (1 + gst / 100);
+                        const boqSource =
+                          selectedVendor?.revisionData?.boqDetails ||
+                          selectedVendor?.revisionData?.boqQuotes;
+                        let target: any = null;
+                        if (Array.isArray(boqSource)) {
+                          target = boqSource[index];
+                        } else if (typeof boqSource === "object" && boqSource !== null) {
+                          const key = item?.id || `boq_${index}`;
+                          target =
+                            boqSource[key] ||
+                            boqSource[`boq_${index}`] ||
+                            boqSource[index] ||
+                            boqSource[String(index)] ||
+                            Object.values(boqSource)[index];
+                        }
+
+                        let subItems: any[] = [];
+                        if (target && Array.isArray(target.items) && target.items.length > 0) {
+                          subItems = target.items;
+                        } else if (target) {
+                          subItems = [target];
+                        }
+
+                        let itemSum = 0;
+                        subItems.forEach((sub: any) => {
+                          const qty = parseFloat(sub.qty || item.qty || 0);
+                          const quotePrice = parseFloat(sub.quotePrice || sub.price || 0);
+                          const gst = parseFloat(sub.gstPercent || sub.gst || 0);
+                          itemSum += qty * quotePrice * (1 + gst / 100);
+                        });
+
+                        return total + itemSum;
                       }, 0)
                       .toFixed(2)}
                   </Text>

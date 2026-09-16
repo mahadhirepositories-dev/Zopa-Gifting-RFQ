@@ -85,9 +85,9 @@ export const HeaderSection = ({
       </div>
 
       <div className="flex items-center gap-4">
-        <p className="text-lg font-bold">
+        {/* <p className="text-lg font-bold">
           <span className="text-blue-600">Revision: </span>Revision {revisionNumber} (R-{revisionNumber})
-        </p>
+        </p> */}
 
         {revisions && revisions.length > 0 && onSelectRevision && (
           <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-md px-3 py-1.5 shadow-2xs">
