@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     }
 
     const userId = crypto.randomUUID();
-    const rfpId = "074db83b-2fe4-4978-874c-a2d34e269a7c";
+    const rfpId = crypto.randomUUID();
 
     try {
       const userValues = {
@@ -122,22 +122,14 @@ export async function POST(request: Request) {
           .where(eq(pendingRegistrations.email, emailClean));
       }
 
-      const existingRfq = await db
-        .select()
-        .from(rfqs)
-        .where(eq(rfqs.id, rfpId))
-        .limit(1);
-
-      if (existingRfq.length === 0) {
-        await db.insert(rfqs).values({
-          id: rfpId,
-          userId: userId,
-          title: "",
-          category: "Corporate Gifting",
-          quantity: 500,
-          status: "draft",
-        });
-      }
+      await db.insert(rfqs).values({
+        id: rfpId,
+        userId: userId,
+        title: "",
+        category: "Corporate Gifting",
+        quantity: 500,
+        status: "draft",
+      });
 
       await upsertRfpCompany(rfpId, {
         companyName: companyClean,

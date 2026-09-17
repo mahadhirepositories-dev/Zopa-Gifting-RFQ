@@ -48,16 +48,18 @@ export async function POST(request: Request) {
 
     const user = existing[0];
 
-    let rfpId = "074db83b-2fe4-4978-874c-a2d34e269a7c";
-
+    let rfpId;
     try {
       const existingRfq = await db
         .select()
         .from(rfqs)
-        .where(eq(rfqs.id, rfpId))
+        .where(eq(rfqs.userId, user.id))
         .limit(1);
 
-      if (existingRfq.length === 0) {
+      if (existingRfq.length > 0) {
+        rfpId = existingRfq[0].id;
+      } else {
+        rfpId = crypto.randomUUID();
         await db.insert(rfqs).values({
           id: rfpId,
           userId: user.id,
