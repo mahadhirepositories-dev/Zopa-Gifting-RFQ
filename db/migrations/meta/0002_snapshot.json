@@ -1,6 +1,6 @@
 {
-  "id": "5f00f2bd-5bcd-42e3-bb51-b91752132aa5",
-  "prevId": "c3b2f5b6-a47e-4b61-af30-cea8b86b240d",
+  "id": "5bad97b4-f619-41a9-9fef-bedc194c9052",
+  "prevId": "5f00f2bd-5bcd-42e3-bb51-b91752132aa5",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -763,6 +763,220 @@
       },
       "indexes": {},
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.rfq_approval_recommendations": {
+      "name": "rfq_approval_recommendations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "rfq_id": {
+          "name": "rfq_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "approval_id": {
+          "name": "approval_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vendor_response_id": {
+          "name": "vendor_response_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'recommended'"
+        },
+        "recommender_role": {
+          "name": "recommender_role",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'buyer'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "rfq_approval_recommendations_rfq_id_rfq_id_fk": {
+          "name": "rfq_approval_recommendations_rfq_id_rfq_id_fk",
+          "tableFrom": "rfq_approval_recommendations",
+          "tableTo": "rfq",
+          "columnsFrom": [
+            "rfq_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "rfq_approval_recommendations_approval_id_rfq_approvals_id_fk": {
+          "name": "rfq_approval_recommendations_approval_id_rfq_approvals_id_fk",
+          "tableFrom": "rfq_approval_recommendations",
+          "tableTo": "rfq_approvals",
+          "columnsFrom": [
+            "approval_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.rfq_approvals": {
+      "name": "rfq_approvals",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "rfq_id": {
+          "name": "rfq_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending_approval'"
+        },
+        "approval_level": {
+          "name": "approval_level",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'level1'"
+        },
+        "level1_approver_email": {
+          "name": "level1_approver_email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "level2_approver_email": {
+          "name": "level2_approver_email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "level1_status": {
+          "name": "level1_status",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'pending'"
+        },
+        "level2_status": {
+          "name": "level2_status",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'pending'"
+        },
+        "buyer_comments": {
+          "name": "buyer_comments",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "level1_comments": {
+          "name": "level1_comments",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "level2_comments": {
+          "name": "level2_comments",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "level1_reviewed_at": {
+          "name": "level1_reviewed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "level2_reviewed_at": {
+          "name": "level2_reviewed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "rfq_approvals_rfq_id_rfq_id_fk": {
+          "name": "rfq_approvals_rfq_id_rfq_id_fk",
+          "tableFrom": "rfq_approvals",
+          "tableTo": "rfq",
+          "columnsFrom": [
+            "rfq_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -2444,8 +2658,8 @@
         }
       },
       "foreignKeys": {
-        "vcd_vendor_resp_id_fk": {
-          "name": "vcd_vendor_resp_id_fk",
+        "vendor_company_details_vendor_response_internal_id_vendor_responses_id_fk": {
+          "name": "vendor_company_details_vendor_response_internal_id_vendor_responses_id_fk",
           "tableFrom": "vendor_company_details",
           "tableTo": "vendor_responses",
           "columnsFrom": [
@@ -2565,8 +2779,8 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "vrr_vendor_resp_id_fk": {
-          "name": "vrr_vendor_resp_id_fk",
+        "vendor_response_revisions_vendor_response_internal_id_vendor_responses_id_fk": {
+          "name": "vendor_response_revisions_vendor_response_internal_id_vendor_responses_id_fk",
           "tableFrom": "vendor_response_revisions",
           "tableTo": "vendor_responses",
           "columnsFrom": [
@@ -2625,6 +2839,13 @@
           "primaryKey": false,
           "notNull": false,
           "default": "'draft'"
+        },
+        "qualification_status": {
+          "name": "qualification_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'qualified'"
         },
         "created_at": {
           "name": "created_at",
