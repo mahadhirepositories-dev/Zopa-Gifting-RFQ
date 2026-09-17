@@ -46,8 +46,8 @@ CREATE TABLE "vendor_responses" (
 	CONSTRAINT "vendor_responses_vendor_response_id_unique" UNIQUE("vendor_response_id")
 );
 --> statement-breakpoint
-ALTER TABLE "vendor_company_details" ADD CONSTRAINT "vendor_company_details_vendor_response_internal_id_vendor_responses_id_fk" FOREIGN KEY ("vendor_response_internal_id") REFERENCES "public"."vendor_responses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "vendor_response_revisions" ADD CONSTRAINT "vendor_response_revisions_vendor_response_internal_id_vendor_responses_id_fk" FOREIGN KEY ("vendor_response_internal_id") REFERENCES "public"."vendor_responses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "vendor_company_details" ADD CONSTRAINT "vcd_vendor_resp_id_fk" FOREIGN KEY ("vendor_response_internal_id") REFERENCES "public"."vendor_responses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "vendor_response_revisions" ADD CONSTRAINT "vrr_vendor_resp_id_fk" FOREIGN KEY ("vendor_response_internal_id") REFERENCES "public"."vendor_responses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "vendor_responses" ADD CONSTRAINT "vendor_responses_rfp_id_rfq_id_fk" FOREIGN KEY ("rfp_id") REFERENCES "public"."rfq"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "vendor_company_details_email_idx" ON "vendor_company_details" USING btree ("email");--> statement-breakpoint
 CREATE INDEX "vendor_company_details_company_name_idx" ON "vendor_company_details" USING btree ("company_name");--> statement-breakpoint
