@@ -1,4 +1,4 @@
-CREATE TABLE "rfq_approval_recommendations" (
+CREATE TABLE IF NOT EXISTS "rfq_approval_recommendations" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"rfq_id" text NOT NULL,
 	"approval_id" integer,
@@ -9,7 +9,7 @@ CREATE TABLE "rfq_approval_recommendations" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "rfq_approvals" (
+CREATE TABLE IF NOT EXISTS "rfq_approvals" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"rfq_id" text NOT NULL,
 	"status" varchar(50) DEFAULT 'pending_approval' NOT NULL,
@@ -27,11 +27,15 @@ CREATE TABLE "rfq_approvals" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "vendor_company_details" DROP CONSTRAINT "vcd_vendor_resp_id_fk";
+ALTER TABLE "vendor_company_details" DROP CONSTRAINT IF EXISTS "vcd_vendor_resp_id_fk";
 --> statement-breakpoint
-ALTER TABLE "vendor_response_revisions" DROP CONSTRAINT "vrr_vendor_resp_id_fk";
+ALTER TABLE "vendor_response_revisions" DROP CONSTRAINT IF EXISTS "vrr_vendor_resp_id_fk";
 --> statement-breakpoint
-ALTER TABLE "vendor_responses" ADD COLUMN "qualification_status" text DEFAULT 'qualified';--> statement-breakpoint
+ALTER TABLE "vendor_company_details" DROP CONSTRAINT IF EXISTS "vendor_company_details_vendor_response_internal_id_vendor_responses_id_fk";
+--> statement-breakpoint
+ALTER TABLE "vendor_response_revisions" DROP CONSTRAINT IF EXISTS "vendor_response_revisions_vendor_response_internal_id_vendor_responses_id_fk";
+--> statement-breakpoint
+ALTER TABLE "vendor_responses" ADD COLUMN IF NOT EXISTS "qualification_status" text DEFAULT 'qualified';--> statement-breakpoint
 ALTER TABLE "rfq_approval_recommendations" ADD CONSTRAINT "rfq_approval_recommendations_rfq_id_rfq_id_fk" FOREIGN KEY ("rfq_id") REFERENCES "public"."rfq"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "rfq_approval_recommendations" ADD CONSTRAINT "rfq_approval_recommendations_approval_id_rfq_approvals_id_fk" FOREIGN KEY ("approval_id") REFERENCES "public"."rfq_approvals"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "rfq_approvals" ADD CONSTRAINT "rfq_approvals_rfq_id_rfq_id_fk" FOREIGN KEY ("rfq_id") REFERENCES "public"."rfq"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
