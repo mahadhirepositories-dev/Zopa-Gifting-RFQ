@@ -125,7 +125,7 @@ export default function ZopaGiftingRFQPage() {
       const targetUrl =
         data.redirectUrl ||
         data.magicLinkUrl ||
-        "http://localhost:3000/rfq/074db83b-2fe4-4978-874c-a2d34e269a7c/requirement";
+        "/";
 
       window.location.href = targetUrl;
     } catch (err: any) {
@@ -175,7 +175,7 @@ export default function ZopaGiftingRFQPage() {
       const targetUrl =
         data.redirectUrl ||
         data.magicLinkUrl ||
-        "http://localhost:3000/rfq/074db83b-2fe4-4978-874c-a2d34e269a7c/requirement";
+        "/";
 
       window.location.href = targetUrl;
     } catch (err: any) {
