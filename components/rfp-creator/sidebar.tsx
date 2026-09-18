@@ -90,8 +90,19 @@ export const Sidebar: React.FC<SidebarProps> = memo(({ isSubmitted }) => {
   );
 
   const visibleSections = useMemo(() => {
+    if (isSubmitted) {
+      return [
+        { section: "vendorcontacts", title: "Add Contact", icon: UserPlus },
+        {
+          section: "dates",
+          title: "RFQ Start and End Date",
+          icon: CalendarDays,
+        },
+        { section: "preview", title: "Preview", icon: Eye },
+      ];
+    }
     return allRfpSections;
-  }, [allRfpSections]);
+  }, [isSubmitted, allRfpSections]);
 
   return (
     <ShadcnSidebar
