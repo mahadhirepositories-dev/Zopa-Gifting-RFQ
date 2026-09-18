@@ -1045,7 +1045,7 @@ export default function BuyerPreview({
         value: "comparison",
         label: "Compare Vendors",
         icon: null,
-        show: isLoggedIn,
+        show: isLoggedIn || isApprover || !!urlResponseId,
       },
       {
         value: "approval-history",
