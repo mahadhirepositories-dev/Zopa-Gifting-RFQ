@@ -1047,11 +1047,12 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
           buyerData?.rfpTitle ||
           "Facility Expansion & Automation";
 
-        const baseURL =
+        let baseURL =
           process.env.NEXT_PUBLIC_APP_URL ||
           (typeof window !== "undefined"
             ? window.location.origin
             : "http://localhost:3000");
+        if (!baseURL.startsWith("http")) baseURL = `https://${baseURL}`;
 
         const buyerPreviewUrl = `${baseURL}/rfq/buyer_preview/${rfpId}?response=${actualResponseId}`;
         const vendorReplyUrl = `${baseURL}/rfq/reply/${rfpId}?responseId=${actualResponseId}`;

@@ -52,9 +52,10 @@ export class EmailService {
     name?: string;
     url?: string;
   }) {
-    const baseURL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const targetUrl = url || "/rfq/074db83b-2fe4-4978-874c-a2d34e269a7c/requirement";
-    const fullUrl = targetUrl.startsWith("http") ? targetUrl : `${baseURL}${targetUrl}`;
+    let baseURL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    if (!baseURL.startsWith("http")) baseURL = `https://${baseURL}`;
+    const targetUrl = url || "/";
+    const fullUrl = targetUrl.startsWith("http") ? targetUrl : `${baseURL}${targetUrl.startsWith("/") ? "" : "/"}${targetUrl}`;
 
     await this.renderAndSend({
       template: WelcomeEmail,
@@ -74,8 +75,9 @@ export class EmailService {
     url: string;
     buyerEmail?: string;
   }) {
-    const baseURL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const fullUrl = url.startsWith("http") ? url : `${baseURL}${url}`;
+    let baseURL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    if (!baseURL.startsWith("http")) baseURL = `https://${baseURL}`;
+    const fullUrl = url.startsWith("http") ? url : `${baseURL}${url.startsWith("/") ? "" : "/"}${url}`;
 
     await this.renderAndSend({
       template: MagicLinkEmail,
@@ -135,8 +137,9 @@ export class EmailService {
     buyerEmail?: string;
     vendorResponseId?: string;
   }) {
-    const baseURL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const fullUrl = url.startsWith("http") ? url : `${baseURL}${url}`;
+    let baseURL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    if (!baseURL.startsWith("http")) baseURL = `https://${baseURL}`;
+    const fullUrl = url.startsWith("http") ? url : `${baseURL}${url.startsWith("/") ? "" : "/"}${url}`;
 
     await this.renderAndSend({
       template: RfpMagicLinkEmail,
@@ -284,7 +287,8 @@ export class EmailService {
     const targetEmail = data.buyerEmail || data.requesterEmail || data.vendorEmail || process.env.ADMIN_EMAIL_TO || "buyer@zopapro.com";
     const targetRfqId = data.rfqId || data.rfpId || "RFQ";
     const companyName = "ZOPA Gifting RFQ";
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    let baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    if (!baseUrl.startsWith("http")) baseUrl = `https://${baseUrl}`;
     const rfqUrl = data.rfpUrl || `${baseUrl}/rfq/buyer_preview/${targetRfqId}`;
 
     await this.renderAndSend({

@@ -64,8 +64,9 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   >(new Map());
   const [showResults, setShowResults] = useState(false);
 
-  const baseUrl =
+  let baseUrl =
     process.env.NEXT_PUBLIC_APP_URL || "https://staging-rfp.zopapro.com";
+  if (!baseUrl.startsWith("http")) baseUrl = `https://${baseUrl}`;
 
   // Filter vendors who have valid phone numbers
   const vendorsWithPhone = vendors.filter(

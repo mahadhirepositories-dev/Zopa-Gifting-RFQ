@@ -90,7 +90,8 @@ export async function POST(
         ? recommendedVendors[0].vendorResponseId
         : "VR-8357";
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    let baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    if (!baseUrl.startsWith("http")) baseUrl = `https://${baseUrl}`;
     const approvalUrl = `${baseUrl}/rfq/buyer_preview/${rfqId}?response=${firstResponseId}`;
 
     // Send email to Level 1 approver

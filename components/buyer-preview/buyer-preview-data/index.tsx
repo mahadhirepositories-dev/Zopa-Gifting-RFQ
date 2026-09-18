@@ -334,8 +334,8 @@ function getUserApprovalRole(
   const isRequester = Boolean(userId && currentApproval.requestedBy === userId);
 
   // If a guest clicks the email link (urlResponseId is present) and the RFQ is pending, 
-  // we let them take action for the current level.
-  const isGuestApproverViaLink = Boolean(urlResponseId);
+  // we let them take action for the current level (but ONLY if they are not logged in).
+  const isGuestApproverViaLink = !userId && !userEmail && Boolean(urlResponseId);
 
   const canTakeAction =
     currentApproval.status === "pending" &&
@@ -790,7 +790,8 @@ export default function BuyerPreview({
     (buyerData?.rfp?.status === "pending_approval" ||
       currentApproval?.status === "pending");
 
-  const isApprover = Boolean(urlResponseId) || approvalRole.isLevel1Approver || approvalRole.isLevel2Approver;
+  const isGuestApprover = !isLoggedIn && Boolean(currentApproval?.status?.startsWith("pending")) && Boolean(urlResponseId);
+  const isApprover = approvalRole.isLevel1Approver || approvalRole.isLevel2Approver || isGuestApprover;
   const isBuyer = isLoggedIn && !isApprover;
   // Gated on the approval record alone (status + level + assigned approver),
   // never on the rfps.status column - a stale column value must not be able to
