@@ -63,8 +63,6 @@ import { Button } from "@/components/ui/button";
 interface EnhancedBuyerPreviewProps extends BuyerPreviewProps {
   isLoggedIn?: boolean;
   vendorsWithNewRevisions?: any;
-  userRole?: "buyer" | "approver" | "admin" | "guest" | "buyer_admin";
-  orgSlug?: string;
   urlResponseId?: string | null;
 
   // FIXED: Two-level approval interface
@@ -77,6 +75,7 @@ interface EnhancedBuyerPreviewProps extends BuyerPreviewProps {
 
     // Level 1 fields
     level1ApproverId: string | null;
+    level1ApproverEmail?: string | null;
     level1Status: string;
     level1ReviewedAt?: string;
     level1Comments?: string;
@@ -88,6 +87,7 @@ interface EnhancedBuyerPreviewProps extends BuyerPreviewProps {
 
     // Level 2 fields
     level2ApproverId: string | null;
+    level2ApproverEmail?: string | null;
     level2Status?: string | null;
     level2ReviewedAt?: string;
     level2Comments?: string;
@@ -301,7 +301,9 @@ const registerPDFFonts = async (Font: any) => {
 
 function getUserApprovalRole(
   currentApproval: EnhancedBuyerPreviewProps["currentApproval"],
-  userId: string | undefined,
+  userId?: string,
+  userEmail?: string,
+  urlResponseId?: string | null
 ): {
   isLevel1Approver: boolean;
   isLevel2Approver: boolean;
@@ -309,7 +311,7 @@ function getUserApprovalRole(
   canTakeAction: boolean;
   currentUserLevel: 1 | 2 | null;
 } {
-  if (!currentApproval || !userId) {
+  if (!currentApproval) {
     return {
       isLevel1Approver: false,
       isLevel2Approver: false,
@@ -319,17 +321,26 @@ function getUserApprovalRole(
     };
   }
 
-  const isLevel1Approver = currentApproval.level1ApproverId === userId;
-  const isLevel2Approver = currentApproval.level2ApproverId === userId;
-  const isRequester = currentApproval.requestedBy === userId;
+  const isLevel1Approver = Boolean(
+    (userId && currentApproval.level1ApproverId === userId) ||
+    (userEmail && currentApproval.level1ApproverEmail?.toLowerCase() === userEmail.toLowerCase())
+  );
+  
+  const isLevel2Approver = Boolean(
+    (userId && currentApproval.level2ApproverId === userId) ||
+    (userEmail && currentApproval.level2ApproverEmail?.toLowerCase() === userEmail.toLowerCase())
+  );
+  
+  const isRequester = Boolean(userId && currentApproval.requestedBy === userId);
 
-  // User can take action if:
-  // 1. Approval is pending AND
-  // 2. User is the approver for the current level
+  // If a guest clicks the email link (urlResponseId is present) and the RFQ is pending, 
+  // we let them take action for the current level.
+  const isGuestApproverViaLink = Boolean(urlResponseId);
+
   const canTakeAction =
     currentApproval.status === "pending" &&
-    ((currentApproval.currentLevel === 1 && isLevel1Approver) ||
-      (currentApproval.currentLevel === 2 && isLevel2Approver));
+    ((currentApproval.currentLevel === 1 && (isLevel1Approver || isGuestApproverViaLink)) ||
+     (currentApproval.currentLevel === 2 && (isLevel2Approver || isGuestApproverViaLink)));
 
   const currentUserLevel = isLevel1Approver ? 1 : isLevel2Approver ? 2 : null;
   return {
@@ -421,8 +432,6 @@ export default function BuyerPreview({
   rfpId,
   isLoggedIn,
   vendorsWithNewRevisions,
-  userRole = "guest",
-  orgSlug,
   urlResponseId,
   currentApproval,
   buyerRecommendations = [],
@@ -780,13 +789,14 @@ export default function BuyerPreview({
     !isRevisionRequested &&
     (buyerData?.rfp?.status === "pending_approval" ||
       currentApproval?.status === "pending");
-  const isApprover = userRole === "approver" || userRole === "admin";
-  const isBuyer = userRole === "buyer" || userRole === "buyer_admin";
+
+  const isApprover = Boolean(urlResponseId) || approvalRole.isLevel1Approver || approvalRole.isLevel2Approver;
+  const isBuyer = isLoggedIn && !isApprover;
   // Gated on the approval record alone (status + level + assigned approver),
   // never on the rfps.status column - a stale column value must not be able to
   // hide the action buttons from the approver who has to unblock the RFQ.
   const canApprove = isApprover && approvalRole.canTakeAction;
-  const canViewApprovalHistory = isLoggedIn && (isApprover || isBuyer);
+  const canViewApprovalHistory = isLoggedIn || Boolean(currentApproval);
 
   const handleUnifiedApprovalDecision = async (
     action: "approve" | "reject" | "request-revision",
@@ -870,15 +880,11 @@ export default function BuyerPreview({
               : "revision requested";
 
         toast.success(`RFQ ${actionText} successfully! Email sent to buyer.`);
-        if (orgSlug) {
-          router.push(`/${orgSlug}/approver/approvals`);
-        } else {
-          fetchRecommendations();
-          if (typeof window !== "undefined") {
-            setTimeout(() => {
-              window.location.reload();
-            }, 1000);
-          }
+        fetchRecommendations();
+        if (typeof window !== "undefined") {
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
         }
       } else {
         toast.error(data.error || `Failed to ${action} RFQ`);
@@ -1016,17 +1022,7 @@ export default function BuyerPreview({
 
   const handleBackClick = () => {
     setIsNavigating(true);
-
-    if (userRole === "approver") {
-      router.push(`/${orgSlug}/approver/approvals`);
-    } else if (userRole === "buyer") {
-      router.push(`/${orgSlug}/buyer/rfq-management`);
-    } else if (userRole === "buyer_admin") {
-      const pathRole = userRole.replace(/_/g, "-");
-      router.push(`/${orgSlug}/${pathRole}/rfq-management`);
-    } else {
-      router.push("/login");
-    }
+    router.back();
   };
 
   // Determine which tabs to show based on login status
@@ -1069,7 +1065,7 @@ export default function BuyerPreview({
         <div className="container mx-auto px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-col">
             <h1 className="text-2xl font-bold text-blue-600">
-              {isApprover ? "Approver Review" : "Buyer Response Preview"}
+              RFQ Response Preview
             </h1>
             <p className="text-sm">
               <span className="text-blue-600">Project: </span>
@@ -1078,20 +1074,6 @@ export default function BuyerPreview({
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {/* User Role Badge */}
-            {isLoggedIn && (
-              <div
-                className={`px-3 py-1 rounded-full text-white text-sm font-medium ${
-                  isApprover
-                    ? "bg-purple-600"
-                    : isBuyer
-                      ? "bg-blue-600"
-                      : "bg-gray-600"
-                }`}
-              >
-                {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
-              </div>
-            )}
 
             <button
               type="button"
@@ -1418,7 +1400,7 @@ export default function BuyerPreview({
             )}
           </TabsContent>
 
-          {(isLoggedIn || userRole === "approver" || !!urlResponseId) && (
+          {(isLoggedIn || isApprover || !!urlResponseId) && (
             <TabsContent value="comparison">
 
               {localResponses?.some(
