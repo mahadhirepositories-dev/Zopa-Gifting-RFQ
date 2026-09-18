@@ -204,6 +204,7 @@ export default function BuyerPreviewPage() {
   const [buyerRecommendations, setBuyerRecommendations] = useState<
     BuyerRecommendation[]
   >([]);
+  const [userRole, setUserRole] = useState<string>("guest");
   const { data: session, isPending: authLoading } = useSession();
   const isLoggedIn = !authLoading && !!session?.user;
 
@@ -220,7 +221,46 @@ export default function BuyerPreviewPage() {
     }
   };
 
+<<<<<<< Updated upstream
 
+=======
+  // Determine user role with proper approver detection
+  const determineUserRole = useCallback(async () => {
+    if (!isLoggedIn || !session?.user) {
+      setUserRole("guest");
+      return;
+    }
+
+    const userEmail = session?.user?.email?.toLowerCase();
+    const userId = session?.user?.id;
+
+    // Check if user is an explicitly assigned level 1 or level 2 approver for THIS specific RFP
+    if (currentApproval) {
+      const isLevel1Email =
+        currentApproval.level1ApproverEmail &&
+        userEmail &&
+        currentApproval.level1ApproverEmail.toLowerCase() === userEmail;
+
+      const isLevel2Email =
+        currentApproval.level2ApproverEmail &&
+        userEmail &&
+        currentApproval.level2ApproverEmail.toLowerCase() === userEmail;
+
+      const isLevel1Approver =
+        (Boolean(currentApproval.level1ApproverId) && currentApproval.level1ApproverId === userId) || Boolean(isLevel1Email);
+      const isLevel2Approver =
+        (Boolean(currentApproval.level2ApproverId) && currentApproval.level2ApproverId === userId) || Boolean(isLevel2Email);
+
+      if (isLevel1Approver || isLevel2Approver) {
+        setUserRole("approver");
+        return;
+      }
+    }
+
+    // Default to buyer role for logged-in user
+    setUserRole("buyer");
+  }, [isLoggedIn, session, currentApproval]);
+>>>>>>> Stashed changes
 
   const fetchApprovalData = useCallback(
     async (rfpId: string) => {

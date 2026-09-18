@@ -57,7 +57,7 @@ export default function ThankYouPage() {
 
   const handleViewRfp = () => {
     if (rfpId) {
-      window.location.href = `/rfq/${rfpId}/requirement`;
+      window.location.href = `/rfq/${rfpId}/vendorcontacts`;
     } else {
       window.location.href = "/";
     }
