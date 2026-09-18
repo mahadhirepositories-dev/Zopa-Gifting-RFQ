@@ -91,12 +91,20 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/public/") ||
     pathname.startsWith("/api/rfq/") ||
     pathname.startsWith("/rfq/buyer-preview/") ||
-    pathname.startsWith("/rfq/buyer_preview/");
+    pathname.startsWith("/rfq/buyer_preview/") ||
+    pathname.startsWith("/rfq/preview/") ||
+    pathname.startsWith("/rfq/reply/") ||
+    pathname.startsWith("/rfq/thankyou/") ||
+    pathname.startsWith("/rfq/confirmation/");
 
   const isProtectedPage =
     (pathname.startsWith("/rfq") &&
       !pathname.startsWith("/rfq/buyer-preview") &&
-      !pathname.startsWith("/rfq/buyer_preview")) ||
+      !pathname.startsWith("/rfq/buyer_preview") &&
+      !pathname.startsWith("/rfq/preview") &&
+      !pathname.startsWith("/rfq/reply") &&
+      !pathname.startsWith("/rfq/thankyou") &&
+      !pathname.startsWith("/rfq/confirmation")) ||
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/select-organization");
