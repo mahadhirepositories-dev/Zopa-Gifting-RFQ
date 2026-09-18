@@ -8,6 +8,8 @@ import {
 } from "@/db/schema/vendor-response-schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   try {
     try {
