@@ -204,10 +204,6 @@ export default function BuyerPreviewPage() {
   const [buyerRecommendations, setBuyerRecommendations] = useState<
     BuyerRecommendation[]
   >([]);
-  const [userRole, setUserRole] = useState<
-    "buyer" | "approver" | "admin" | "guest"
-  >("guest");
-  const [orgSlug, setOrgSlug] = useState<string>("");
   const { data: session, isPending: authLoading } = useSession();
   const isLoggedIn = !authLoading && !!session?.user;
 
@@ -224,89 +220,7 @@ export default function BuyerPreviewPage() {
     }
   };
 
-  // Determine user role with proper approver detection
-  const determineUserRole = useCallback(async () => {
-    console.log("[BuyerPreview] determineUserRole called:", {
-      isLoggedIn,
-      hasSession: !!session?.user,
-      sessionRole: (session?.user as any)?.role,
-      responseParam,
-    });
 
-    const userEmail = session?.user?.email?.toLowerCase();
-    const userId = session?.user?.id;
-
-    // Check if user is an approver for THIS specific RFP
-    if (currentApproval) {
-      const isLevel1Email =
-        currentApproval.level1ApproverEmail &&
-        userEmail &&
-        currentApproval.level1ApproverEmail.toLowerCase() === userEmail;
-
-      const isLevel2Email =
-        currentApproval.level2ApproverEmail &&
-        userEmail &&
-        currentApproval.level2ApproverEmail.toLowerCase() === userEmail;
-
-      const isLevel1Approver =
-        currentApproval.level1ApproverId === userId || isLevel1Email;
-      const isLevel2Approver =
-        currentApproval.level2ApproverId === userId || isLevel2Email;
-
-      // If user came via email link or email matches or status is pending approval
-      if (
-        isLevel1Approver ||
-        isLevel2Approver ||
-        responseParam ||
-        (currentApproval.status === "pending_approval" && (responseParam || !isLoggedIn))
-      ) {
-        setUserRole("approver");
-        console.log("[BuyerPreview] User role set to: approver");
-        return;
-      }
-    }
-
-    if (responseParam) {
-      setUserRole("approver");
-      console.log("[BuyerPreview] User role set to approver via URL responseParam");
-      return;
-    }
-
-    if (!isLoggedIn || !session?.user) {
-      console.log("[BuyerPreview] Not logged in, setting guest");
-      setUserRole("guest");
-      return;
-    }
-
-    try {
-      // Get user's membership info
-      // const membershipRes = await fetch("/api/user/current-membership", {
-      //   credentials: "include",
-      // });
-
-      // if (membershipRes.ok) {
-      //   const membershipData = await safeJson(membershipRes, null);
-      //   const role = membershipData?.role;
-      //   const organizationSlug = membershipData?.organization?.slug;
-
-      //   if (organizationSlug) {
-      //     setOrgSlug(organizationSlug);
-      //   }
-
-      //   // Check organization role
-      //   if (role === "admin" || role === "zopa_admin") {
-      //     setUserRole("admin");
-      //   } else {
-      //     setUserRole("buyer");
-      //   }
-      // } else {
-      //   setUserRole("buyer");
-      // }
-    } catch (error) {
-      console.error("[BuyerPreview] Error determining user role:", error);
-      setUserRole("buyer");
-    }
-  }, [isLoggedIn, session, currentApproval, buyerRecommendations.length, responseParam]);
 
   const fetchApprovalData = useCallback(
     async (rfpId: string) => {
@@ -467,22 +381,6 @@ export default function BuyerPreviewPage() {
     fetchData();
   }, [rfpId, isLoggedIn, fetchApprovalData, checkVendorRevisions]);
 
-  useEffect(() => {
-    if (!loading) {
-      const timer = window.setTimeout(() => {
-        void determineUserRole();
-      }, 0);
-
-      return () => window.clearTimeout(timer);
-    }
-  }, [
-    loading,
-    currentApproval,
-    buyerRecommendations,
-    isLoggedIn,
-    determineUserRole,
-  ]);
-
   if (loading) {
     return <BuyerPreviewSkeleton />;
   }
@@ -520,8 +418,6 @@ export default function BuyerPreviewPage() {
       rfpId={rfpId}
       isLoggedIn={isLoggedIn}
       vendorsWithNewRevisions={vendorsWithNewRevisions}
-      userRole={userRole}
-      orgSlug={orgSlug}
       currentApproval={currentApproval ?? undefined}
       buyerRecommendations={buyerRecommendations}
       urlResponseId={responseParam}
