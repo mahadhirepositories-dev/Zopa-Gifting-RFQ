@@ -90,6 +90,10 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/public/") ||
     pathname.startsWith("/api/rfq/") ||
+    pathname.startsWith("/api/rfps/") ||
+    pathname.startsWith("/api/vendor-response") ||
+    pathname.startsWith("/api/vendor-upload") ||
+    pathname.startsWith("/api/email") ||
     pathname.startsWith("/rfq/buyer-preview/") ||
     pathname.startsWith("/rfq/buyer_preview/") ||
     pathname.startsWith("/rfq/preview/") ||
