@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { EmailService } from "@/lib/email/email-service";
 import { createAndSetAuthSession } from "@/lib/auth-session";
 import { upsertRfpCompany } from "@/lib/rfq-updates";
+import { isWorkEmail } from "@/lib/validations/work-email";
 
 export async function GET() {
   return NextResponse.json(
@@ -27,6 +28,14 @@ export async function POST(request: Request) {
     }
 
     const emailClean = email.trim().toLowerCase();
+    if (!isWorkEmail(emailClean)) {
+      return NextResponse.json(
+        {
+          error: "Please enter a valid work email address. Personal domains (Gmail, Yahoo, Outlook, etc.) are not allowed.",
+        },
+        { status: 400 },
+      );
+    }
 
     // Check if user exists in DB
     const existing = await db

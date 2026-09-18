@@ -170,27 +170,7 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
             />
           </div>
         ) : (
-          <div className="h-10 w-12 flex items-center justify-center bg-red-600 rounded shrink-0 shadow-sm relative overflow-hidden">
-            <svg
-              viewBox="0 0 100 80"
-              className="w-full h-full p-1"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M50 5 L95 25 L50 75 L5 25 Z"
-                fill="#DC2626"
-                stroke="#F59E0B"
-                strokeWidth="4"
-              />
-              <path
-                d="M30 30 C35 25 65 25 70 32 C75 40 40 45 40 50 C40 58 70 55 65 65"
-                stroke="#F59E0B"
-                strokeWidth="7"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
+         ""
         )}
         <h2 className="text-xl font-bold text-slate-900 truncate tracking-tight">
           {requirement.projectName || "RFQ Document"}

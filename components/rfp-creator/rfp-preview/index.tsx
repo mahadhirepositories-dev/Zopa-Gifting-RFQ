@@ -606,8 +606,9 @@ export const Preview: React.FC<PreviewProps> = ({
         throw new Error(updateResponse.message || "Failed to update RFQ");
       }
 
-      const baseUrl =
+      let baseUrl =
         process.env.NEXT_PUBLIC_APP_URL || "https://staging-rfp.zopapro.com";
+      if (!baseUrl.startsWith("http")) baseUrl = `https://${baseUrl}`;
 
       // Only process vendors if there are vendors to email
       let vendorProcessingPromises: Promise<any>[] = [];
@@ -845,8 +846,9 @@ export const Preview: React.FC<PreviewProps> = ({
     if (!rfpId) return;
     try {
       setResendingEmail(email);
-      const baseUrl =
+      let baseUrl =
         process.env.NEXT_PUBLIC_APP_URL || "https://staging-rfp.zopapro.com";
+      if (!baseUrl.startsWith("http")) baseUrl = `https://${baseUrl}`;
 
       const contact = data.vendorContacts.find(
         (vc: VendorContact) => vc.email === email,

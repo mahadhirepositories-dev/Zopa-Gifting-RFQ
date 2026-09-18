@@ -6,7 +6,9 @@ const getBaseURL = () => {
   if (typeof window !== "undefined") {
     return window.location.origin;
   }
-  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  let baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  if (!baseUrl.startsWith("http")) baseUrl = `https://${baseUrl}`;
+  return baseUrl;
 };
 
 export const authClient = createAuthClient({

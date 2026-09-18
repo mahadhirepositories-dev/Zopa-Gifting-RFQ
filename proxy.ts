@@ -41,8 +41,9 @@ export async function proxy(request: NextRequest) {
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/static") ||
+    pathname.startsWith("/uploads") ||
     pathname === "/favicon.ico" ||
-    pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|css|js|woff|woff2|ttf|eot)$/)
+    pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|css|js|woff|woff2|ttf|eot|pdf|docx?|xlsx?)$/)
   ) {
     return NextResponse.next();
   }
@@ -85,6 +86,7 @@ export async function proxy(request: NextRequest) {
     pathname === "/" ||
     pathname.startsWith("/auth/verify") ||
     pathname.startsWith("/vendor-registration") ||
+    pathname.startsWith("/uploads") ||
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/public/") ||
     pathname.startsWith("/api/rfq/") ||

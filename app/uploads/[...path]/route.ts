@@ -31,11 +31,19 @@ export async function GET(
     else if (ext === "webp") contentType = "image/webp";
     else if (ext === "svg") contentType = "image/svg+xml";
     else if (ext === "pdf") contentType = "application/pdf";
+    else if (ext === "doc") contentType = "application/msword";
+    else if (ext === "docx") contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    else if (ext === "xls") contentType = "application/vnd.ms-excel";
+    else if (ext === "xlsx") contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    else if (ext === "csv") contentType = "text/csv";
+    else if (ext === "txt") contentType = "text/plain";
+    else if (ext === "zip") contentType = "application/zip";
 
     return new NextResponse(fileBuffer, {
       status: 200,
       headers: {
         "Content-Type": contentType,
+        "Content-Disposition": "inline",
         "Cache-Control": "public, max-age=31536000, immutable",
       },
     });

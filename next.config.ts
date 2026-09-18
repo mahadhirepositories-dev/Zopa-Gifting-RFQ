@@ -52,10 +52,6 @@ const nextConfig: NextConfig = {
     return {
       beforeFiles: [
         {
-          source: "/uploads/:path*",
-          destination: "/api/uploads/:path*",
-        },
-        {
           source: "/rfp/buyer_preview/:id*",
           destination: "/rfq/buyer-preview/:id*",
         },

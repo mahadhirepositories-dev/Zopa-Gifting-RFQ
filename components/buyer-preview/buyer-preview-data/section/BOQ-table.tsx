@@ -6,7 +6,7 @@ import {
   BuyerBOQItem,
   VendorBOQDetail,
 } from "@/lib/types/index";
-import { FileText, ExternalLink } from "lucide-react";
+import { FileText, ExternalLink, Download } from "lucide-react";
 
 interface BOQProps {
   buyerData: BuyerPreviewProps["buyerData"];
@@ -44,26 +44,36 @@ function FileLink({
 }) {
   const displayName = name || url.split("/").pop() || "View File";
   // Normalize URL: remove localhost/domain prefixes to make it relative
-  const normalizedUrl = url.includes('://') 
-    ? new URL(url).pathname 
+  const normalizedUrl = url.includes("://")
+    ? new URL(url).pathname
     : url;
-  
+
   return (
-    <a
-      href={normalizedUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={displayName}
-      className={`flex items-center gap-1.5 px-2 py-1.5 rounded border ${bgClass} ${borderClass} hover:opacity-80 transition-opacity`}
-    >
-      <FileText className={`w-3.5 h-3.5 shrink-0 ${colorClass}`} />
-      <span
-        className={`text-xs font-medium truncate max-w-[120px] ${colorClass}`}
+    <div className={`flex items-center gap-1 px-2 py-1.5 rounded border ${bgClass} ${borderClass}`}>
+      <a
+        href={normalizedUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={`View ${displayName}`}
+        className="flex items-center gap-1.5 hover:opacity-80 transition-opacity min-w-0 flex-1"
       >
-        {displayName}
-      </span>
-      <ExternalLink className={`w-3 h-3 shrink-0 ${colorClass} opacity-60`} />
-    </a>
+        <FileText className={`w-3.5 h-3.5 shrink-0 ${colorClass}`} />
+        <span
+          className={`text-xs font-medium truncate max-w-[100px] ${colorClass}`}
+        >
+          {displayName}
+        </span>
+        <ExternalLink className={`w-3 h-3 shrink-0 ${colorClass} opacity-60`} />
+      </a>
+      <a
+        href={normalizedUrl}
+        download={displayName}
+        title={`Download ${displayName}`}
+        className={`p-1 rounded hover:bg-black/10 ${colorClass} shrink-0`}
+      >
+        <Download className="w-3.5 h-3.5" />
+      </a>
+    </div>
   );
 }
 
@@ -366,6 +376,8 @@ export const BOQ: React.FC<BOQProps> = ({ buyerData, selectedVendor }) => {
                           vendorItem.vendorAttachmentUrl;
                         const vendorAttachmentName =
                           vendorItem.vendorAttachmentName;
+                        const vendorAttachments =
+                          (vendorItem as any).vendorAttachments || [];
 
                         return (
                           <tr
@@ -643,7 +655,21 @@ export const BOQ: React.FC<BOQProps> = ({ buyerData, selectedVendor }) => {
 
                             {/* Vendor Attachment */}
                             <td className="px-4 py-2 border border-gray-200 align-top">
-                              {vendorAttachmentUrl ? (
+                              {vendorAttachments && vendorAttachments.length > 0 ? (
+                                <div className="flex flex-col gap-1.5">
+                                  {vendorAttachments.map((att: any, attIdx: number) => (
+                                    <FileLink
+                                      key={attIdx}
+                                      url={att.url}
+                                      name={att.name || att.documentName}
+                                      label="Vendor file"
+                                      colorClass="text-blue-700"
+                                      bgClass="bg-blue-50"
+                                      borderClass="border-blue-200"
+                                    />
+                                  ))}
+                                </div>
+                              ) : vendorAttachmentUrl ? (
                                 <FileLink
                                   url={vendorAttachmentUrl}
                                   name={vendorAttachmentName}
