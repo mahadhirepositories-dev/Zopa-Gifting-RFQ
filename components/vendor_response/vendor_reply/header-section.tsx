@@ -54,11 +54,12 @@ export const HeaderSection = ({
       }
     }
     const finalSrc = imageSrc.toString();
-    const baseUrl =
+    let baseUrl =
       process.env.NEXT_PUBLIC_APP_URL ||
       (typeof window !== "undefined"
         ? window.location.origin
         : "http://localhost:3000");
+    if (!baseUrl.startsWith("http")) baseUrl = `https://${baseUrl}`;
 
     if (finalSrc.startsWith("/uploads/")) {
       return `${baseUrl}${finalSrc}`;

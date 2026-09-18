@@ -161,7 +161,8 @@ function VendorRFQPortalContent() {
 
       const resData = await res.json();
       const actualResponseId = resData?.vendorResponseId || resData?.data?.vendorResponseId || vendorResponseId;
-      const baseURL = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+      let baseURL = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+      if (!baseURL.startsWith("http")) baseURL = `https://${baseURL}`;
       const buyerPreviewUrl = `${baseURL}/rfq/buyer_preview/${rfpId}?response=${actualResponseId}`;
 
       // Notify buyer via email API
