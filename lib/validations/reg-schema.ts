@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Country } from "react-phone-number-input";
 import { validatePhoneNumber } from "@/lib/validations/phoneValidation";
+import { isWorkEmail } from "@/lib/validations/work-email";
 
 export const registerSchema = z
   .object({
@@ -18,7 +19,11 @@ export const registerSchema = z
       .string()
       .trim()
       .min(1, "Work email is required")
-      .email("Enter a valid email address"),
+      .email("Enter a valid email address")
+      .refine(
+        (val) => isWorkEmail(val),
+        "Please enter a valid work email address. Personal domains (Gmail, Yahoo, Outlook, etc.) are not allowed."
+      ),
     phoneNumber: z.string().trim().min(1, "Phone number is required"),
     // Not a form field — the calling-code the phone input is currently set
     // to, passed in alongside regForm at validation time so we can check
@@ -74,8 +79,12 @@ export const loginSchema = z.object({
   email: z
     .string()
     .trim()
-    .min(1, "Email is required")
-    .email("Enter a valid email address"),
+    .min(1, "Work email is required")
+    .email("Enter a valid email address")
+    .refine(
+      (val) => isWorkEmail(val),
+      "Please enter a valid work email address. Personal domains (Gmail, Yahoo, Outlook, etc.) are not allowed."
+    ),
 });
 
 export type LoginFormValues = z.infer<typeof loginSchema>;

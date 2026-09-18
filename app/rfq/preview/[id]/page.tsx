@@ -200,7 +200,7 @@ export default function RFQVendorPreviewPage({
         <div className="p-6 flex flex-col md:flex-row items-center justify-between gap-4 h-full">
           {/* Left: Logo & Document Title */}
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 relative shrink-0 flex items-center justify-center bg-red-600 rounded-lg overflow-hidden text-white font-bold text-lg shadow-xs">
+            <div className="w-10 h-10 relative shrink-0 flex items-center justify-center bg-white rounded-lg overflow-hidden text-white font-bold text-lg shadow-xs">
               {contact.logoUrl || contact.logoPreview ? (
                 <Image
                   src={contact.logoPreview || contact.logoUrl || ""}
@@ -210,7 +210,7 @@ export default function RFQVendorPreviewPage({
                   unoptimized
                 />
               ) : (
-                "S"
+                ""
               )}
             </div>
             <div>

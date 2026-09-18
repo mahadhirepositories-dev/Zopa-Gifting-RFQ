@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { LoginForm } from "@/components/login-form";
+import { isWorkEmail } from "@/lib/validations/work-email";
 
 export default function ZopaGiftingRFQPage() {
   const [authMode, setAuthMode] = useState<"register" | "login">("register");
@@ -93,6 +94,14 @@ export default function ZopaGiftingRFQPage() {
       return;
     }
 
+    if (!isWorkEmail(regForm.email)) {
+      setFeedback({
+        type: "error",
+        message: "Please enter a valid work email address. Personal email domains (Gmail, Yahoo, Outlook, etc.) are not allowed.",
+      });
+      return;
+    }
+
     if (!regForm.agreeTerms) {
       setFeedback({
         type: "error",
@@ -145,6 +154,14 @@ export default function ZopaGiftingRFQPage() {
       setFeedback({
         type: "error",
         message: "Please enter your Work Email address.",
+      });
+      return;
+    }
+
+    if (!isWorkEmail(loginEmail)) {
+      setFeedback({
+        type: "error",
+        message: "Please enter a valid work email address. Personal email domains (Gmail, Yahoo, Outlook, etc.) are not allowed.",
       });
       return;
     }

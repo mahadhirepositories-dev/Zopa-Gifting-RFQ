@@ -57,11 +57,17 @@ export async function createAndSetAuthSession(
     });
 
     const isProd = process.env.NODE_ENV === "production";
-    const cookieName = isProd
-      ? "__Secure-better-auth.session_token"
-      : "better-auth.session_token";
+    
+    // Always clear/update both cookie variants to prevent old session bleed
+    response.cookies.set("better-auth.session_token", sessionToken, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: isProd,
+      maxAge: 30 * 24 * 60 * 60,
+    });
 
-    response.cookies.set(cookieName, sessionToken, {
+    response.cookies.set("__Secure-better-auth.session_token", sessionToken, {
       path: "/",
       httpOnly: true,
       sameSite: "lax",
