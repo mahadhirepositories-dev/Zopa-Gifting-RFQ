@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Eye, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MainFormContent } from "./main-form-content";
@@ -280,6 +280,38 @@ export const MainContent: React.FC<MainContentProps> = ({
     handleInputChange("rfpDates", data);
   };
 
+  const [hasVendorReplies, setHasVendorReplies] = useState(false);
+
+  useEffect(() => {
+    if (!rfpId) return;
+
+    let isMounted = true;
+    async function checkVendorReplies() {
+      try {
+        const res = await fetch(`/api/vendor-response?rfpId=${rfpId}`);
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data)
+              ? data
+              : [];
+          if (isMounted) {
+            setHasVendorReplies(list.length > 0);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to check vendor replies:", err);
+      }
+    }
+
+    checkVendorReplies();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [rfpId]);
+
   const handleUpdateSelection = (newSelection: any) => {
     setSelection(newSelection);
   };
@@ -295,14 +327,16 @@ export const MainContent: React.FC<MainContentProps> = ({
       {/* Top Action Bar */}
       <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0 shadow-2xs">
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            onClick={handleViewBuyerPreview}
-            className="border-blue-600 text-blue-600 hover:bg-blue-50 text-xs font-bold uppercase flex items-center gap-2 h-9 px-4 rounded-lg cursor-pointer"
-          >
-            <Eye className="w-4 h-4 text-blue-600" />
-            View Buyer Preview
-          </Button>
+          {hasVendorReplies && (
+            <Button
+              variant="outline"
+              onClick={handleViewBuyerPreview}
+              className="border-blue-600 text-blue-600 hover:bg-blue-50 text-xs font-bold uppercase flex items-center gap-2 h-9 px-4 rounded-lg cursor-pointer"
+            >
+              <Eye className="w-4 h-4 text-blue-600" />
+              View Buyer Preview
+            </Button>
+          )}
         </div>
 
         <Button

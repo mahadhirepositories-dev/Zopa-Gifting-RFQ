@@ -221,9 +221,6 @@ export default function BuyerPreviewPage() {
     }
   };
 
-<<<<<<< Updated upstream
-
-=======
   // Determine user role with proper approver detection
   const determineUserRole = useCallback(async () => {
     if (!isLoggedIn || !session?.user) {
@@ -260,7 +257,6 @@ export default function BuyerPreviewPage() {
     // Default to buyer role for logged-in user
     setUserRole("buyer");
   }, [isLoggedIn, session, currentApproval]);
->>>>>>> Stashed changes
 
   const fetchApprovalData = useCallback(
     async (rfpId: string) => {
