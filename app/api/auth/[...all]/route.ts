@@ -137,6 +137,8 @@ export async function GET(request: NextRequest) {
           console.error("Error auto-establishing fallback session for get-session:", err);
         }
       }
+      // If we got here inside /get-session interception and didn't return, return null session
+      return NextResponse.json(null);
     }
 
   return authHandler.GET(request);
