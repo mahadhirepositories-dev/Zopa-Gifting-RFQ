@@ -80,19 +80,34 @@ export async function POST(
       .limit(1);
 
     const now = new Date();
+    
+    let isL1ApprovingL2Workflow = false;
+    if (action === "approve" && latestApproval?.approvalLevel === "level2" && latestApproval?.level1Status === "pending") {
+      isL1ApprovingL2Workflow = true;
+      approvalStatusVal = "pending_approval";
+      rfqStatusVal = "pending_approval";
+    }
 
     if (latestApproval) {
+      const updateData: any = {
+        updatedAt: now,
+      };
+      
+      if (latestApproval.approvalLevel === "level2" && latestApproval.level1Status === "approved" && !isL1ApprovingL2Workflow) {
+        updateData.status = approvalStatusVal;
+        updateData.level2Status = action === "approve" ? "approved" : (action === "reject" ? "rejected" : "revision_requested");
+        updateData.level2ReviewedAt = now;
+        updateData.level2Comments = comments || latestApproval.level2Comments || `Action: ${action}`;
+      } else {
+        updateData.status = approvalStatusVal;
+        updateData.level1Status = action === "approve" ? "approved" : (action === "reject" ? "rejected" : "revision_requested");
+        updateData.level1ReviewedAt = now;
+        updateData.level1Comments = comments || latestApproval.level1Comments || `Action: ${action}`;
+      }
+
       await db
         .update(rfqApprovals)
-        .set({
-          status: approvalStatusVal,
-          level1Status: approvalStatusVal,
-          level1ReviewedAt: now,
-          level1Comments: comments || latestApproval.level1Comments || `Action: ${action}`,
-          level2Status: latestApproval.approvalLevel === "level2" ? approvalStatusVal : latestApproval.level2Status,
-          level2ReviewedAt: latestApproval.approvalLevel === "level2" ? now : latestApproval.level2ReviewedAt,
-          updatedAt: now,
-        })
+        .set(updateData)
         .where(eq(rfqApprovals.id, latestApproval.id));
     } else {
       await db.insert(rfqApprovals).values({
@@ -135,7 +150,10 @@ export async function POST(
 
     // Send email to buyer
     try {
-      if (action === "request-revision" || action === "requote") {
+      if (isL1ApprovingL2Workflow) {
+        // Only L1 approved so far, do not send final buyer decision email
+        console.log(`[RFQ Approval API] Skipping buyer decision email because Level 2 is still pending.`);
+      } else if (action === "request-revision" || action === "requote") {
         await EmailService.sendRevisionRequestEmail({
           buyerEmail,
           rfqId,

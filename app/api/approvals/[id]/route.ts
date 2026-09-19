@@ -68,6 +68,8 @@ export async function POST(
     const now = new Date();
     let approvalStatusVal = "approved";
     let rfqStatusVal = "Approved";
+    
+    let isL1ApprovingL2Workflow = false;
 
     if (action === "reject") {
       approvalStatusVal = "rejected";
@@ -75,18 +77,36 @@ export async function POST(
     } else if (action === "request-revision" || action === "requote") {
       approvalStatusVal = "revision_requested";
       rfqStatusVal = "Re-quote Requested";
+    } else if (action === "approve") {
+      if (approval.approvalLevel === "level2" && approval.level1Status === "pending") {
+        isL1ApprovingL2Workflow = true;
+        approvalStatusVal = "pending_approval"; // Still pending overall
+        rfqStatusVal = "pending_approval";
+      }
+    }
+
+    const updateData: any = {
+      updatedAt: now,
+    };
+    
+    if (approval.approvalLevel === "level2" && approval.level1Status === "approved" && !isL1ApprovingL2Workflow) {
+      // This is L2 approver acting
+      updateData.status = approvalStatusVal;
+      updateData.level2Status = action === "approve" ? "approved" : (action === "reject" ? "rejected" : "revision_requested");
+      updateData.level2ReviewedAt = now;
+      updateData.level2Comments = comments || approval.level2Comments || `Action: ${action}`;
+    } else {
+      // This is L1 approver acting (or it's a 1-level workflow)
+      updateData.status = approvalStatusVal;
+      updateData.level1Status = action === "approve" ? "approved" : (action === "reject" ? "rejected" : "revision_requested");
+      updateData.level1ReviewedAt = now;
+      updateData.level1Comments = comments || approval.level1Comments || `Action: ${action}`;
     }
 
     // Update approval record
     await db
       .update(rfqApprovals)
-      .set({
-        status: approvalStatusVal,
-        level1Status: approvalStatusVal,
-        level1ReviewedAt: now,
-        level1Comments: comments || approval.level1Comments || `Action: ${action}`,
-        updatedAt: now,
-      })
+      .set(updateData)
       .where(eq(rfqApprovals.id, approval.id));
 
     // Update RFQ status
@@ -97,6 +117,35 @@ export async function POST(
         updatedAt: now,
       })
       .where(eq(rfqs.id, approval.rfqId));
+
+    if (isL1ApprovingL2Workflow && approval.level2ApproverEmail) {
+      // Send email to Level 2 approver
+      let baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      if (!baseUrl.startsWith("http")) baseUrl = `https://${baseUrl}`;
+      // In a real app we'd fetch the first recommended vendor ID from rfqApprovalRecommendations,
+      // but for simplicity we can just link to the buyer preview directly.
+      const approvalUrl = `${baseUrl}/rfq/buyer_preview/${approval.rfqId}`;
+
+      try {
+        await EmailService.sendApprovalRequestEmail({
+          approverEmail: approval.level2ApproverEmail,
+          rfqId: approval.rfqId,
+          approvalUrl,
+          projectName: existingRfq.title || "Gifting Project",
+          buyerComments: comments,
+          recommendedVendors: [], // Ideally fetch from DB, but keeping simple
+          approvalLevel: "Level 2",
+        });
+      } catch (emailErr) {
+        console.error("Failed to send Level 2 approval email:", emailErr);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Level 1 approved. Approval request sent to Level 2 approver.`,
+        rfqStatus: rfqStatusVal,
+      });
+    }
 
     // Determine buyer email for notification
     let buyerEmail = body.buyerEmail || body.email;
