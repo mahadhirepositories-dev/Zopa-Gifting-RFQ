@@ -826,7 +826,7 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
         )}
 
       {/* Mandatory Vendor Selection Notice for Approvers */}
-      {isLoggedIn && isApproverMode && isPendingApproval && (
+      {(isLoggedIn || isApproverMode) && isApproverMode && isPendingApproval && (
         <Alert className="border-orange-200 bg-orange-50">
           <AlertTriangle className="h-4 w-4 text-orange-600" />
           <AlertDescription className="text-orange-700">
@@ -851,11 +851,11 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
         vendors={visibleVendors}
         lowestPriceVendor={lowestPriceVendor}
         fastestDeliveryVendor={fastestDeliveryVendor}
-        selectedVendors={isLoggedIn ? selectedVendors : new Map()}
-        onToggleVendor={isLoggedIn ? toggleVendorSelection : () => {}}
-        onUpdateRemarks={isLoggedIn ? updateVendorRemarks : () => {}}
-        validationErrors={isLoggedIn ? validationErrors : new Map()}
-        isLoggedIn={isLoggedIn}
+        selectedVendors={(isLoggedIn || isApproverMode) ? selectedVendors : new Map()}
+        onToggleVendor={(isLoggedIn || isApproverMode) ? toggleVendorSelection : () => {}}
+        onUpdateRemarks={(isLoggedIn || isApproverMode) ? updateVendorRemarks : () => {}}
+        validationErrors={(isLoggedIn || isApproverMode) ? validationErrors : new Map()}
+        isLoggedIn={isLoggedIn || isApproverMode}
         recommendations={recommendations}
         isBuyerActionsLocked={isBuyerActionsLocked}
         currentApproval={currentApproval}
@@ -863,11 +863,11 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
 
       <CommercialsTable
         vendors={visibleVendors}
-        selectedVendors={isLoggedIn ? selectedVendors : new Map()}
-        onToggleVendor={isLoggedIn ? toggleVendorSelection : () => {}}
-        onUpdateRemarks={isLoggedIn ? updateVendorRemarks : () => {}}
-        validationErrors={isLoggedIn ? validationErrors : new Map()}
-        isLoggedIn={isLoggedIn}
+        selectedVendors={(isLoggedIn || isApproverMode) ? selectedVendors : new Map()}
+        onToggleVendor={(isLoggedIn || isApproverMode) ? toggleVendorSelection : () => {}}
+        onUpdateRemarks={(isLoggedIn || isApproverMode) ? updateVendorRemarks : () => {}}
+        validationErrors={(isLoggedIn || isApproverMode) ? validationErrors : new Map()}
+        isLoggedIn={isLoggedIn || isApproverMode}
         recommendations={recommendations}
         isBuyerActionsLocked={isBuyerActionsLocked}
         currentApproval={currentApproval}
@@ -877,11 +877,11 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
         <ItemLevelViewTable
           vendors={visibleVendors}
           buyerData={buyerData}
-          selectedVendors={isLoggedIn ? selectedVendors : new Map()}
-          onToggleVendor={isLoggedIn ? toggleVendorSelection : () => {}}
-          onUpdateRemarks={isLoggedIn ? updateVendorRemarks : () => {}}
-          validationErrors={isLoggedIn ? validationErrors : new Map()}
-          isLoggedIn={isLoggedIn}
+          selectedVendors={(isLoggedIn || isApproverMode) ? selectedVendors : new Map()}
+          onToggleVendor={(isLoggedIn || isApproverMode) ? toggleVendorSelection : () => {}}
+          onUpdateRemarks={(isLoggedIn || isApproverMode) ? updateVendorRemarks : () => {}}
+          validationErrors={(isLoggedIn || isApproverMode) ? validationErrors : new Map()}
+          isLoggedIn={isLoggedIn || isApproverMode}
           recommendations={recommendations}
           rfpId={rfpId}
           currentApproval={currentApproval}
@@ -919,17 +919,17 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
         vendors={visibleVendors}
         buyerData={evaluationCriteria}
         document={document?.documentsToShare}
-        selectedVendors={isLoggedIn ? selectedVendors : new Map()}
-        onToggleVendor={isLoggedIn ? toggleVendorSelection : () => {}}
-        onUpdateRemarks={isLoggedIn ? updateVendorRemarks : () => {}}
-        validationErrors={isLoggedIn ? validationErrors : new Map()}
-        isLoggedIn={isLoggedIn}
+        selectedVendors={(isLoggedIn || isApproverMode) ? selectedVendors : new Map()}
+        onToggleVendor={(isLoggedIn || isApproverMode) ? toggleVendorSelection : () => {}}
+        onUpdateRemarks={(isLoggedIn || isApproverMode) ? updateVendorRemarks : () => {}}
+        validationErrors={(isLoggedIn || isApproverMode) ? validationErrors : new Map()}
+        isLoggedIn={isLoggedIn || isApproverMode}
         recommendations={recommendations}
         isBuyerActionsLocked={isBuyerActionsLocked}
         currentApproval={currentApproval}
       />
 
-      {isLoggedIn && isApproverMode && buyerRecommendations.length > 0 && (
+      {(isLoggedIn || isApproverMode) && isApproverMode && buyerRecommendations.length > 0 && (
         <Card className="border-blue-200 bg-blue-50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-blue-900">
@@ -981,7 +981,7 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
         </Card>
       )}
 
-      {isLoggedIn && (
+      {(isLoggedIn || isApproverMode) && (
         <VendorRecommendationTable
           vendors={processedVendors}
           selectedVendors={selectedVendors}
