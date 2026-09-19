@@ -80,7 +80,7 @@ export async function GET(
         rfpId: currentApprovalRecord.rfqId,
         status: currentApprovalRecord.status,
         approvalLevel: currentApprovalRecord.approvalLevel,
-        currentLevel: currentApprovalRecord.approvalLevel === "level2" ? 2 : 1,
+        currentLevel: currentApprovalRecord.level1Status === "pending" ? 1 : (currentApprovalRecord.approvalLevel === "level2" ? 2 : 1),
         requiredLevels: currentApprovalRecord.approvalLevel === "level2" ? 2 : 1,
         level1ApproverEmail: currentApprovalRecord.level1ApproverEmail,
         level2ApproverEmail: currentApprovalRecord.level2ApproverEmail,
