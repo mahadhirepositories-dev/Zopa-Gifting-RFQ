@@ -259,7 +259,7 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
       return;
     }
 
-    if (!isLoggedIn) return;
+    if (!isLoggedIn && !isApproverMode) return;
 
     const newSelected = new Map(selectedVendors);
     const newErrors = new Map(validationErrors);
@@ -284,7 +284,7 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
       return;
     }
 
-    if (!isLoggedIn) return;
+    if (!isLoggedIn && !isApproverMode) return;
 
     const newSelected = new Map(selectedVendors);
     const newErrors = new Map(validationErrors);
@@ -424,7 +424,7 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
       return;
     }
 
-    if (!rfpId || selectedVendors.size === 0 || !isLoggedIn) return;
+    if (!rfpId || selectedVendors.size === 0 || (!isLoggedIn && !isApproverMode)) return;
 
     if (!validateRecommendations()) {
       toast.error("Please provide remarks for all selected vendors");
@@ -709,18 +709,6 @@ export const VendorComparison: React.FC<VendorComparisonProps> = ({
                   Approver Mode
                 </Badge>
               )}
-            </div>
-          )}
-
-          {!isLoggedIn && (
-            <div className="flex items-center gap-2">
-              <Badge
-                variant="outline"
-                className="bg-amber-50 text-amber-700 border-amber-200"
-              >
-                <Lock className="h-3 w-3 mr-1" />
-                Guest View
-              </Badge>
             </div>
           )}
         </div>
