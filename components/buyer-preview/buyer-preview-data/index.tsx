@@ -831,18 +831,7 @@ export default function BuyerPreview({
         await Promise.all(recommendationPromises);
       }
 
-      // Always call /api/rfq/[id]/approve endpoint to update RFQ status and trigger buyer decision email
-      const approveRes = await fetch(`/api/rfq/${rfpId}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          comments: comments.trim(),
-          buyerEmail,
-        }),
-      });
-
-      // Call /api/approvals/[id] endpoint to update approval history table
+      // Call /api/approvals/[id] endpoint to correctly process approval, send emails, and update history
       const response = await fetch(`/api/approvals/${targetApprovalId}`, {
         method: "PUT",
         headers: {
@@ -872,7 +861,7 @@ export default function BuyerPreview({
         console.warn("Response body non-JSON or empty:", err);
       }
 
-      if (response.ok || approveRes.ok) {
+      if (response.ok) {
         const actionText =
           action === "approve"
             ? "approved"
