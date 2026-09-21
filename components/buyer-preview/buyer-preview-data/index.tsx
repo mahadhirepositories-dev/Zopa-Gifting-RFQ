@@ -797,6 +797,7 @@ export default function BuyerPreview({
   const isGuestApprover = !isLoggedIn && Boolean(currentApproval?.status?.toLowerCase().startsWith("pending")) && Boolean(urlResponseId);
   const isApprover = approvalRole.isLevel1Approver || approvalRole.isLevel2Approver || isGuestApprover;
   const isBuyer = isLoggedIn && !isApprover;
+
   // Gated on the approval record alone (status + level + assigned approver),
   // never on the rfps.status column - a stale column value must not be able to
   // hide the action buttons from the approver who has to unblock the RFQ.
@@ -826,6 +827,7 @@ export default function BuyerPreview({
                 vendorResponseId: vendor.vendorResponseId,
                 reason: vendor.remarks?.trim() || "",
                 approvalId: currentApproval.id,
+                recommenderRole: approvalRole.isLevel1Approver ? currentApproval?.level1ApproverEmail : (approvalRole.isLevel2Approver ? currentApproval?.level2ApproverEmail : "buyer"),
                 action,
               }),
             });
@@ -1446,7 +1448,7 @@ export default function BuyerPreview({
             </TabsContent>
           )}
 
-          {isLoggedIn && canViewApprovalHistory && (
+          {canViewApprovalHistory && (
             <TabsContent value="approval-history">
               <ApprovalHistory rfpId={rfpId || ""} showMinimal={false} />
 

@@ -15,7 +15,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { vendorResponseId, reason = "", approvalId: bodyApprovalId } = body;
+    const { vendorResponseId, reason = "", approvalId: bodyApprovalId, recommenderRole = "buyer" } = body;
 
     if (!vendorResponseId) {
       return NextResponse.json(
@@ -45,7 +45,7 @@ export async function POST(
         vendorResponseId,
         reason,
         status: "recommended",
-        recommenderRole: "buyer",
+        recommenderRole,
       })
       .returning();
 
