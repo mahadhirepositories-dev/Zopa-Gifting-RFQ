@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { rfqApprovals, rfqApprovalRecommendations, vendorResponses, vendorCompanyDetails } from "@/db/schema";
+import { rfqApprovals, rfqApprovalRecommendations, vendorResponses, vendorCompanyDetails, rfqs, users, rfqContacts, rfqContactsMembers } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { ensureApprovalTablesExist } from "@/lib/db-approval-init";
 
@@ -23,6 +23,26 @@ export async function GET(
       .where(eq(rfqApprovals.rfqId, rfqId))
       .orderBy(desc(rfqApprovals.createdAt))
       .limit(1);
+
+    // Fetch buyer email
+    let buyerEmail = "Buyer";
+    const [rfqRecord] = await db
+      .select({ userId: rfqs.userId })
+      .from(rfqs)
+      .where(eq(rfqs.id, rfqId))
+      .limit(1);
+
+    if (rfqRecord?.userId) {
+      const [u] = await db.select({ email: users.email }).from(users).where(eq(users.id, rfqRecord.userId)).limit(1);
+      if (u?.email) buyerEmail = u.email;
+    }
+    if (buyerEmail === "Buyer") {
+      const [member] = await db.select().from(rfqContactsMembers).where(eq(rfqContactsMembers.rfqId, rfqId)).limit(1);
+      if (member?.rfqContactId) {
+        const [c] = await db.select({ contactEmail: rfqContacts.contactEmail }).from(rfqContacts).where(eq(rfqContacts.id, member.rfqContactId)).limit(1);
+        if (c?.contactEmail) buyerEmail = c.contactEmail;
+      }
+    }
 
     // Get recommendations
     const recommendationsRecords = await db
@@ -61,7 +81,7 @@ export async function GET(
           vendorResponseId: rec.vendorResponseId,
           reason: rec.reason,
           status: rec.status,
-          recommenderRole: rec.recommenderRole,
+          recommenderRole: rec.recommenderRole === "buyer" ? buyerEmail : rec.recommenderRole,
           createdAt: rec.createdAt,
           vendorResponse: {
             vendorResponseId: rec.vendorResponseId,
@@ -71,6 +91,13 @@ export async function GET(
           },
         };
       })
+    );
+
+    // Deduplicate enriched recommendations by vendorResponseId
+    const uniqueRecommendations = Array.from(
+      new Map(
+        enrichedRecommendations.map((rec) => [rec.vendorResponseId, rec])
+      ).values()
     );
 
     let currentApproval = null;
@@ -93,12 +120,13 @@ export async function GET(
         level2ReviewedAt: currentApprovalRecord.level2ReviewedAt,
         createdAt: currentApprovalRecord.createdAt,
         updatedAt: currentApprovalRecord.updatedAt,
+        requestedBy: buyerEmail, // Inject buyer email here!
       };
     }
 
     return NextResponse.json({
       currentApproval,
-      recommendations: enrichedRecommendations,
+      recommendations: uniqueRecommendations,
       history: currentApprovalRecord ? [currentApproval] : [],
     });
   } catch (error) {
