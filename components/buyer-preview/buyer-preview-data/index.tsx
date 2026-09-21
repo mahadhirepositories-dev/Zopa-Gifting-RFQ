@@ -1545,6 +1545,7 @@ export default function BuyerPreview({
                           </label>
                           <p className="text-sm text-gray-900">
                             {currentApproval.level1Approver?.name ||
+                              (currentApproval as any).level1ApproverEmail ||
                               "Not assigned"}
                           </p>
                           <p className="text-xs text-gray-500">
@@ -1604,6 +1605,7 @@ export default function BuyerPreview({
                             </label>
                             <p className="text-sm text-gray-900">
                               {currentApproval.level2Approver?.name ||
+                                (currentApproval as any).level2ApproverEmail ||
                                 "Not assigned"}
                             </p>
                             <p className="text-xs text-gray-500">
