@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { rfqs, rfqApprovals, users, rfqContacts } from "@/db/schema";
+import { rfqs, rfqApprovals, users, rfqContacts, rfqApprovalRecommendations } from "@/db/schema";
 import { EmailService } from "@/lib/email/email-service";
 import { eq } from "drizzle-orm";
 
@@ -122,9 +122,19 @@ export async function POST(
       // Send email to Level 2 approver
       let baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
       if (!baseUrl.startsWith("http")) baseUrl = `https://${baseUrl}`;
-      // In a real app we'd fetch the first recommended vendor ID from rfqApprovalRecommendations,
-      // but for simplicity we can just link to the buyer preview directly.
-      const approvalUrl = `${baseUrl}/rfq/buyer_preview/${approval.rfqId}`;
+      let responseId = body.selectedVendor;
+      if (!responseId) {
+        const [rec] = await db
+          .select()
+          .from(rfqApprovalRecommendations)
+          .where(eq(rfqApprovalRecommendations.approvalId, approval.id))
+          .limit(1);
+        if (rec) responseId = rec.vendorResponseId;
+      }
+      
+      const approvalUrl = responseId 
+        ? `${baseUrl}/rfq/buyer_preview/${approval.rfqId}?response=${responseId}`
+        : `${baseUrl}/rfq/buyer_preview/${approval.rfqId}`;
 
       try {
         await EmailService.sendApprovalRequestEmail({
@@ -133,7 +143,7 @@ export async function POST(
           approvalUrl,
           projectName: existingRfq.title || "Gifting Project",
           buyerComments: comments,
-          recommendedVendors: [], // Ideally fetch from DB, but keeping simple
+          recommendedVendors: body.selectedVendors || [],
           approvalLevel: "Level 2",
         });
       } catch (emailErr) {

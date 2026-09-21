@@ -778,19 +778,23 @@ export default function BuyerPreview({
   };
   const approvalRole = getUserApprovalRole(currentApproval, userId);
   const isApproved =
-    buyerData?.rfp?.status === "approved" ||
-    currentApproval?.status === "approved";
+    buyerData?.rfp?.status?.toLowerCase() === "approved" ||
+    currentApproval?.status?.toLowerCase() === "approved";
   const isRevisionRequested =
-    buyerData?.rfp?.status === "revision_requested" ||
+    buyerData?.rfp?.status?.toLowerCase() === "revision_requested" ||
     isBuyerRevisionPending(currentApproval);
   // An outstanding revision request wins over the pending badge - the RFQ is
   // waiting on the buyer, not on an approver.
   const isPendingApproval =
     !isRevisionRequested &&
-    (buyerData?.rfp?.status === "pending_approval" ||
-      currentApproval?.status === "pending");
+    (buyerData?.rfp?.status?.toLowerCase() === "pending_approval" ||
+      buyerData?.rfp?.status?.toLowerCase() === "pending" ||
+      buyerData?.rfp?.status?.toLowerCase() === "under_review" ||
+      currentApproval?.status?.toLowerCase() === "pending" ||
+      currentApproval?.status?.toLowerCase() === "pending_approval" ||
+      currentApproval?.status?.toLowerCase() === "under_review");
 
-  const isGuestApprover = !isLoggedIn && Boolean(currentApproval?.status?.startsWith("pending")) && Boolean(urlResponseId);
+  const isGuestApprover = !isLoggedIn && Boolean(currentApproval?.status?.toLowerCase().startsWith("pending")) && Boolean(urlResponseId);
   const isApprover = approvalRole.isLevel1Approver || approvalRole.isLevel2Approver || isGuestApprover;
   const isBuyer = isLoggedIn && !isApprover;
   // Gated on the approval record alone (status + level + assigned approver),
@@ -1109,7 +1113,9 @@ export default function BuyerPreview({
             {isPendingApproval && (
               <div className="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-medium">
                 <Clock className="h-4 w-4 inline mr-1" />
-                Pending Approval
+                {currentApproval?.currentLevel === 2
+                  ? "Pending Level 2 Approval"
+                  : "Pending Approval"}
               </div>
             )}
             {isApproved && (
