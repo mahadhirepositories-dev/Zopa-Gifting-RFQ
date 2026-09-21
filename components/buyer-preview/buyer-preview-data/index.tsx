@@ -1046,7 +1046,7 @@ export default function BuyerPreview({
         value: "approval-history",
         label: "Approval & Recommendations",
         icon: <FileText className="h-4 w-4 mr-2" />,
-        show: isLoggedIn && canViewApprovalHistory,
+        show: canViewApprovalHistory,
       },
     ];
 
