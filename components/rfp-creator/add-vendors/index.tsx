@@ -409,6 +409,14 @@ export const VendorContacts: React.FC<VendorContactsProps> = ({
 
       const result = await response.json();
       const fetchedRfpData: RFPData = result?.data || result;
+      // API returns BOQ under `boq`, but RFPData expects `boqItems` — normalize
+      if (!fetchedRfpData.boqItems && (result.boq || result.data?.boq)) {
+        fetchedRfpData.boqItems = result.boq || result.data?.boq || [];
+      }
+      // Also pull deliveryLocations from generalTerms if not at top level
+      if (!fetchedRfpData.deliveryLocations && result.generalTerms?.deliveryLocations) {
+        fetchedRfpData.deliveryLocations = result.generalTerms.deliveryLocations;
+      }
       if (fetchedRfpData) {
         setRfpData(fetchedRfpData);
         setCategory(getBoqCategoryText(fetchedRfpData?.boqItems?.[0]));
