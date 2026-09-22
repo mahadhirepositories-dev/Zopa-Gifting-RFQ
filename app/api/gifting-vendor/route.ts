@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
-import postgres from "postgres";
 import { db } from "@/db";
 import { giftingVendors as localGiftingVendors } from "@/db/schema/gifting-vendor-schema";
 
@@ -10,76 +9,39 @@ export async function GET(request: Request) {
     const category = searchParams.get("category");
     const search = searchParams.get("search");
 
-    // Database connection details for "zopa-rfp" database
-    const user = process.env.DB_USER || "postgres";
-    const password = process.env.DB_PASSWORD || "12345";
-    const host = process.env.DB_HOST || "localhost";
-    const port = process.env.DB_PORT || 5432;
-    const dbName = process.env.VENDOR_DB_NAME || "zopa-rfp";
-
-    const vendorDbUrl =
-      process.env.VENDOR_DATABASE_URL ||
-      `postgres://${user}:${password}@${host}:${port}/${dbName}`;
-
     let rawVendors: any[] = [];
+    const apiKey = process.env.ZOPA_GIFTING_RFQ_API_KEY;
 
-    // 1. Fetch from "zopa-rfp" database gifting_vendors table
-    try {
-      const sql = postgres(vendorDbUrl, { max: 5 });
-      rawVendors = await sql`
-        SELECT 
-          id,
-          name,
-          company_name,
-          email,
-          phone_number,
-          country_code,
-          category,
-          description,
-          tags,
-          service_areas,
-          city,
-          state,
-          country,
-          logo_url,
-          approval_status
-        FROM gifting_vendors
-      `;
-      await sql.end();
-    } catch (err) {
-      console.warn("[gifting-vendor API] Warning: Failed querying zopa-rfp database:", err);
-    }
-
-    // 2. Fallback to master_vendor_contacts in zopa-rfp if gifting_vendors returned 0 rows
-    if (!rawVendors || rawVendors.length === 0) {
+    if (apiKey) {
+      // 1. Fetch from zopa-rfp external API securely using the API key
       try {
-        const sql = postgres(vendorDbUrl, { max: 5 });
-        rawVendors = await sql`
-          SELECT 
-            id,
-            name,
-            company_name,
-            email,
-            phone_number,
-            country_code,
-            category,
-            description,
-            tags,
-            service_areas,
-            city,
-            state,
-            country,
-            logo_url,
-            approval_status
-          FROM master_vendor_contacts
-        `;
-        await sql.end();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        
+        const response = await fetch("https://flux.zopapro.com/api/external/gifting-vendors", {
+          method: "GET",
+          headers: {
+            "x-api-key": apiKey,
+            "Content-Type": "application/json"
+          },
+          signal: controller.signal,
+          next: { revalidate: 60 } // cache for 60 seconds
+        });
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          rawVendors = await response.json();
+        } else {
+          console.warn(`[gifting-vendor API] Warning: External API returned status ${response.status}: ${await response.text().catch(() => '')}`);
+        }
       } catch (err) {
-        console.warn("[gifting-vendor API] Warning: Failed querying master_vendor_contacts:", err);
+        console.warn("[gifting-vendor API] Warning: Failed fetching from external API:", err);
       }
+    } else {
+      console.warn("[gifting-vendor API] Warning: ZOPA_GIFTING_RFQ_API_KEY is not set. Skipping external API fetch.");
     }
 
-    // 3. Fallback to local database giftingVendors schema
+    // 2. Fallback to local database giftingVendors schema
     if (!rawVendors || rawVendors.length === 0) {
       try {
         rawVendors = await db.select().from(localGiftingVendors);
@@ -103,7 +65,7 @@ export async function GET(request: Request) {
         name: v.name || "",
         companyName: v.company_name || v.companyName || v.name || "Vendor",
         email: v.email || "",
-        mobileNo: v.phone_number || v.mobileNo || v.phone || "",
+        mobileNo: v.phoneNumber || v.phone_number || v.mobileNo || v.phone || "",
         countryCode: v.country_code || v.countryCode || "+91",
         category: parseValue(v.category),
         description: parseValue(v.description),
@@ -113,7 +75,7 @@ export async function GET(request: Request) {
         state: parseValue(v.state),
         country: parseValue(v.country),
         logoUrl: v.logo_url || v.logoUrl || null,
-        approvalStatus: v.approval_status || "approved",
+        approvalStatus: v.approvalStatus || v.approval_status || "approved",
       };
     });
 
