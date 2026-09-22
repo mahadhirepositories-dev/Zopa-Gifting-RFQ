@@ -312,6 +312,8 @@ export const VendorContacts: React.FC<VendorContactsProps> = ({
             tokenize(d),
           );
 
+          const vendorCategoryTokens = vendorCategories.flatMap(tokenize);
+
           // 1. Category match (exact or substring, either direction)
           const categoryMatch = vendorCategories.some((vendorCategory) =>
             boqCategoryTexts.some(
@@ -338,7 +340,13 @@ export const VendorContacts: React.FC<VendorContactsProps> = ({
               boqDescriptionTokens.has(token) || boqTagTokens.has(token),
           );
 
-          return categoryMatch || tagMatch || descriptionMatch;
+          // 4. Cross-match: BOQ Description tokens against Vendor Category tokens
+          // (Often buyers put the generic item like "Water Bottle" in description, but vendors list it as a Category)
+          const crossCategoryMatch = vendorCategoryTokens.some(
+            (token) => boqDescriptionTokens.has(token)
+          );
+
+          return categoryMatch || tagMatch || descriptionMatch || crossCategoryMatch;
         });
       },
     [],
