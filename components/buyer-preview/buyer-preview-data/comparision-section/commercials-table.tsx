@@ -402,19 +402,29 @@ export const CommercialsTable: React.FC<CommercialsTableProps> = ({
                       );
                       break;
                     case "exclusions":
-                      const text =
-                        typeof vendor.otherInformation === "string"
-                          ? vendor.otherInformation || "N/A"
-                          : vendor.otherInformation &&
-                              Object.keys(vendor.otherInformation).length > 0
-                            ? JSON.stringify(vendor.otherInformation)
-                            : "N/A";
+                      let exclusionText = "N/A";
+                      if (typeof vendor.otherInformation === "string") {
+                        exclusionText = vendor.otherInformation || "N/A";
+                      } else if (
+                        vendor.otherInformation &&
+                        typeof vendor.otherInformation === "object"
+                      ) {
+                        const info = vendor.otherInformation as Record<string, any>;
+                        const parts: string[] = [];
+                        for (const [key, val] of Object.entries(info)) {
+                          if (val !== undefined && val !== null && String(val).trim() !== "") {
+                            const label = key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()).trim();
+                            parts.push(`${label}: ₹${parseFloat(String(val)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+                          }
+                        }
+                        exclusionText = parts.length > 0 ? parts.join(", ") : "N/A";
+                      }
                       content = (
                         <TruncateText
-                          text={text}
+                          text={exclusionText}
                           expanded={!!expandedStates[vendor.id]}
                           onToggle={() => toggleExpand(vendor.id)}
-                          charLimit={20}
+                          charLimit={50}
                         />
                       );
                       break;

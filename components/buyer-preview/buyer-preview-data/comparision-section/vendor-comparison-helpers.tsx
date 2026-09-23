@@ -339,7 +339,7 @@ export const processVendors = (
       quoteRefId: vendor.vendorResponseId || "N/A",
       revision: revisionCount > 0 ? `R${revisionCount - 1}` : "R0",
       overallScore: vendor.evaluationScore || 0,
-      deliveryTime: latestRevision?.generalTerms?.deliveryTimeValue || "N/A",
+      deliveryTime: latestRevision?.generalTerms?.deliveryTimeValue || "",
       complianceScore: calculateComplianceScore(latestRevision),
       logoUrl: comp.logoUrl || vendor.logoUrl,
       boqDetails: latestBoq,
