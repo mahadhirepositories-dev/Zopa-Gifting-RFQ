@@ -64,6 +64,8 @@ interface EnhancedBuyerPreviewProps extends BuyerPreviewProps {
   isLoggedIn?: boolean;
   vendorsWithNewRevisions?: any;
   urlResponseId?: string | null;
+  userId?: string;
+  userEmail?: string;
 
   // FIXED: Two-level approval interface
   currentApproval?: {
@@ -435,6 +437,8 @@ export default function BuyerPreview({
   urlResponseId,
   currentApproval,
   buyerRecommendations = [],
+  userId,
+  userEmail,
 }: EnhancedBuyerPreviewProps) {
   const router = useRouter();
 
@@ -527,7 +531,6 @@ export default function BuyerPreview({
   const [activeMainTab, setActiveMainTab] = useState("vendor-responses");
   const [approvalLoading, setApprovalLoading] = useState(false);
   const [isNavigating, setIsNavigating] = React.useState(false);
-  const [userId, setUserId] = useState<string | undefined>();
 
   const qualifiedResponses = localResponses.filter(
     (v) => v.qualificationStatus !== "disqualified",
@@ -776,7 +779,7 @@ export default function BuyerPreview({
     window.open(`https://wa.me/?text=${encodedText}`, "_blank");
     setShareMenuOpen(false);
   };
-  const approvalRole = getUserApprovalRole(currentApproval, userId);
+  const approvalRole = getUserApprovalRole(currentApproval, userId, userEmail, urlResponseId);
   const isApproved =
     buyerData?.rfp?.status?.toLowerCase() === "approved" ||
     currentApproval?.status?.toLowerCase() === "approved";

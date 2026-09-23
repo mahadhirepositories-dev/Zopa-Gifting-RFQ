@@ -457,6 +457,8 @@ export default function BuyerPreviewPage() {
       currentApproval={currentApproval ?? undefined}
       buyerRecommendations={buyerRecommendations}
       urlResponseId={responseParam}
+      userId={session?.user?.id}
+      userEmail={session?.user?.email}
     />
   );
 }
