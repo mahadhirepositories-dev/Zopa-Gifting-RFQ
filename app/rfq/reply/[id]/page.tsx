@@ -148,6 +148,15 @@ export default function VendorReplyPage({
             if (respJson?.data?.status === "submitted") {
               setIsSubmitted(false);
             }
+            if (respJson?.data?.vendorEmail && fetchedBuyerData?.vendorContacts) {
+              const matchedVendor = fetchedBuyerData.vendorContacts.find(
+                (contact: any) => contact.email?.toLowerCase() === respJson.data.vendorEmail?.toLowerCase()
+              );
+              if (matchedVendor) {
+                setVendorDetails(matchedVendor);
+                setOrganizationVendor(matchedVendor);
+              }
+            }
           }
         } catch (e) {
           console.warn("Could not load vendor response status:", e);
