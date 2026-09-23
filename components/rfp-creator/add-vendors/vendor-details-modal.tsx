@@ -196,9 +196,15 @@ export const VendorDetailsModal: React.FC<VendorDetailsModalProps> = ({
 
   const v = vendor as any;
   const tags = parseTags(v.tags);
-  const descriptionItems = parseDisplayField(vendor.description);
   const serviceAreas = v.serviceAreas ? parseDisplayField(v.serviceAreas) : [];
-  const category = displayFlexibleArrayField(vendor.category);
+  const rawCategory = displayFlexibleArrayField(vendor.category);
+  const rawDescription = displayFlexibleArrayField(vendor.description);
+  
+  const category = "Gifting Items";
+  const displayDesc = (rawCategory && rawCategory.toLowerCase() !== "gifting items") 
+    ? rawCategory 
+    : (rawDescription || "—");
+
   const hasAnyDocument = DOCUMENT_FIELDS.some((d) => !!v[d.field]);
 
   const initials = (vendor.name || "?")
@@ -375,7 +381,7 @@ export const VendorDetailsModal: React.FC<VendorDetailsModalProps> = ({
             </div>
 
             {/* Tags + Description side by side */}
-            {(tags.length > 0 || descriptionItems.length > 0) && (
+            {(tags.length > 0 || displayDesc !== "—") && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {tags.length > 0 && (
                   <div>
@@ -392,15 +398,15 @@ export const VendorDetailsModal: React.FC<VendorDetailsModalProps> = ({
                   </div>
                 )}
 
-                {descriptionItems.length > 0 && (
+                {displayDesc !== "—" && (
                   <div>
                     <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
                       Description
                     </p>
                     <div className="flex flex-wrap gap-1.5">
-                      {descriptionItems.map((item, i) => (
+                      {displayDesc.split(",").map((item, i) => (
                         <Badge key={i} variant="outline">
-                          {item}
+                          {item.trim()}
                         </Badge>
                       ))}
                     </div>

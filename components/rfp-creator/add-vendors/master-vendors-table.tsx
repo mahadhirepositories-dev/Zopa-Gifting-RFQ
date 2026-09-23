@@ -175,10 +175,14 @@ export const MasterVendorsTable: React.FC<MasterVendorsTableProps> = ({
         <TableBody>
           {approvedVendors.map((vendor) => {
             const isAdded = isVendorAdded(vendor);
-            const categoryDisplay =
-              displayFlexibleArrayField(vendor.category) || "—";
-            const descriptionDisplay =
-              displayFlexibleArrayField(vendor.description) || "—";
+            const rawCategory = displayFlexibleArrayField(vendor.category);
+            const rawDescription = displayFlexibleArrayField(vendor.description);
+            
+            const categoryDisplay = "Gifting Items";
+            const descriptionDisplay = (rawCategory && rawCategory.toLowerCase() !== "gifting items") 
+              ? rawCategory 
+              : (rawDescription || "—");
+              
             const tags = parseTags((vendor as any).tags);
             const stickyBg = isAdded ? "bg-green-50" : "bg-white";
 
