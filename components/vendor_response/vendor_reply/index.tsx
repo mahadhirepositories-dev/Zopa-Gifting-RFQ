@@ -396,16 +396,19 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
           if (!currentEmail || currentEmail === "Unknown" || currentEmail.trim() === "") {
             setValue("companydetails.email", vInfo.email || "");
           }
-          setContact((prev) => {
-            if (!prev.mobileNo && vInfo.mobileNo) {
-              return {
-                ...prev,
-                mobileNo: vInfo.mobileNo,
-                countryCode: vInfo.countryCode || "+91",
-              };
-            }
-            return prev;
-          });
+          if (!contact.mobileNo && vInfo.mobileNo) {
+            const newMobileNo = vInfo.mobileNo;
+            const newCountryCode = vInfo.countryCode || "+91";
+            const formattedPhone = newMobileNo.startsWith("+")
+              ? newMobileNo
+              : `${newCountryCode} ${newMobileNo}`.trim();
+            setContact((prev) => ({
+              ...prev,
+              mobileNo: formattedPhone,
+              countryCode: newCountryCode,
+            }));
+            setValue("companydetails.phone", formattedPhone, { shouldValidate: true });
+          }
         }
         
         if (respData?.scopeAgreement) {
