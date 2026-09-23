@@ -385,6 +385,29 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
             }));
           }
         }
+
+        const vInfo = vendorDetails || organizationVendor;
+        if (vInfo) {
+          const currentCompany = getValues("companydetails.companyName");
+          if (!currentCompany || currentCompany === "Unknown" || currentCompany.trim() === "") {
+            setValue("companydetails.companyName", vInfo.companyName || "");
+          }
+          const currentEmail = getValues("companydetails.email");
+          if (!currentEmail || currentEmail === "Unknown" || currentEmail.trim() === "") {
+            setValue("companydetails.email", vInfo.email || "");
+          }
+          setContact((prev) => {
+            if (!prev.mobileNo && vInfo.mobileNo) {
+              return {
+                ...prev,
+                mobileNo: vInfo.mobileNo,
+                countryCode: vInfo.countryCode || "+91",
+              };
+            }
+            return prev;
+          });
+        }
+        
         if (respData?.scopeAgreement) {
           setValue("scopeOfWork.agreement", respData.scopeAgreement);
         }
@@ -522,7 +545,7 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
         console.error("Error loading vendor response data:", err);
       }
     },
-    [vendorResponseId, rfpId, boqList, setValue],
+    [vendorResponseId, rfpId, boqList, setValue, vendorDetails, organizationVendor, getValues],
   );
 
   useEffect(() => {
