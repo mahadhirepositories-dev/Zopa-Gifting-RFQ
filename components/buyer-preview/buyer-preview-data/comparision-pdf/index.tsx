@@ -371,16 +371,27 @@ export const VendorComparisionPdf: React.FC<VendorComparisonPDFProps> = ({
         return (vendor.revisionCount || 1) - 1;
       case "exclusions":
         const maxLength = sortedVendors.length > 6 ? 20 : 30;
-        const text =
-          typeof vendor.otherInformation === "string"
-            ? vendor.otherInformation || " "
-            : vendor.otherInformation &&
-                Object.keys(vendor.otherInformation).length > 0
-              ? JSON.stringify(vendor.otherInformation)
-              : "";
-        return text.length > maxLength
-          ? text.substring(0, maxLength) + "..."
-          : text;
+        let exclusionStr = "";
+        if (typeof vendor.otherInformation === "string") {
+          exclusionStr = vendor.otherInformation || " ";
+        } else if (
+          vendor.otherInformation &&
+          typeof vendor.otherInformation === "object" &&
+          Object.keys(vendor.otherInformation).length > 0
+        ) {
+          const info = vendor.otherInformation as Record<string, any>;
+          const parts: string[] = [];
+          for (const [key, val] of Object.entries(info)) {
+            if (val !== undefined && val !== null && String(val).trim() !== "") {
+              const label = key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()).trim();
+              parts.push(`${label}: ${parseFloat(String(val)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+            }
+          }
+          exclusionStr = parts.length > 0 ? parts.join(", ") : "";
+        }
+        return exclusionStr.length > maxLength
+          ? exclusionStr.substring(0, maxLength) + "..."
+          : exclusionStr;
       default:
         return "";
     }

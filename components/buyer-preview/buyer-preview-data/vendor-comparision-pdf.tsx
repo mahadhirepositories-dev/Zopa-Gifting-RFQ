@@ -583,15 +583,23 @@ export const VendorComparisonDocument: React.FC<
                       { width: "23%" },
                     ]}
                   >
-                    {typeof vendor.otherInformation === "string"
-                      ? vendor.otherInformation || "N/A"
-                      : vendor.otherInformation &&
-                          Object.keys(vendor.otherInformation).length > 0
-                        ? JSON.stringify(vendor.otherInformation).substring(
-                            0,
-                            100
-                          ) + "..."
-                        : "N/A"}
+                    {(() => {
+                      if (typeof vendor.otherInformation === "string") {
+                        return vendor.otherInformation || "N/A";
+                      }
+                      if (vendor.otherInformation && typeof vendor.otherInformation === "object" && Object.keys(vendor.otherInformation).length > 0) {
+                        const info = vendor.otherInformation as Record<string, any>;
+                        const parts: string[] = [];
+                        for (const [key, val] of Object.entries(info)) {
+                          if (val !== undefined && val !== null && String(val).trim() !== "") {
+                            const label = key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()).trim();
+                            parts.push(`${label}: ${parseFloat(String(val)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+                          }
+                        }
+                        return parts.length > 0 ? parts.join(", ") : "N/A";
+                      }
+                      return "N/A";
+                    })()}
                   </Text>
                 </View>
               );
