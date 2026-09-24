@@ -25,7 +25,7 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: false, // Passwordless — Magic Link only
   },
-  user: {
+    user: {
     additionalFields: {
       mobileNumber: { type: "string", required: false, input: false },
       companyName: { type: "string", required: false, input: false },
@@ -35,6 +35,7 @@ export const auth = betterAuth({
       state: { type: "string", required: false, input: false },
       city: { type: "string", required: false, input: false },
       postalCode: { type: "string", required: false, input: false },
+      role: { type: "string", required: false, input: false },
     },
   },
   databaseHooks: {
