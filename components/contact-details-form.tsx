@@ -21,18 +21,18 @@ export function ContactDetailsForm({
   isSubmitting = false,
 }: ContactDetailsFormProps) {
   const [formData, setFormData] = useState<ContactFormData>({
-    companyName: "KG Corp",
-    name: "Devipriya Venkatesan",
-    email: "devipriyavenkatesan.v@gmail.com",
+    companyName: "",
+    name: "",
+    email: "",
     phoneCountryCode: "+91",
     phoneCountryFlag: "🇮🇳",
-    phoneNumber: "8521479630",
-    addressLine1: "894, Sri Ram Colony, Jai Ram Puram",
-    addressLine2: "Anna Nagar East",
-    selectedCountries: ["India"],
-    selectedStates: ["Tamil Nadu"],
-    selectedCities: ["Chennai"],
-    postalCode: "600014",
+    phoneNumber: "",
+    addressLine1: "",
+    addressLine2: "",
+    selectedCountries: [],
+    selectedStates: [],
+    selectedCities: [],
+    postalCode: "",
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof ContactFormData, string>>>({});
