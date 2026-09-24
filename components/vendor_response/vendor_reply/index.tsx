@@ -1060,13 +1060,13 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
           data.companydetails?.email ||
           vendorDetails?.email ||
           organizationVendor?.email ||
-          "priyavenkatesan41@gmail.com";
+          "[Vendor Email]";
         const buyerCompanyName =
-          buyerData?.company?.name || buyerData?.buyerCompanyName || "KG Corp";
+          buyerData?.company?.name || buyerData?.buyerCompanyName || "[Company Name]";
         const buyerEmail =
           buyerData?.contact?.contactEmail ||
           buyerData?.buyerEmail ||
-          "buyer@zopapro.com";
+          "[Buyer Email]";
         const projectName =
           buyerData?.requirement?.projectName ||
           buyerData?.projectName ||

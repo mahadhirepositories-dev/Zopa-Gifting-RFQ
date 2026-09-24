@@ -47,7 +47,7 @@ export const AboutRequirements = forwardRef<
 >(({ data, onChange, errors, values, disabled, companyName }, ref) => {
   const projectName = values?.projectName || data?.projectName || "";
   const purpose = values?.purpose || data?.purpose || "";
-  const registeredCompany = companyName || values?.companyName || "KG Corp";
+  const registeredCompany = companyName || values?.companyName || "[Your Company]";
 
   const validation = useMemo(() => {
     const result = requirementSchema.safeParse({ projectName, purpose });

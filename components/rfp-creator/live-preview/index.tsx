@@ -184,17 +184,17 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
         </h3>
         <p className="text-slate-700 leading-relaxed font-mono text-xs sm:text-sm">
           <span className="font-bold text-slate-900">
-            {company.name || "KG Corp"}
+            {company.name || "[Company Name]"}
           </span>{" "}
           {getIncorporationText(company.country)}, having its office at{" "}
           <span className="font-bold text-slate-900">
-            {company.city || "Chennai"}
-            {(company.city || "Chennai") && ","}{" "}
-            {company.state || "Tamil Nadu"}
-            {(company.state || "Tamil Nadu") && ","}{" "}
-            {company.postalCode || "600014"}
-            {(company.postalCode || "600014") && ","}{" "}
-            {company.country || "India"}
+            {company.city || "[City]"}
+            {(company.city || "[City]") && ","}{" "}
+            {company.state || "[State]"}
+            {(company.state || "[State]") && ","}{" "}
+            {company.postalCode || "[Postal Code]"}
+            {(company.postalCode || "[Postal Code]") && ","}{" "}
+            {company.country || "[Country]"}
           </span>
           , hereinafter referred to as &quot;Company&quot;.
           {company.businessType

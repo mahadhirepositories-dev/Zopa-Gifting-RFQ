@@ -111,7 +111,6 @@ export async function proxy(request: NextRequest) {
       !pathname.startsWith("/rfq/thankyou") &&
       !pathname.startsWith("/rfq/confirmation")) ||
     pathname.startsWith("/dashboard") ||
-    (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) ||
     pathname.startsWith("/select-organization");
 
 
