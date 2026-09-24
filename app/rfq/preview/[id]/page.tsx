@@ -699,7 +699,7 @@ export default function RFQVendorPreviewPage({
 
       {/* Footer fixed at bottom */}
       <footer className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 py-2.5 text-center text-[11px] text-slate-500 font-sans shadow-md">
-        <p>Need Assistance? Contact us for support: <a href="mailto:flux@zopapro.com" className="text-blue-600 underline">flux@zopapro.com</a></p>
+        <p>Need Assistance? Contact us for support: <a href="mailto:grow@zopapro.com" className="text-blue-600 underline">grow@zopapro.com</a></p>
         <p>© 2026 ZOPA FLUX. All rights reserved.</p>
       </footer>
     </div>

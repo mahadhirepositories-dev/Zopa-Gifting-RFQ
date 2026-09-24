@@ -1,0 +1,1 @@
+ALTER TABLE "rfq_contacts" ADD COLUMN "is_phone_masked" boolean DEFAULT false;

@@ -13,10 +13,10 @@ export default function Footer({ className }: { className?: string }) {
         <p className="text-gray-700 mb-2">
           Need Assistance? Contact us for support:{" "}
           <a
-            href="mailto:flux@zopapro.com"
+            href="mailto:grow@zopapro.com"
             className="text-blue-600 hover:underline"
           >
-            flux@zopapro.com
+            grow@zopapro.com
           </a>
         </p>
         <p className="text-gray-500 text-xs">

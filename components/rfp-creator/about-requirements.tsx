@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
   requirementSchema,
@@ -147,6 +148,30 @@ export const AboutRequirements = forwardRef<
               {projectNameError}
             </p>
           )}
+        </div>
+
+        {/* Mask Phone Checkbox */}
+        <div className="flex items-center space-x-2 pt-1 pb-3">
+          <Checkbox 
+            id="mask-phone" 
+            name="isPhoneMasked"
+            checked={values?.isPhoneMasked === true}
+            onCheckedChange={(checked) => {
+              const event = {
+                target: {
+                  name: "isPhoneMasked",
+                  value: checked === true,
+                  type: "checkbox",
+                  checked: checked === true
+                },
+              } as any;
+              onChange(event);
+            }}
+            disabled={disabled}
+          />
+          <Label htmlFor="mask-phone" className="text-sm font-semibold text-slate-800">
+            Mask my phone number from vendors
+          </Label>
         </div>
 
         {/* Purpose Options */}
