@@ -8,8 +8,16 @@ async function makeAdmin(email) {
     const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
     
     if (!user) {
-      console.log(`User with email ${email} not found. Please log in once via magic link so the user record is created, then run this again.`);
-      process.exit(1);
+      console.log(`User with email ${email} not found. Creating new admin user...`);
+      await db.insert(users).values({
+        id: crypto.randomUUID(),
+        name: "Admin User",
+        email: email,
+        emailVerified: false,
+        role: "admin",
+      });
+      console.log(`Success! Admin user created for ${email}. You can now log in.`);
+      process.exit(0);
     }
 
     await db.update(users).set({ role: "admin" }).where(eq(users.email, email));
