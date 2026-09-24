@@ -233,6 +233,20 @@ export async function GET(
       }
     };
 
+    let creatorUser = user;
+    if (targetRfq?.userId && (!user || targetRfq.userId !== user.id)) {
+      const foundUser = await safeSelect(() =>
+        db
+          .select()
+          .from(users)
+          .where(eq(users.id, targetRfq.userId))
+          .limit(1)
+      );
+      if (foundUser) {
+        creatorUser = foundUser;
+      }
+    }
+
     const formattedRfpUniqueId = targetRfpId.startsWith("RFP-")
       ? targetRfpId
       : `RFP-${targetRfpId.substring(0, 8).toUpperCase()}`;
@@ -241,8 +255,8 @@ export async function GET(
       rfpId: targetRfpId,
       rfpUniqueId: formattedRfpUniqueId,
       rfpuniqId: formattedRfpUniqueId,
-      creatorEmail: user?.email || contactDetails?.contactEmail || "",
-      creatorUserId: targetRfq?.userId || user?.id || "",
+      creatorEmail: creatorUser?.email || contactDetails?.contactEmail || "",
+      creatorUserId: targetRfq?.userId || creatorUser?.id || "",
       rfpsData: targetRfq || { status: "draft" },
       categorySelection: categoryRow
         ? {
@@ -421,20 +435,20 @@ export async function GET(
           : null,
       ),
       company: {
-        name: company?.name || user?.companyName || user?.name || "",
-        addressLine1: company?.addressLine1 || user?.addressLine1 || "",
-        addressLine2: company?.addressLine2 || user?.addressLine2 || "",
-        city: company?.city || user?.city || "",
-        state: company?.state || user?.state || "",
-        postalCode: company?.postalCode || user?.postalCode || "",
-        country: company?.country || user?.country || "India",
+        name: company?.name || creatorUser?.companyName || creatorUser?.name || "",
+        addressLine1: company?.addressLine1 || creatorUser?.addressLine1 || "",
+        addressLine2: company?.addressLine2 || creatorUser?.addressLine2 || "",
+        city: company?.city || creatorUser?.city || "",
+        state: company?.state || creatorUser?.state || "",
+        postalCode: company?.postalCode || creatorUser?.postalCode || "",
+        country: company?.country || creatorUser?.country || "India",
         businessType: company?.businessType || "",
         isPhoneMasked: company?.isPhoneMasked || false,
       },
       contact: {
-        contactName: contactDetails?.contactName || user?.name || "",
-        contactEmail: contactDetails?.contactEmail || user?.email || "",
-        contactPhone: contactDetails?.contactPhone || user?.mobileNumber || "",
+        contactName: contactDetails?.contactName || creatorUser?.name || "",
+        contactEmail: contactDetails?.contactEmail || creatorUser?.email || "",
+        contactPhone: contactDetails?.contactPhone || creatorUser?.mobileNumber || "",
         contactTitle: contactDetails?.contactTitle || "",
         contactDepartment: contactDetails?.contactDepartment || "",
         logoUrl: contactDetails?.logoUrl || null,
