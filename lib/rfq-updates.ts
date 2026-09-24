@@ -26,11 +26,13 @@ interface CompanySourceData {
   postalCode?: string | null;
   country?: string | null;
   businessType?: string | null;
+  isPhoneMasked?: boolean | null;
 }
 
 interface RequirementSourceData {
   projectName?: string | null;
   purpose?: string | null;
+  isPhoneMasked?: boolean | null;
 }
 
 interface CategorySourceData {
@@ -54,6 +56,7 @@ export async function upsertRfpCompany(rfpId: string, data: CompanySourceData) {
     postalCode: data.postalCode?.trim() || "Unknown",
     country: data.country?.trim() || "Unknown",
     businessType: data.businessType ? String(data.businessType).trim() : null,
+    isPhoneMasked: data.isPhoneMasked === true,
   };
 
   const [existing] = await db
@@ -100,6 +103,10 @@ export async function upsertRfpRequirement(
       .where(eq(rfqRequirements.rfqId, rfpId));
   } else {
     await db.insert(rfqRequirements).values(values);
+  }
+
+  if (typeof (data as any).isPhoneMasked !== 'undefined') {
+    await db.update(rfqCompanies).set({ isPhoneMasked: (data as any).isPhoneMasked === true }).where(eq(rfqCompanies.rfqId, rfpId));
   }
 }
 
@@ -473,3 +480,4 @@ export async function upsertRfpDates(rfpId: string, data: any) {
     console.warn("Error upserting RFP dates:", error);
   }
 }
+

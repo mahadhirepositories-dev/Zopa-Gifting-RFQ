@@ -188,10 +188,6 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
           </span>{" "}
           {getIncorporationText(company.country)}, having its office at{" "}
           <span className="font-bold text-slate-900">
-            {company.addressLine1 || "894, Sri Ram Colony"}
-            {(company.addressLine1 || "894, Sri Ram Colony") && ","}{" "}
-            {company.addressLine2 || "Jai Ram Puram"}
-            {(company.addressLine2 || "Jai Ram Puram") && ","}{" "}
             {company.city || "Chennai"}
             {(company.city || "Chennai") && ","}{" "}
             {company.state || "Tamil Nadu"}
@@ -520,13 +516,11 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
           </p>
           <p>
             <strong className="font-sans text-slate-900">Phone:</strong>{" "}
-            {contact.contactPhone || "+91 8909876545"}
+            {company.isPhoneMasked ? "Masked from vendors" : (contact.contactPhone || "+91 8909876545")}
           </p>
           <p>
             <strong className="font-sans text-slate-900">Address:</strong>{" "}
-            {contact.contactAddressLine1 || company.addressLine1 || "894, Sri Ram Colony"}
-            {contact.contactAddressLine2 || company.addressLine2 ? `, ${contact.contactAddressLine2 || company.addressLine2}` : " , Jai Ram Puram"}
-            , {contact.contactCity || company.city || "Chennai"}, {contact.contactState || company.state || "Tamil Nadu"}
+            {contact.contactCity || company.city || "Chennai"}, {contact.contactState || company.state || "Tamil Nadu"}
             , {contact.contactPostalCode || company.postalCode || "600014"}, {contact.contactCountry || company.country || "India"}
           </p>
         </div>

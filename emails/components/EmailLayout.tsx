@@ -18,7 +18,7 @@ export default function EmailLayout({ children }: EmailLayoutProps) {
         <Container style={emailStyles.container}>{children}</Container>
         
         <Text style={emailStyles.footer}>
-          Need Assistance? Contact us for support: flux@zopapro.com
+          Need Assistance? Contact us for support: grow@zopapro.com
         </Text>
         <Text style={emailStyles.footer}>
           &copy; {new Date().getFullYear()} Zopa. All rights reserved.

@@ -37,10 +37,25 @@ export default function WelcomeEmail({
           You can continue to the RFQ requirement page and provide the details
           needed to create your RFQ.{" "}
         </Text>{" "}
+        <Section style={{ textAlign: "center" as const, margin: "24px 0" }}>
+          {" "}
+          <Button style={emailStyles.button} href={verificationUrl}>
+            {" "}
+            Login to ZOPA RFQ{" "}
+          </Button>{" "}
+        </Section>{" "}
         <Text style={emailStyles.paragraph}>
           {" "}
           If you have any questions or need assistance, please feel free to
-          contact our support team.{" "}
+          contact our support team at{" "}
+          <a href="mailto:grow@zopapro.com" style={{ color: "#2563eb" }}>
+            grow@zopapro.com
+          </a>{" "}
+          or WhatsApp via{" "}
+          <a href="https://wa.me/917075452105" style={{ color: "#2563eb" }}>
+            +91 7075452105
+          </a>
+          .{" "}
         </Text>{" "}
         <Text style={emailStyles.paragraph}>
           {" "}

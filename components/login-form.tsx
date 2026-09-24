@@ -628,14 +628,18 @@ export const LoginForm = ({
                           >
                             I accept ZOPA&apos;s{" "}
                             <a
-                              href="#"
+                              href="https://zopapro.com/terms-conditions/"
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="text-blue-600 font-semibold hover:underline"
                             >
                               Terms of Service
                             </a>{" "}
                             &{" "}
                             <a
-                              href="#"
+                              href="https://zopapro.com/privacy-policy/"
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="text-blue-600 font-semibold hover:underline"
                             >
                               Privacy Policy
