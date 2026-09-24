@@ -31,8 +31,8 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
+  experimental: {
+    memoryBasedWorkersCount: true,
   },
   reactStrictMode: false,
   async redirects() {

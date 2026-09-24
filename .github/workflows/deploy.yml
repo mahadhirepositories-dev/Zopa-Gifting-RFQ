@@ -203,7 +203,7 @@ jobs:
 
             # Build application
             echo "🏗️ Building application..."
-            export NODE_OPTIONS="--max-old-space-size=2048"
+            export NODE_OPTIONS="--max-old-space-size=1024"
             run_critical npm run build
 
             # Run database migrations
