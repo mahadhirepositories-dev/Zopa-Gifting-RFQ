@@ -84,6 +84,7 @@ export async function proxy(request: NextRequest) {
   // 4. Identify Public and Protected Routes
   const isPublicRoute =
     pathname === "/" ||
+    pathname.startsWith("/admin/login") ||
     pathname.startsWith("/auth/verify") ||
     pathname.startsWith("/vendor-registration") ||
     pathname.startsWith("/uploads") ||
@@ -110,7 +111,7 @@ export async function proxy(request: NextRequest) {
       !pathname.startsWith("/rfq/thankyou") &&
       !pathname.startsWith("/rfq/confirmation")) ||
     pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/admin") ||
+    (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) ||
     pathname.startsWith("/select-organization");
 
 
