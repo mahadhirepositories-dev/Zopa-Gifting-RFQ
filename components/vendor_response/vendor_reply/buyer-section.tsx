@@ -17,13 +17,13 @@ export const BuyerSection: React.FC<BuyerSectionProps> = ({
             <tr>
               <td className="font-bold p-2 w-40">Buyer Name</td>
               <td className="p-2">
-                {buyerData?.contact?.contactName || buyerData?.contactName || "Contact Name"}
+                {buyerData?.contact?.contactName || buyerData?.contactName || "[Contact Name]"}
               </td>
             </tr>
             <tr>
               <td className="font-bold p-2">Company Name</td>
               <td className="p-2">
-                {buyerData?.company?.name || buyerData?.companyName || "Company Name"}
+                {buyerData?.company?.name || buyerData?.companyName || "[Company Name]"}
               </td>
             </tr>
             <tr>
@@ -34,7 +34,7 @@ export const BuyerSection: React.FC<BuyerSectionProps> = ({
                   buyerData?.company?.addressLine2,
                 ]
                   .filter(Boolean)
-                  .join(", ") || "Address Line 1"}
+                  .join(", ") || "Not provided"}
               </td>
             </tr>
             <tr>

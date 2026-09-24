@@ -266,14 +266,14 @@ export default function RFQVendorPreviewPage({
             </h2>
             <div className="text-slate-700 leading-relaxed space-y-2">
               <p>
-                <span className="font-bold text-slate-900 capitalize">{company.name || contact.contactName || "KG Corp"}</span> incorporated under Indian Companies Act, having its office at{" "}
+                <span className="font-bold text-slate-900 capitalize">{company.name || contact.contactName || "[Company Name]"}</span> incorporated under Indian Companies Act, having its office at{" "}
                 <span className="font-bold text-slate-900 capitalize">
                   {[
-                    company.addressLine1 || "894, Sri Ram Colony, Jai Ram Puram",
-                    company.city || "Chennai",
-                    company.state || "Tamil Nadu",
-                    company.country || "India",
-                    company.postalCode || "600014",
+                    company.addressLine1 || "[Address Line 1]",
+                    company.city || "[City]",
+                    company.state || "[State]",
+                    company.country || "[Country]",
+                    company.postalCode || "[Postal Code]",
                   ].filter(Boolean).join(", ")}
                 </span>
                 , hereinafter referred to as &quot;Company&quot; 
@@ -295,7 +295,7 @@ export default function RFQVendorPreviewPage({
               About the Requirement
             </h2>
             <p className="text-slate-700 leading-relaxed">
-              <span className="font-bold text-slate-900 capitalize">{company.name || "KG Corp"}</span> has invited you to participate in the RFQ process for <span className="font-bold text-slate-900 capitalize">{projectName}</span> for the purpose of <span className="text-slate-700">{requirement.purpose || "Lorem Ipsum is Simply Dummy Text Of The Printing And Typesetting Industry. Lorem Ipsum Has Been The Industry's Standard Dummy Text Ever Since 1966.,"}</span>.
+              <span className="font-bold text-slate-900 capitalize">{company.name || "[Company Name]"}</span> has invited you to participate in the RFQ process for <span className="font-bold text-slate-900 capitalize">{projectName}</span> for the purpose of <span className="text-slate-700">{requirement.purpose || "[Purpose]"}</span>.
             </p>
           </div>
 
@@ -623,7 +623,7 @@ export default function RFQVendorPreviewPage({
                 <Contact className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
                 <div>
                   <span className="text-[10px] text-slate-500 font-semibold block uppercase">Contact Name</span>
-                  <span className="font-bold text-slate-900">{contact.contactName || "Devipriya Venkatesan"}</span>
+                  <span className="font-bold text-slate-900">{contact.contactName || "[Contact Name]"}</span>
                 </div>
               </div>
 
@@ -631,7 +631,7 @@ export default function RFQVendorPreviewPage({
                 <Send className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
                 <div>
                   <span className="text-[10px] text-slate-500 font-semibold block uppercase">Email</span>
-                  <span className="font-bold text-slate-900 break-all">{contact.contactEmail || "devipriyavenkatesan.v@gmail.com"}</span>
+                  <span className="font-bold text-slate-900 break-all">{contact.contactEmail || "[Email]"}</span>
                 </div>
               </div>
 
@@ -639,7 +639,7 @@ export default function RFQVendorPreviewPage({
                 <Phone className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
                 <div>
                   <span className="text-[10px] text-slate-500 font-semibold block uppercase">Phone</span>
-                  <span className="font-bold text-slate-900">{company?.isPhoneMasked ? "Masked" : (contact?.contactPhone || "+91 8521479630")}</span>
+                  <span className="font-bold text-slate-900">{company?.isPhoneMasked ? "Masked" : (contact?.contactPhone || "[Phone]")}</span>
                 </div>
               </div>
 
@@ -648,7 +648,7 @@ export default function RFQVendorPreviewPage({
                 <div>
                   <span className="text-[10px] text-slate-500 font-semibold block uppercase">Address</span>
                   <span className="font-bold text-slate-900">
-                    {company.addressLine1 || "894, Sri Ram Colony, Jai Ram Puram, Chennai, Tamil Nadu, India, 600014"}
+                    {company.addressLine1 || "[Address]"}
                   </span>
                 </div>
               </div>

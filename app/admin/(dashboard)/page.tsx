@@ -21,7 +21,7 @@ export default async function AdminDashboard() {
             <Users className="w-4 h-4 text-slate-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{buyersCount?.value || 0}</div>
+            <div className="text-2xl font-bold">{Number(buyersCount?.value || 0)}</div>
           </CardContent>
         </Card>
 
@@ -31,7 +31,7 @@ export default async function AdminDashboard() {
             <Building2 className="w-4 h-4 text-slate-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{vendorsCount?.value || 0}</div>
+            <div className="text-2xl font-bold">{Number(vendorsCount?.value || 0)}</div>
           </CardContent>
         </Card>
 
@@ -41,7 +41,7 @@ export default async function AdminDashboard() {
             <FileText className="w-4 h-4 text-slate-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{rfqsCount?.value || 0}</div>
+            <div className="text-2xl font-bold">{Number(rfqsCount?.value || 0)}</div>
           </CardContent>
         </Card>
       </div>
