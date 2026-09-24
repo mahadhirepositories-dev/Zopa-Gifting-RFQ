@@ -12,7 +12,17 @@ import {
 } from "@/db/schema";
 import { EmailService } from "@/lib/email/email-service";
 
+// Ensure the base URL always has a protocol prefix
+function getServerBaseURL(): string {
+  let url = process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  if (!url.startsWith("http")) {
+    url = `https://${url}`;
+  }
+  return url;
+}
+
 export const auth = betterAuth({
+  baseURL: getServerBaseURL(),
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: {
