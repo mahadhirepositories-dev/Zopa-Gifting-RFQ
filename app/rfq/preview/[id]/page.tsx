@@ -30,6 +30,7 @@ type DataType = {
     country?: string;
     postalCode?: string;
     businessType?: string;
+    isPhoneMasked?: boolean;
   };
   requirement?: {
     projectName?: string;
@@ -196,11 +197,11 @@ export default function RFQVendorPreviewPage({
   return (
     <div className="min-h-screen bg-slate-100/60 font-mono text-slate-800 text-xs flex flex-col">
       {/* Top Header Bar fixed at top */}
-      <header className="bg-slate-100 border-b border-slate-200 fixed top-0 left-0 right-0 z-50 shadow-xs py-3 px-6 h-16">
+      <header className="bg-slate-100 border-b border-slate-200 fixed top-0 left-0 right-0 z-50 shadow-xs py-3 px-6 h-16 print:static print:bg-white print:border-none print:shadow-none print:h-auto">
         <div className="p-6 flex flex-col md:flex-row items-center justify-between gap-4 h-full">
           {/* Left: Logo & Document Title */}
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 relative shrink-0 flex items-center justify-center bg-white rounded-lg overflow-hidden text-white font-bold text-lg shadow-xs">
+            <div className="w-10 h-10 relative shrink-0 flex items-center justify-center bg-white rounded-lg overflow-hidden text-white font-bold text-lg shadow-xs print:shadow-none print:border">
               {contact.logoUrl || contact.logoPreview ? (
                 <Image
                   src={contact.logoPreview || contact.logoUrl || ""}
@@ -224,14 +225,14 @@ export default function RFQVendorPreviewPage({
             <div className="text-base font-bold text-blue-700">
               RFQ ID : <span className="text-slate-900">{rfpUniqId}</span>
             </div>
-            <div className="mt-0.5 inline-flex items-center gap-1.5 bg-blue-100/80 text-blue-700 px-3 py-0.5 rounded-full text-[11px] font-bold">
+            <div className="mt-0.5 inline-flex items-center gap-1.5 bg-blue-100/80 text-blue-700 px-3 py-0.5 rounded-full text-[11px] font-bold print:bg-white print:border print:text-slate-800">
               <Calendar className="w-3.5 h-3.5" />
               Valid until: {rfpDates.endDate || "2026-09-30"}
             </div>
           </div>
 
           {/* Right: Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 print:hidden">
             <Button
               onClick={handleDownload}
               variant="outline"
@@ -252,7 +253,7 @@ export default function RFQVendorPreviewPage({
       </header>
 
       {/* Main Container */}
-      <div className="p-10 pt-24 pb-24 flex-1 w-full grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="p-10 pt-24 pb-24 print:pt-6 print:pb-6 print:p-0 flex-1 w-full grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Left Column (3/4 Width) */}
         <div className="md:col-span-3 space-y-6">
           {/* Section 1: Company Introduction */}
@@ -638,7 +639,7 @@ export default function RFQVendorPreviewPage({
                 <Phone className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
                 <div>
                   <span className="text-[10px] text-slate-500 font-semibold block uppercase">Phone</span>
-                  <span className="font-bold text-slate-900">{contact.contactPhone || "+91 8521479630"}</span>
+                  <span className="font-bold text-slate-900">{company?.isPhoneMasked ? "Masked" : (contact?.contactPhone || "+91 8521479630")}</span>
                 </div>
               </div>
 
