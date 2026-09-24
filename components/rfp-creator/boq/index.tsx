@@ -616,8 +616,11 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
     };
 
     // ─── DOWNLOAD COMPLETE EXCEL SPREADSHEET WITH ENTERED DATA ────────────────
-    const downloadFilteredExcel = () => {
-      const wb = XLSX.utils.book_new();
+    const downloadFilteredExcel = async () => {
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("Gifting_Category_Sheet");
+
       const headers = [
         "Category",
         "Description",
@@ -629,8 +632,25 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
         "Remarks",
       ];
 
+      // Add header row with styling
+      const headerRow = ws.addRow(headers);
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true };
+      });
+
+      // Set column widths
+      ws.columns = [
+        { width: 22 },
+        { width: 32 },
+        { width: 10 },
+        { width: 14 },
+        { width: 18 },
+        { width: 38 },
+        { width: 20 },
+        { width: 22 },
+      ];
+
       const giftingItems = INITIAL_CATEGORY_ITEMS["Gifting Items"] || [];
-      const exportRows: any[][] = [];
 
       // Map each of the 30 default template items under "Gifting Items"
       giftingItems.forEach((desc) => {
@@ -638,7 +658,7 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
           (d) => (d.description || "").trim().toLowerCase() === desc.toLowerCase(),
         );
         if (filled) {
-          exportRows.push([
+          ws.addRow([
             filled.category || "Gifting Items",
             filled.description,
             filled.uom || "Nos",
@@ -649,7 +669,7 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
             filled.remarks || "",
           ]);
         } else {
-          exportRows.push([
+          ws.addRow([
             "Gifting Items",
             desc,
             "Nos",
@@ -668,7 +688,7 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
           (desc) => desc.toLowerCase() === (d.description || "").trim().toLowerCase(),
         );
         if (!isStandard) {
-          exportRows.push([
+          ws.addRow([
             d.category || "Gifting Items",
             d.description,
             d.uom || "Nos",
@@ -681,26 +701,37 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
         }
       });
 
-      const ws = XLSX.utils.aoa_to_sheet([headers, ...exportRows]);
-      ws["!cols"] = [
-        { wch: 22 },
-        { wch: 32 },
-        { wch: 10 },
-        { wch: 14 },
-        { wch: 18 },
-        { wch: 38 },
-        { wch: 20 },
-        { wch: 22 },
-      ];
+      // Add dropdown data validation for "Logo Requirement" column (column G = 7)
+      // Apply to all data rows (row 2 onwards, up to a generous limit)
+      const lastDataRow = Math.max(ws.rowCount, 200);
+      for (let row = 2; row <= lastDataRow; row++) {
+        ws.getCell(`G${row}`).dataValidation = {
+          type: "list",
+          allowBlank: true,
+          formulae: ['"With Logo,Without Logo"'],
+        };
+      }
 
-      XLSX.utils.book_append_sheet(wb, ws, "Gifting_Category_Sheet");
-      XLSX.writeFile(wb, "Gifting_Category_Spreadsheet.xlsx");
+      // Write and download
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "Gifting_Category_Spreadsheet.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
       toast.success("Excel sheet downloaded with full template and entered details!");
     };
 
     // ─── DOWNLOAD BLANK TEMPLATE ───────────────────────────────────────────────
-    const download20CategoryTemplate = () => {
-      downloadFilteredExcel();
+    const download20CategoryTemplate = async () => {
+      await downloadFilteredExcel();
     };
 
     const categoryCount = Object.keys(groupedBOQItems).length;
@@ -844,40 +875,6 @@ export const BOQ = forwardRef<BOQHandle, BOQProps>(
                 Open full-window Excel UI to view and edit all 20 categories,
                 upload your Excel sheet, or add items manually.
               </p>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-              <Button
-                type="button"
-                onClick={() => {
-                  setIsExcelFullWindow(true);
-                  setShowExcelView(true);
-                }}
-                className="bg-[#107c41] hover:bg-[#0d6836] text-white font-bold text-xs h-9 px-5 flex items-center gap-1.5"
-              >
-                <Grid className="w-4 h-4" /> Open Full Excel Spreadsheet View
-              </Button>
-
-              <Label htmlFor="boqEmptyUpload" className="cursor-pointer m-0">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold text-xs h-9"
-                  asChild
-                >
-                  <span>
-                    <Upload className="w-4 h-4 text-blue-600" /> Upload Excel
-                    File
-                  </span>
-                </Button>
-              </Label>
-              <input
-                type="file"
-                id="boqEmptyUpload"
-                accept=".csv, .xlsx, .xls"
-                onChange={handleBulkUpload}
-                className="hidden"
-              />
             </div>
           </div>
         ) : (

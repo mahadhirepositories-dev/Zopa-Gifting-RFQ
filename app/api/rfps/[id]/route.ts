@@ -258,8 +258,9 @@ export async function GET(
             purpose: requirement.purpose || "",
             rfpTitle: requirement.rfpTitle || "",
             briefRfp: requirement.briefRfp || "",
+            isPhoneMasked: company?.isPhoneMasked || false,
           }
-        : null,
+        : { isPhoneMasked: company?.isPhoneMasked || false },
       scope: {
         deliverables: scopeRow ? parseField(scopeRow.deliverables) || [] : [],
       },

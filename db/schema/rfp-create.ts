@@ -34,6 +34,7 @@ export const rfqCompanies = pgTable("rfq_company", {
     .unique()
     .references(() => rfqs.id, { onDelete: "cascade" }),
   contactId: integer("contact_id"),
+  isPhoneMasked: boolean("is_phone_masked").default(false),
   name: text("company_name").notNull(),
   addressLine1: text("address_line_1").notNull(),
   addressLine2: text("address_line_2"),
@@ -185,6 +186,7 @@ export const rfqContacts = pgTable("rfq_contacts", {
   contactTitle: varchar("contact_title", { length: 255 }),
   contactEmail: varchar("contact_email", { length: 255 }).unique(),
   contactPhone: varchar("contact_phone", { length: 50 }),
+  isPhoneMasked: boolean("is_phone_masked").default(false),
   contactAddressLine1: varchar("contact_address_line_1", { length: 255 }),
   contactAddressLine2: varchar("contact_address_line_2", { length: 255 }),
   contactCity: varchar("contact_city", { length: 255 }),

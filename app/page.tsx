@@ -26,7 +26,7 @@ export default function ZopaGiftingRFQPage() {
     companyName: "",
     addressLine1: "",
     addressLine2: "",
-    country: [],
+    country: ["India"],
     state: [],
     city: [],
     postalCode: "",
@@ -57,8 +57,8 @@ export default function ZopaGiftingRFQPage() {
     },
     {
       stepNumber: "2",
-      title: "Send to Vendors",
-      description: "Share the RFQ with relevant approved gifting vendors.",
+      title: "Receive Samples",
+      description: "Receive product samples from vendors to evaluate quality and suitability.",
       badge: "Step 2",
     },
     {
@@ -70,9 +70,9 @@ export default function ZopaGiftingRFQPage() {
     },
     {
       stepNumber: "4",
-      title: "Select L1 Vendor",
+      title: "Approve Vendors",
       description:
-        "Review the comparative quotes and select the L1 (lowest) vendor based on your requirement.",
+        "Review the comparative quotes and approve the best vendors based on your requirement.",
       badge: "Step 4",
     },
   ];
