@@ -1,14 +1,9 @@
 import React from "react";
-import { db } from "@/db";
-import { giftingVendors } from "@/db/schema";
-import { desc } from "drizzle-orm";
+import { fetchGiftingVendors } from "@/lib/get-vendors";
 import { VendorsTable } from "./vendors-table";
 
 export default async function AdminVendorsPage() {
-  const vendorsList = await db
-    .select()
-    .from(giftingVendors)
-    .orderBy(desc(giftingVendors.id));
+  const vendorsList = await fetchGiftingVendors();
 
   return (
     <div className="space-y-6">
@@ -17,7 +12,7 @@ export default async function AdminVendorsPage() {
           Registered Vendors
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Catalog of corporate gifting vendors and suppliers.
+          Catalog of corporate gifting vendors and suppliers imported from ZOPA Flux.
         </p>
       </div>
 
