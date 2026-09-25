@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "./admin-sidebar";
+import { AdminHeader } from "./admin-header";
 
 import { db } from "@/db";
 import { users, sessions } from "@/db/schema";
@@ -61,17 +62,19 @@ export default async function AdminLayout({
     redirect("/");
   }
 
+  const adminUser = {
+    name: session.user.name,
+    email: session.user.email,
+    image: session.user.image,
+  };
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-slate-50">
-        <AdminSidebar />
+        <AdminSidebar user={adminUser} />
         <main className="flex-1 overflow-y-auto">
-          <div className="p-4 border-b bg-white flex items-center justify-between">
-            <SidebarTrigger />
-            <div className="font-semibold text-slate-800">Admin Portal</div>
-            <div className="text-sm text-slate-500">{session.user.name}</div>
-          </div>
-          <div className="p-6">
+          <AdminHeader user={adminUser} />
+          <div className="p-6 max-w-7xl mx-auto">
             {children}
           </div>
         </main>
