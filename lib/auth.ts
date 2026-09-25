@@ -12,13 +12,11 @@ import {
 } from "@/db/schema";
 import { EmailService } from "@/lib/email/email-service";
 
-function getServerBaseURL(): string {
-  // Always prioritize NEXT_PUBLIC_APP_URL since it's used for the frontend domain
-  let url = process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || "https://gifting-flux.zopapro.com";
-  
-  // If we are in production, force the production domain if somehow localhost sneaks in via .env
-  if (process.env.NODE_ENV === "production" && url.includes("localhost")) {
-    url = "https://gifting-flux.zopapro.com";
+function getServerBaseURL(): string | undefined {
+  let url = process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL;
+
+  if (!url) {
+    return undefined;
   }
 
   if (!url.startsWith("http")) {
@@ -30,7 +28,12 @@ function getServerBaseURL(): string {
 export const auth = betterAuth({
   baseURL: getServerBaseURL(),
   trustHost: true,
-  trustedOrigins: ["https://gifting-flux.zopapro.com", "http://localhost:3000"],
+  trustedOrigins: [
+    "https://*.zopapro.com",
+    "https://gifting-flux.zopapro.com",
+    "https://staging-gifting-flux.zopapro.com",
+    "http://localhost:3000",
+  ],
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: {
