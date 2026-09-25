@@ -12,9 +12,15 @@ import {
 } from "@/db/schema";
 import { EmailService } from "@/lib/email/email-service";
 
-// Ensure the base URL always has a protocol prefix
 function getServerBaseURL(): string {
-  let url = process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  // Always prioritize NEXT_PUBLIC_APP_URL since it's used for the frontend domain
+  let url = process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || "https://gifting-flux.zopapro.com";
+  
+  // If we are in production, force the production domain if somehow localhost sneaks in via .env
+  if (process.env.NODE_ENV === "production" && url.includes("localhost")) {
+    url = "https://gifting-flux.zopapro.com";
+  }
+
   if (!url.startsWith("http")) {
     url = `https://${url}`;
   }
@@ -24,6 +30,7 @@ function getServerBaseURL(): string {
 export const auth = betterAuth({
   baseURL: getServerBaseURL(),
   trustHost: true,
+  trustedOrigins: ["https://gifting-flux.zopapro.com", "http://localhost:3000"],
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,21 @@ import { authClient } from "@/lib/auth-client";
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const errorParam = params.get("error");
+      const errorDesc = params.get("error_description");
+      if (errorParam) {
+        if (errorParam === "INVALID_TOKEN") {
+          toast.error("This magic link has expired or has already been used. Please request a new one.");
+        } else {
+          toast.error(errorDesc || `Login failed: ${errorParam}`);
+        }
+      }
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,6 +39,7 @@ export default function AdminLoginPage() {
       const { data, error } = await authClient.signIn.magicLink({
         email,
         callbackURL: "/admin",
+        errorCallbackURL: "/admin/login",
       });
       if (error) {
         toast.error(error.message || "Failed to send magic link");
