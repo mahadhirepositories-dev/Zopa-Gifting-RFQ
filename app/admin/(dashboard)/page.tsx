@@ -16,22 +16,26 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Users, Building2, FileText, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
+import { getGiftingVendorsCount } from "@/lib/get-vendors";
 
 export default async function AdminDashboard() {
   let buyersCount = [{ value: 0 }];
-  let vendorsCount = [{ value: 0 }];
+  let fluxVendorsCount = 0;
   let rfqsCount = [{ value: 0 }];
   let recentBuyers: any[] = [];
   let recentRfqs: any[] = [];
   let dbError = null;
 
   try {
-    buyersCount = await db
-      .select({ value: count() })
-      .from(users)
-      .where(eq(users.role, "user"));
-    vendorsCount = await db.select({ value: count() }).from(giftingVendors);
-    rfqsCount = await db.select({ value: count() }).from(rfqs);
+    const [buyersRes, rfqsRes, vendorsRes] = await Promise.all([
+      db.select({ value: count() }).from(users).where(eq(users.role, "user")).catch(() => [{ value: 0 }]),
+      db.select({ value: count() }).from(rfqs).catch(() => [{ value: 0 }]),
+      getGiftingVendorsCount().catch(() => 0),
+    ]);
+
+    buyersCount = buyersRes;
+    rfqsCount = rfqsRes;
+    fluxVendorsCount = vendorsRes;
 
     recentBuyers = await db
       .select()
@@ -51,7 +55,7 @@ export default async function AdminDashboard() {
   }
 
   const totalBuyers = Number(buyersCount[0]?.value || 0);
-  const totalVendors = Number(vendorsCount[0]?.value || 0);
+  const totalVendors = fluxVendorsCount;
   const totalRfqs = Number(rfqsCount[0]?.value || 0);
 
   return (

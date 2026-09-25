@@ -22,21 +22,21 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Eye, Building2, Phone, Mail, MapPin, Tag, Star, Award } from "lucide-react";
 
 interface Vendor {
-  id: number;
+  id: number | string;
   companyName: string;
   name: string | null;
   email: string;
   mobileNo: string | null;
   category: string | null;
-  tags: string | null;
-  description: string | null;
+  tags?: string | null;
+  description?: string | null;
   city: string | null;
   state: string | null;
-  country: string | null;
-  serviceAreas: string | null;
-  rating: number | null;
+  country?: string | null;
+  serviceAreas?: string | null;
+  rating?: number | null;
   status: string | null;
-  createdAt: Date | string;
+  createdAt?: Date | string | null;
 }
 
 interface VendorsTableProps {
