@@ -10,18 +10,40 @@ const authHandler = toNextJsHandler(auth);
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
 
-  // Intercept /get-session to resolve session automatically if cookie is missing but zopa_user_email exists
+  // If this is /get-session, support both native Better Auth sessions and buyer DB sessions
   if (url.pathname.endsWith("/get-session")) {
+    try {
+      const response = await authHandler.GET(request);
+      if (response && response.status === 200) {
+        const cloned = response.clone();
+        try {
+          const body = await cloned.json();
+          if (body && body.user) {
+            return response;
+          }
+        } catch {
+          // If JSON parse fails, continue to fallback
+        }
+      }
+    } catch (err) {
+      console.warn("Better Auth get-session check:", err);
+    }
+
+    // Fallback: Check custom session token in database
     const sessionCookie =
       request.cookies.get("better-auth.session_token")?.value ||
       request.cookies.get("__Secure-better-auth.session_token")?.value;
 
     if (sessionCookie) {
       try {
+        const rawToken = sessionCookie.includes(".")
+          ? sessionCookie.substring(0, sessionCookie.lastIndexOf("."))
+          : sessionCookie;
+
         const activeSessions = await db
           .select()
           .from(sessions)
-          .where(eq(sessions.token, sessionCookie))
+          .where(eq(sessions.token, rawToken))
           .limit(1);
 
         if (
@@ -65,83 +87,56 @@ export async function GET(request: NextRequest) {
           }
         }
       } catch (err) {
-        console.warn("Error checking existing session cookie:", err);
+        console.warn("DB session fallback error:", err);
       }
     }
 
+    // Fallback: Check zopa_user_email cookie
     const emailCookie = request.cookies.get("zopa_user_email")?.value;
-      if (emailCookie) {
-        try {
-          const userRows = await db
-            .select()
-            .from(users)
-            .where(eq(users.email, emailCookie.trim().toLowerCase()))
-            .limit(1);
+    if (emailCookie) {
+      try {
+        const userRows = await db
+          .select()
+          .from(users)
+          .where(eq(users.email, emailCookie.trim().toLowerCase()))
+          .limit(1);
 
-          if (userRows.length > 0) {
-            const user = userRows[0];
-            const sessionToken = crypto.randomUUID();
-            const sessionId = crypto.randomUUID();
-            const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-            await db.insert(sessions).values({
-              id: sessionId,
+        if (userRows.length > 0) {
+          const user = userRows[0];
+          return NextResponse.json({
+            user: {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              emailVerified: user.emailVerified,
+              mobileNumber: user.mobileNumber,
+              companyName: user.companyName,
+              addressLine1: user.addressLine1,
+              addressLine2: user.addressLine2,
+              country: user.country,
+              state: user.state,
+              city: user.city,
+              postalCode: user.postalCode,
+              image: user.image,
+              role: user.role,
+              createdAt: user.createdAt,
+              updatedAt: user.updatedAt,
+            },
+            session: {
+              id: "fallback-session",
               userId: user.id,
-              token: sessionToken,
-              expiresAt: expiresAt,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            });
-
-            const sessionData = {
-              user: {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                emailVerified: user.emailVerified,
-                mobileNumber: user.mobileNumber,
-                companyName: user.companyName,
-                addressLine1: user.addressLine1,
-                addressLine2: user.addressLine2,
-                country: user.country,
-                state: user.state,
-                city: user.city,
-                postalCode: user.postalCode,
-                image: user.image,
-                role: user.role,
-                createdAt: user.createdAt,
-                updatedAt: user.updatedAt,
-              },
-              session: {
-                id: sessionId,
-                userId: user.id,
-                expiresAt: expiresAt,
-                token: sessionToken,
-              },
-            };
-
-            const isProd = process.env.NODE_ENV === "production";
-            const cookieName = isProd
-              ? "__Secure-better-auth.session_token"
-              : "better-auth.session_token";
-
-            const response = NextResponse.json(sessionData);
-            response.cookies.set(cookieName, sessionToken, {
-              path: "/",
-              httpOnly: true,
-              sameSite: "lax",
-              secure: isProd,
-              maxAge: 30 * 24 * 60 * 60,
-            });
-            return response;
-          }
-        } catch (err) {
-          console.error("Error auto-establishing fallback session for get-session:", err);
+              expiresAt: new Date(Date.now() + 86400000),
+              token: "fallback-token",
+            },
+          });
         }
+      } catch (err) {
+        console.warn("Email cookie fallback error:", err);
       }
-      // If we got here inside /get-session interception and didn't return, return null session
-      return NextResponse.json(null);
     }
+
+    return NextResponse.json(null);
+  }
 
   return authHandler.GET(request);
 }
@@ -149,3 +144,4 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   return authHandler.POST(request);
 }
+
