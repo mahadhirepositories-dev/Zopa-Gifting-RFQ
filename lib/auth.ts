@@ -23,6 +23,7 @@ function getServerBaseURL(): string {
 
 export const auth = betterAuth({
   baseURL: getServerBaseURL(),
+  trustHost: true,
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: {
