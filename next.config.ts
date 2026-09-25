@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["@react-pdf/renderer", "exceljs", "xlsx"],
   images: {
     remotePatterns: [
       {
@@ -32,7 +33,9 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   experimental: {
-    memoryBasedWorkersCount: true,
+    webpackBuildWorker: false,
+    webpackMemoryOptimizations: true,
+    cpus: 1,
   },
   reactStrictMode: false,
   async redirects() {
