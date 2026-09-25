@@ -197,13 +197,36 @@ jobs:
             run_critical command -v pm2 >/dev/null
             echo "✅ Node $(node -v), npm $(npm -v), pm2 $(pm2 -v)"
 
+            # Stop existing process before building to free up memory
+            if pm2 describe "${APP_NAME}" >/dev/null 2>&1; then
+              echo "♻️ Temporarily stopping ${APP_NAME} to free memory for build..."
+              pm2 stop "${APP_NAME}" || true
+            fi
+
+            # Check and display server memory
+            echo "📊 Server memory status:"
+            free -h || true
+
+            # If no swap exists, attempt to enable a swapfile to prevent OOM kills
+            SWAP_TOTAL=$(free -m 2>/dev/null | awk '/Swap:/ {print $2}' || echo "0")
+            if [ -n "${SWAP_TOTAL}" ] && [ "${SWAP_TOTAL}" -eq 0 ] 2>/dev/null; then
+              echo "⚠️ No swap space detected. Attempting to enable swapfile..."
+              if command -v sudo >/dev/null 2>&1; then
+                (sudo fallocate -l 2G /swapfile 2>/dev/null && \
+                 sudo chmod 600 /swapfile 2>/dev/null && \
+                 sudo mkswap /swapfile 2>/dev/null && \
+                 sudo swapon /swapfile 2>/dev/null && \
+                 echo "✅ Created 2G swapfile") || echo "ℹ️ Could not enable swap automatically"
+              fi
+            fi
+
             # Install dependencies with npm
             echo "📦 Installing dependencies..."
-            run_critical npm install
+            run_critical npm install --prefer-offline --no-audit
 
             # Build application
             echo "🏗️ Building application..."
-            export NODE_OPTIONS="--max-old-space-size=1024"
+            export NODE_OPTIONS="--max-old-space-size=1536"
             run_critical npm run build
 
             # Run database migrations
@@ -230,9 +253,8 @@ jobs:
             # Deploy with PM2
             echo "🚀 Deploying with PM2..."
             if pm2 describe "${APP_NAME}" >/dev/null 2>&1; then
-              echo "♻️ Stopping ${APP_NAME}..."
-              pm2 stop "${APP_NAME}"
-              pm2 delete "${APP_NAME}"
+              echo "♻️ Removing old PM2 entry for ${APP_NAME}..."
+              pm2 delete "${APP_NAME}" || true
             fi
 
             echo "▶️ Starting ${APP_NAME} with ecosystem config..."
