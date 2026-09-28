@@ -9,7 +9,7 @@ import {
   rfqVendorContacts,
   vendorResponses,
 } from "@/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and } from "drizzle-orm";
 import { getSessionUser } from "@/lib/auth-session";
 
 export async function GET(request: NextRequest) {
@@ -63,18 +63,41 @@ export async function GET(request: NextRequest) {
         vendorCountRows.forEach((row) => {
           vendorCountsMap[row.rfqId] = row.count;
         });
-      } catch (err) {
-        console.warn("Could not query vendor counts:", err);
-      }
 
-      try {
-        const responseCountRows = await db
+        // Also check vendor_responses count for total invited vendors as fallback
+        const allVendorResponsesRows = await db
           .select({
             rfpId: vendorResponses.rfpId,
             count: sql<number>`count(*)::int`,
           })
           .from(vendorResponses)
           .where(sql`${vendorResponses.rfpId} IN ${rfqIds}`)
+          .groupBy(vendorResponses.rfpId);
+
+        allVendorResponsesRows.forEach((row) => {
+          vendorCountsMap[row.rfpId] = Math.max(
+            vendorCountsMap[row.rfpId] || 0,
+            row.count
+          );
+        });
+      } catch (err) {
+        console.warn("Could not query vendor counts:", err);
+      }
+
+      try {
+        // Only count actual submitted quotes from vendors, ignoring initial draft invite records
+        const responseCountRows = await db
+          .select({
+            rfpId: vendorResponses.rfpId,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(vendorResponses)
+          .where(
+            and(
+              sql`${vendorResponses.rfpId} IN ${rfqIds}`,
+              sql`LOWER(COALESCE(${vendorResponses.status}, 'draft')) != 'draft'`
+            )
+          )
           .groupBy(vendorResponses.rfpId);
 
         responseCountRows.forEach((row) => {

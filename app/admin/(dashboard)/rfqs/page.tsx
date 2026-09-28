@@ -1,13 +1,27 @@
 import React from "react";
 import { db } from "@/db";
-import { rfqs } from "@/db/schema";
-import { desc } from "drizzle-orm";
+import { rfqs, users } from "@/db/schema";
+import { desc, eq } from "drizzle-orm";
 import { RfqsTable } from "./rfqs-table";
 
 export default async function AdminRFQsPage() {
   const rfqList = await db
-    .select()
+    .select({
+      id: rfqs.id,
+      title: rfqs.title,
+      status: rfqs.status,
+      category: rfqs.category,
+      quantity: rfqs.quantity,
+      estimatedBudget: rfqs.estimatedBudget,
+      deliveryLocation: rfqs.deliveryLocation,
+      createdAt: rfqs.createdAt,
+      userId: rfqs.userId,
+      buyerName: users.name,
+      buyerEmail: users.email,
+      buyerCompany: users.companyName,
+    })
     .from(rfqs)
+    .leftJoin(users, eq(rfqs.userId, users.id))
     .orderBy(desc(rfqs.createdAt));
 
   return (

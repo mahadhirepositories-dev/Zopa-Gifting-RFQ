@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -21,7 +22,16 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format } from "date-fns";
-import { Search, Eye, Building, Phone, Mail, Calendar, ShieldCheck } from "lucide-react";
+import {
+  Search,
+  Eye,
+  Building,
+  Phone,
+  Mail,
+  Calendar,
+  ShieldCheck,
+  FileText,
+} from "lucide-react";
 
 interface Buyer {
   id: string;
@@ -32,6 +42,7 @@ interface Buyer {
   createdAt: Date | string;
   image?: string | null;
   emailVerified?: boolean | null;
+  rfqCount?: number;
 }
 
 interface BuyersTableProps {
@@ -76,6 +87,7 @@ export function BuyersTable({ initialBuyers }: BuyersTableProps) {
               <TableHead className="w-[280px]">Buyer Name & Email</TableHead>
               <TableHead>Company</TableHead>
               <TableHead>Mobile</TableHead>
+              <TableHead>RFQs Submitted</TableHead>
               <TableHead>Joined Date</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -84,7 +96,7 @@ export function BuyersTable({ initialBuyers }: BuyersTableProps) {
             {filteredBuyers.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="text-center text-slate-500 py-10 text-sm"
                 >
                   {search ? "No buyers matching your search." : "No registered buyers found."}
@@ -119,19 +131,28 @@ export function BuyersTable({ initialBuyers }: BuyersTableProps) {
                     <TableCell className="text-sm text-slate-600">
                       {buyer.mobileNumber || "-"}
                     </TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                        {buyer.rfqCount || 0} {buyer.rfqCount === 1 ? "RFQ" : "RFQs"}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-xs text-slate-500">
                       {buyer.createdAt ? format(new Date(buyer.createdAt), "dd MMM yyyy") : "-"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedBuyer(buyer)}
-                        className="text-xs gap-1.5 h-8 border-slate-200 hover:bg-blue-50 hover:text-blue-600"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>View</span>
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="text-xs gap-1.5 h-8 border-slate-200 hover:bg-blue-50 hover:text-blue-600"
+                        >
+                          <Link href={`/admin/buyers/${buyer.id}`}>
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View</span>
+                          </Link>
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -141,7 +162,7 @@ export function BuyersTable({ initialBuyers }: BuyersTableProps) {
         </Table>
       </div>
 
-      {/* Buyer Details Dialog */}
+      {/* Buyer Details Dialog (Quick View) */}
       <Dialog open={!!selectedBuyer} onOpenChange={(open) => !open && setSelectedBuyer(null)}>
         {selectedBuyer && (
           <DialogContent className="sm:max-w-md bg-white">
@@ -197,6 +218,16 @@ export function BuyersTable({ initialBuyers }: BuyersTableProps) {
 
                 <div className="flex items-center justify-between p-2.5 rounded-md border border-slate-100 bg-slate-50/50">
                   <span className="text-slate-500 flex items-center gap-2 font-medium">
+                    <FileText className="w-4 h-4 text-slate-400" />
+                    RFQs Submitted
+                  </span>
+                  <span className="font-semibold text-blue-600">
+                    {selectedBuyer.rfqCount || 0} RFQs
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 rounded-md border border-slate-100 bg-slate-50/50">
+                  <span className="text-slate-500 flex items-center gap-2 font-medium">
                     <Calendar className="w-4 h-4 text-slate-400" />
                     Registration Date
                   </span>
@@ -216,6 +247,18 @@ export function BuyersTable({ initialBuyers }: BuyersTableProps) {
                     Verified
                   </Badge>
                 </div>
+              </div>
+
+              <div className="pt-2">
+                <Button
+                  asChild
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                >
+                  <Link href={`/admin/buyers/${selectedBuyer.id}`}>
+                    <FileText className="w-4 h-4" />
+                    <span>View Submitted RFQs ({selectedBuyer.rfqCount || 0})</span>
+                  </Link>
+                </Button>
               </div>
             </div>
           </DialogContent>
