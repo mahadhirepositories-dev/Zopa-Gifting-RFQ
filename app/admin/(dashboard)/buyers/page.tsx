@@ -1,7 +1,7 @@
 import React from "react";
 import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { users, rfqs } from "@/db/schema";
+import { eq, desc, sql } from "drizzle-orm";
 import { BuyersTable } from "./buyers-table";
 
 export default async function AdminBuyersPage() {
@@ -10,6 +10,27 @@ export default async function AdminBuyersPage() {
     .from(users)
     .where(eq(users.role, "user"))
     .orderBy(desc(users.createdAt));
+
+  // Count RFQs per buyer
+  const rfqCounts = await db
+    .select({
+      userId: rfqs.userId,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(rfqs)
+    .groupBy(rfqs.userId);
+
+  const rfqCountMap = new Map<string, number>();
+  rfqCounts.forEach((rc) => {
+    if (rc.userId) {
+      rfqCountMap.set(rc.userId, rc.count);
+    }
+  });
+
+  const enrichedBuyers = buyersList.map((buyer) => ({
+    ...buyer,
+    rfqCount: rfqCountMap.get(buyer.id) || 0,
+  }));
 
   return (
     <div className="space-y-6">
@@ -22,7 +43,7 @@ export default async function AdminBuyersPage() {
         </p>
       </div>
 
-      <BuyersTable initialBuyers={buyersList} />
+      <BuyersTable initialBuyers={enrichedBuyers} />
     </div>
   );
 }

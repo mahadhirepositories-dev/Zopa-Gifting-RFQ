@@ -64,6 +64,7 @@ interface EnhancedBuyerPreviewProps extends BuyerPreviewProps {
   isLoggedIn?: boolean;
   vendorsWithNewRevisions?: any;
   urlResponseId?: string | null;
+  totalVendorsSent?: number;
   userId?: string;
   userEmail?: string;
 
@@ -435,6 +436,7 @@ export default function BuyerPreview({
   isLoggedIn,
   vendorsWithNewRevisions,
   urlResponseId,
+  totalVendorsSent,
   currentApproval,
   buyerRecommendations = [],
   userId,
@@ -539,6 +541,21 @@ export default function BuyerPreview({
     (v) => v.qualificationStatus === "disqualified",
   );
 
+  const totalSentCount = Math.max(
+    totalVendorsSent || 0,
+    Array.isArray((buyerData as any)?.vendorContacts)
+      ? (buyerData as any).vendorContacts.length
+      : 0,
+    Array.isArray((buyerData as any)?.vendorcontacts)
+      ? (buyerData as any).vendorcontacts.length
+      : 0,
+    Array.isArray(buyerData?.vendors?.vendorList)
+      ? buyerData.vendors.vendorList.length
+      : 0,
+    localResponses.length,
+    1
+  );
+
   const handleQualificationChange = async (
     vendorResponseId: string,
     newStatus: "qualified" | "disqualified",
@@ -640,11 +657,19 @@ export default function BuyerPreview({
             v.vendorResponseId === urlResponseId &&
             v.companydetails?.companyName,
         );
+        if (!targetVendor) {
+          targetVendor = qualifiedResponses.find(
+            (v) => v.vendorResponseId === urlResponseId,
+          );
+        }
       }
       if (!targetVendor) {
         targetVendor = qualifiedResponses.find(
           (v) => v.companydetails?.companyName,
         );
+      }
+      if (!targetVendor) {
+        targetVendor = qualifiedResponses[0];
       }
 
       if (targetVendor) {
@@ -1083,7 +1108,11 @@ export default function BuyerPreview({
                   : "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
               }`}
             >
-              <UniqueVendorCount responses={localResponses}>
+              <UniqueVendorCount
+                responses={localResponses}
+                totalVendorsSent={totalSentCount}
+                buyerData={buyerData}
+              >
                 {(count) => (
                   <>
                     RFQ Sent to {count} Vendor{count !== 1 ? "s" : ""}

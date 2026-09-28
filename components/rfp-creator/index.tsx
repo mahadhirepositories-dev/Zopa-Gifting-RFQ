@@ -297,7 +297,10 @@ export const MainContent: React.FC<MainContentProps> = ({
               ? data
               : [];
           if (isMounted) {
-            setHasVendorReplies(list.length > 0);
+            const actualSubmitted = list.filter(
+              (v: any) => v.status && v.status.toLowerCase() !== "draft",
+            );
+            setHasVendorReplies(actualSubmitted.length > 0);
           }
         }
       } catch (err) {

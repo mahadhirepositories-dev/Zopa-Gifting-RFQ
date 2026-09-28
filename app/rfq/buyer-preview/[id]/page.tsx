@@ -4,8 +4,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useSearchParams } from "next/navigation";
-import { AlertCircle } from "lucide-react";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { AlertCircle, Clock, Eye } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import BuyerPreview from "@/components/buyer-preview/buyer-preview-data/index";
 import BuyerPreviewSkeleton from "./buyer-preview-skeleton";
 import { RFPData } from "@/lib/types";
@@ -183,6 +184,7 @@ type DataType = {
 };
 
 export default function BuyerPreviewPage() {
+  const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const idParam = params.id;
@@ -194,6 +196,7 @@ export default function BuyerPreviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [rfpData, setRfpData] = useState<RFPData | null>(null);
   const [vendorResponses, setVendorResponses] = useState<VendorResponse[]>([]);
+  const [totalVendorsSent, setTotalVendorsSent] = useState<number>(0);
   const [buyerData, setBuyerData] = useState<DataType | null>(null);
   const [rfpUniqueId, setRfpUniqueId] = useState("");
   const [vendorsWithNewRevisions, setVendorsWithNewRevisions] = useState<
@@ -373,24 +376,55 @@ export default function BuyerPreviewPage() {
         const response = await fetch(
           `/api/vendor-response?rfpId=${rfpId}`,
         );
+        let actualSubmittedVendors: any[] = [];
+        let allResponsesList: any[] = [];
         if (response.ok) {
           const vendorDataJson = await safeJson(response, []);
           const vendorData = vendorDataJson?.data || vendorDataJson || [];
-          setVendorResponses(Array.isArray(vendorData) ? vendorData : []);
+          allResponsesList = Array.isArray(vendorData) ? vendorData : [];
+          actualSubmittedVendors = allResponsesList.filter((v: any) => v.status && v.status.toLowerCase() !== "draft");
+          setVendorResponses(actualSubmittedVendors);
+        }
+
+        // If no vendors have replied yet, redirect to RFQ preview and do not show buyer preview
+        if (actualSubmittedVendors.length === 0) {
+          router.replace(`/rfq/preview/${rfpId}${responseParam ? `?response=${responseParam}` : ""}`);
+          setLoading(false);
+          return;
         }
 
         // Fetch RFP details (public / available to all users)
+        let rfpBuyerData: any = null;
         const rfpRes = await fetch(`/api/rfps/${rfpId}`, {
           credentials: "include",
           cache: "no-cache",
         });
         if (rfpRes.ok) {
-          const rfpBuyerData = await safeJson(rfpRes, null);
+          rfpBuyerData = await safeJson(rfpRes, null);
           if (rfpBuyerData) {
             setBuyerData(rfpBuyerData);
             setRfpUniqueId(rfpBuyerData.rfp?.rfpuniqId || "");
           }
         }
+
+        // Compute total vendors sent from contacts, vendor list, or all invite responses
+        const vendorContactsCount = Array.isArray(rfpBuyerData?.vendorContacts)
+          ? rfpBuyerData.vendorContacts.length
+          : Array.isArray(rfpBuyerData?.vendorcontacts)
+            ? rfpBuyerData.vendorcontacts.length
+            : 0;
+        const vendorListCount = Array.isArray(rfpBuyerData?.vendors?.vendorList)
+          ? rfpBuyerData.vendors.vendorList.length
+          : 0;
+
+        const maxVendorsSent = Math.max(
+          vendorContactsCount,
+          vendorListCount,
+          allResponsesList.length,
+          actualSubmittedVendors.length,
+          1
+        );
+        setTotalVendorsSent(maxVendorsSent);
 
         // Fetch approval data for all users (logged-in and guest approvers)
         try {
@@ -415,7 +449,7 @@ export default function BuyerPreviewPage() {
     };
 
     fetchData();
-  }, [rfpId, isLoggedIn, fetchApprovalData, checkVendorRevisions]);
+  }, [rfpId, isLoggedIn, fetchApprovalData, checkVendorRevisions, responseParam, router]);
 
   if (loading) {
     return <BuyerPreviewSkeleton />;
@@ -445,6 +479,48 @@ export default function BuyerPreviewPage() {
     );
   }
 
+  // If no vendors have replied yet, do not render BuyerPreview comparison view
+  if (vendorResponses.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-8 max-w-md w-full text-center shadow-xs space-y-4">
+          <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+            <Clock className="w-7 h-7" />
+          </div>
+          <div className="space-y-1.5">
+            <h2 className="text-lg font-bold text-slate-900">
+              No Vendor Quotes Received Yet
+            </h2>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              None of the invited vendors have submitted a quotation for this RFQ yet.
+              The Buyer Preview and quotation comparison will become available once at least one vendor replies.
+            </p>
+          </div>
+          <div className="pt-2 flex flex-col sm:flex-row gap-2.5 justify-center">
+            <Button
+              onClick={() =>
+                router.replace(
+                  `/rfq/preview/${rfpId}${responseParam ? `?response=${responseParam}` : ""}`
+                )
+              }
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2 rounded-lg flex items-center justify-center gap-1.5"
+            >
+              <Eye className="w-4 h-4" />
+              View RFQ Preview
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push(isLoggedIn ? "/dashboard" : "/")}
+              className="border-slate-200 text-slate-700 hover:bg-slate-50 font-medium text-xs px-4 py-2 rounded-lg"
+            >
+              {isLoggedIn ? "Go to Dashboard" : "Return Home"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <BuyerPreview
       rfpData={rfpData || undefined}
@@ -457,6 +533,7 @@ export default function BuyerPreviewPage() {
       currentApproval={currentApproval ?? undefined}
       buyerRecommendations={buyerRecommendations}
       urlResponseId={responseParam}
+      totalVendorsSent={totalVendorsSent}
       userId={session?.user?.id}
       userEmail={session?.user?.email}
     />
