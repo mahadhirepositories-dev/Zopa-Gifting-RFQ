@@ -1,7 +1,9 @@
 import { db } from "@/db";
 import { sessions, users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 /**
  * Creates a valid Better Auth session in the DB and attaches the
@@ -82,14 +84,45 @@ export async function createAndSetAuthSession(
   }
 }
 
+
 /**
- * Resolves the authenticated user from session token or email cookie
+ * Resolves the authenticated user from Better Auth session, session token cookie, or email cookie
  */
-export async function getSessionUser(request: Request | any) {
+export async function getSessionUser(request?: Request | any) {
+  // 1. Try Better Auth getSession API first
+  try {
+    let reqHeaders: Headers | undefined;
+    if (request?.headers && typeof request.headers.get === "function") {
+      reqHeaders = request.headers;
+    } else {
+      reqHeaders = await headers();
+    }
+
+    if (reqHeaders) {
+      const session = await auth.api.getSession({
+        headers: reqHeaders,
+      });
+
+      if (session?.user?.id) {
+        const userRows = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, session.user.id))
+          .limit(1);
+
+        if (userRows.length > 0) return userRows[0];
+        return session.user as any;
+      }
+    }
+  } catch {
+    // Continue to database / cookie fallback
+  }
+
+  // 2. Try better-auth.session_token cookie lookup in database
   let sessionToken: string | undefined;
 
   try {
-    if (typeof request.cookies?.get === "function") {
+    if (typeof request?.cookies?.get === "function") {
       sessionToken =
         request.cookies.get("better-auth.session_token")?.value ||
         request.cookies.get("__Secure-better-auth.session_token")?.value;
@@ -98,17 +131,40 @@ export async function getSessionUser(request: Request | any) {
     // ignore
   }
 
-  if (!sessionToken && typeof request.headers?.get === "function") {
-    const cookieHeader = request.headers.get("cookie") || "";
+  if (!sessionToken) {
+    let cookieHeader = "";
+    if (typeof request?.headers?.get === "function") {
+      cookieHeader = request.headers.get("cookie") || "";
+    }
+    if (!cookieHeader) {
+      try {
+        const nextHeaders = await headers();
+        cookieHeader = nextHeaders.get("cookie") || "";
+      } catch {
+        // ignore
+      }
+    }
+
     const match = cookieHeader.match(/(?:__Secure-)?better-auth\.session_token=([^;]+)/);
     if (match) sessionToken = decodeURIComponent(match[1]);
   }
 
   if (sessionToken) {
+    const rawToken = sessionToken.trim();
+    // Strip Better Auth HMAC signature if present (format: token.signature)
+    const tokenToLookup = rawToken.includes(".")
+      ? rawToken.substring(0, rawToken.lastIndexOf("."))
+      : rawToken;
+
     const activeSessions = await db
       .select()
       .from(sessions)
-      .where(eq(sessions.token, sessionToken))
+      .where(
+        or(
+          eq(sessions.token, rawToken),
+          eq(sessions.token, tokenToLookup)
+        )
+      )
       .limit(1);
 
     if (
@@ -125,11 +181,29 @@ export async function getSessionUser(request: Request | any) {
     }
   }
 
+  // 3. Fallback: zopa_user_email cookie
   let emailCookie: string | undefined;
-  if (typeof request.cookies?.get === "function") {
-    emailCookie = request.cookies.get("zopa_user_email")?.value;
-  } else if (typeof request.headers?.get === "function") {
-    const cookieHeader = request.headers.get("cookie") || "";
+  try {
+    if (typeof request?.cookies?.get === "function") {
+      emailCookie = request.cookies.get("zopa_user_email")?.value;
+    }
+  } catch {
+    // ignore
+  }
+
+  if (!emailCookie) {
+    let cookieHeader = "";
+    if (typeof request?.headers?.get === "function") {
+      cookieHeader = request.headers.get("cookie") || "";
+    }
+    if (!cookieHeader) {
+      try {
+        const nextHeaders = await headers();
+        cookieHeader = nextHeaders.get("cookie") || "";
+      } catch {
+        // ignore
+      }
+    }
     const match = cookieHeader.match(/zopa_user_email=([^;]+)/);
     if (match) emailCookie = decodeURIComponent(match[1]);
   }
@@ -145,4 +219,15 @@ export async function getSessionUser(request: Request | any) {
   }
 
   return null;
+}
+
+/**
+ * Resolves the authenticated user and verifies they have the 'admin' role.
+ */
+export async function getAdminUser(request?: Request | any) {
+  const user = await getSessionUser(request);
+  if (!user || user.role !== "admin") {
+    return null;
+  }
+  return user;
 }
