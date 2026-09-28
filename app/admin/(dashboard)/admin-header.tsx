@@ -38,7 +38,7 @@ export function AdminHeader({ user }: AdminHeaderProps) {
         console.error("SignOut error:", e);
       }
     } finally {
-      window.location.href = "/admin/login";
+      window.location.href = "/";
     }
   };
 
