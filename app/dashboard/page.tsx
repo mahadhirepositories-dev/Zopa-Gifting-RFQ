@@ -87,6 +87,9 @@ export default function BuyerDashboardPage() {
   const [rfqToDelete, setRfqToDelete] = useState<BuyerRFQ | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // No Responses / Draft Info Modal state
+  const [noResponsesRfq, setNoResponsesRfq] = useState<BuyerRFQ | null>(null);
+
   // Logout state
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -580,16 +583,24 @@ export default function BuyerDashboardPage() {
                               <span>{rfq.responsesCount} {rfq.responsesCount === 1 ? "quote" : "quotes"} received</span>
                             </Link>
                           ) : rfq.vendorsCount > 0 ? (
-                            <Link
-                              href={`/rfq/preview/${rfq.id}`}
-                              className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 transition-colors"
-                              title="View RFQ Preview"
+                            <button
+                              type="button"
+                              onClick={() => setNoResponsesRfq(rfq)}
+                              className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 transition-colors cursor-pointer"
+                              title="View Quote Status"
                             >
                               <Users className="w-3.5 h-3.5 text-slate-500" />
                               <span>{rfq.vendorsCount} invited (0 quotes)</span>
-                            </Link>
+                            </button>
                           ) : (
-                            <span className="text-xs text-slate-400">No vendors invited</span>
+                            <button
+                              type="button"
+                              onClick={() => setNoResponsesRfq(rfq)}
+                              className="text-xs text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                              title="View Quote Status"
+                            >
+                              No vendors invited
+                            </button>
                           )}
                         </TableCell>
 
@@ -614,13 +625,19 @@ export default function BuyerDashboardPage() {
                                 <Eye className="w-4 h-4" />
                               </Link>
                             ) : (
-                              <Link
-                                href={`/rfq/preview/${rfq.id}`}
-                                className="inline-flex items-center justify-center p-2 rounded-lg text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                                title="View RFQ Preview"
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setNoResponsesRfq(rfq)}
+                                className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer"
+                                title={
+                                  rfq.status.toLowerCase() === "draft"
+                                    ? "RFQ in Draft Status"
+                                    : "No quotes received yet"
+                                }
                               >
                                 <Eye className="w-4 h-4" />
-                              </Link>
+                              </Button>
                             )}
 
                             {/* Edit RFQ */}
@@ -703,6 +720,65 @@ export default function BuyerDashboardPage() {
                 "Delete RFQ"
               )}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* No Responses / Draft Info Modal */}
+      <Dialog
+        open={Boolean(noResponsesRfq)}
+        onOpenChange={(open) => !open && setNoResponsesRfq(null)}
+      >
+        <DialogContent className="max-w-md bg-white p-6 rounded-2xl border border-slate-200">
+          <DialogHeader className="space-y-3 text-left">
+            <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Clock className="w-6 h-6" />
+            </div>
+            <DialogTitle className="text-lg font-bold text-slate-900">
+              {noResponsesRfq?.status.toLowerCase() === "draft"
+                ? "RFQ in Draft Status"
+                : "No Vendor Has Replied"}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-slate-600 leading-relaxed">
+              {noResponsesRfq?.status.toLowerCase() === "draft"
+                ? "This RFQ is currently in draft. No vendor has replied yet. Please complete and publish the RFQ, then wait for at least one vendor to reply."
+                : "No vendor has replied yet. Please wait for at least one vendor to reply for the RFQ."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="mt-6 flex flex-row justify-end gap-2.5">
+            {noResponsesRfq?.status.toLowerCase() === "draft" ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setNoResponsesRfq(null)}
+                  className="text-xs font-semibold cursor-pointer"
+                >
+                  Close
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    const id = noResponsesRfq.id;
+                    setNoResponsesRfq(null);
+                    handleEditRfq(id);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                  Continue Editing RFQ
+                </Button>
+              </>
+            ) : (
+              <Button
+                type="button"
+                onClick={() => setNoResponsesRfq(null)}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs cursor-pointer"
+              >
+                Got it
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

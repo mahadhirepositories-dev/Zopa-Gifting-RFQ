@@ -5,7 +5,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { AlertCircle, Clock, Eye } from "lucide-react";
+import { AlertCircle, Clock, Eye, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BuyerPreview from "@/components/buyer-preview/buyer-preview-data/index";
 import BuyerPreviewSkeleton from "./buyer-preview-skeleton";
@@ -386,13 +386,6 @@ export default function BuyerPreviewPage() {
           setVendorResponses(actualSubmittedVendors);
         }
 
-        // If no vendors have replied yet, redirect to RFQ preview and do not show buyer preview
-        if (actualSubmittedVendors.length === 0) {
-          router.replace(`/rfq/preview/${rfpId}${responseParam ? `?response=${responseParam}` : ""}`);
-          setLoading(false);
-          return;
-        }
-
         // Fetch RFP details (public / available to all users)
         let rfpBuyerData: any = null;
         const rfpRes = await fetch(`/api/rfps/${rfpId}`, {
@@ -425,6 +418,12 @@ export default function BuyerPreviewPage() {
           1
         );
         setTotalVendorsSent(maxVendorsSent);
+
+        // If no vendors have replied yet, do not fetch approval/revision data or show comparison view
+        if (actualSubmittedVendors.length === 0) {
+          setLoading(false);
+          return;
+        }
 
         // Fetch approval data for all users (logged-in and guest approvers)
         try {
@@ -481,37 +480,37 @@ export default function BuyerPreviewPage() {
 
   // If no vendors have replied yet, do not render BuyerPreview comparison view
   if (vendorResponses.length === 0) {
+    const isDraft = (buyerData?.rfp?.status || "").toLowerCase() === "draft";
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
         <div className="bg-white rounded-2xl border border-slate-200/80 p-8 max-w-md w-full text-center shadow-xs space-y-4">
           <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto">
             <Clock className="w-7 h-7" />
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <h2 className="text-lg font-bold text-slate-900">
-              No Vendor Quotes Received Yet
+              {isDraft ? "RFQ in Draft Status" : "No Vendor Has Replied"}
             </h2>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              None of the invited vendors have submitted a quotation for this RFQ yet.
-              The Buyer Preview and quotation comparison will become available once at least one vendor replies.
+            <p className="text-sm text-slate-600 leading-relaxed">
+              {isDraft
+                ? "This RFQ is currently in draft. No vendor has replied yet. Please complete and publish the RFQ, then wait for at least one vendor to reply."
+                : "No vendor has replied yet. Please wait for at least one vendor to reply for the RFQ."}
             </p>
           </div>
           <div className="pt-2 flex flex-col sm:flex-row gap-2.5 justify-center">
-            <Button
-              onClick={() =>
-                router.replace(
-                  `/rfq/preview/${rfpId}${responseParam ? `?response=${responseParam}` : ""}`
-                )
-              }
-              className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2 rounded-lg flex items-center justify-center gap-1.5"
-            >
-              <Eye className="w-4 h-4" />
-              View RFQ Preview
-            </Button>
+            {isDraft ? (
+              <Button
+                onClick={() => router.push(`/rfq/${rfpId}/requirement`)}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Edit className="w-4 h-4" />
+                Continue Editing RFQ
+              </Button>
+            ) : null}
             <Button
               variant="outline"
               onClick={() => router.push(isLoggedIn ? "/dashboard" : "/")}
-              className="border-slate-200 text-slate-700 hover:bg-slate-50 font-medium text-xs px-4 py-2 rounded-lg"
+              className="border-slate-200 text-slate-700 hover:bg-slate-50 font-medium text-xs px-4 py-2 rounded-lg cursor-pointer"
             >
               {isLoggedIn ? "Go to Dashboard" : "Return Home"}
             </Button>
