@@ -6,6 +6,7 @@ import {
   vendorCompanyDetails,
   vendorResponseRevisions,
 } from "@/db/schema/vendor-response-schema";
+import { rfqVendorContacts } from "@/db/schema/rfp-create";
 import { eq, desc, and, sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -52,6 +53,32 @@ export async function POST(request: NextRequest) {
 
     const companyData = companyInfo || companydetails || {};
     const email = inputVendorEmail || companyData.email || "vendor@example.com";
+
+    // Prefill from rfqVendorContacts if companyName or phone is not provided
+    if ((!companyData.companyName || !companyData.phone) && rfpId) {
+      try {
+        const [contact] = await db
+          .select()
+          .from(rfqVendorContacts)
+          .where(
+            and(
+              eq(rfqVendorContacts.rfqId, rfpId),
+              email && email !== "vendor@example.com"
+                ? sql`LOWER(${rfqVendorContacts.email}) = LOWER(${email.trim()})`
+                : sql`true`
+            )
+          )
+          .limit(1);
+
+        if (contact) {
+          if (!companyData.companyName) companyData.companyName = contact.companyName;
+          if (!companyData.phone) companyData.phone = contact.mobileNo;
+          if (!companyData.email && contact.email) companyData.email = contact.email;
+        }
+      } catch (err) {
+        console.warn("Could not prefill vendor company details from rfqVendorContacts in POST:", err);
+      }
+    }
 
     // 1. Check if vendor response already exists by responseId OR by (rfpId AND vendorEmail/vendorId)
     let existingResponse = null;
@@ -250,7 +277,7 @@ export async function GET(request: NextRequest) {
 
     if (responseId) {
       response = await db.query.vendorResponses.findFirst({
-        where: eq(vendorResponses.vendorResponseId, responseId),
+        where: sql`LOWER(${vendorResponses.vendorResponseId}) = LOWER(${responseId.trim()})`,
         with: {
           companyDetails: true,
           revisions: {
@@ -294,6 +321,105 @@ export async function GET(request: NextRequest) {
           },
         },
       });
+    }
+
+    if (response) {
+      if ((!response.companyDetails?.companyName || !response.companyDetails?.phone) && (rfpId || response.rfpId)) {
+        try {
+          const targetRfpId = rfpId || response.rfpId;
+          const [contact] = await db
+            .select()
+            .from(rfqVendorContacts)
+            .where(
+              and(
+                eq(rfqVendorContacts.rfqId, targetRfpId),
+                response.vendorEmail
+                  ? sql`LOWER(${rfqVendorContacts.email}) = LOWER(${response.vendorEmail.trim()})`
+                  : sql`true`
+              )
+            )
+            .limit(1);
+
+          if (contact) {
+            const compName = response.companyDetails?.companyName || contact.companyName || "";
+            const phoneNum = response.companyDetails?.phone || contact.mobileNo || "";
+            const emailAddr = response.companyDetails?.email || contact.email || response.vendorEmail;
+
+            if (response.companyDetails) {
+              response.companyDetails.companyName = compName;
+              response.companyDetails.phone = phoneNum;
+              response.companyDetails.email = emailAddr;
+
+              await db
+                .update(vendorCompanyDetails)
+                .set({
+                  companyName: compName,
+                  phone: phoneNum,
+                  email: emailAddr,
+                  updatedAt: new Date(),
+                })
+                .where(eq(vendorCompanyDetails.id, response.companyDetails.id));
+            } else {
+              const [insertedCd] = await db
+                .insert(vendorCompanyDetails)
+                .values({
+                  vendorResponseInternalId: response.id,
+                  companyName: compName,
+                  addressLine1: "",
+                  phone: phoneNum,
+                  email: emailAddr,
+                  businessType: "",
+                })
+                .returning();
+              (response as any).companyDetails = insertedCd;
+            }
+          }
+        } catch (err) {
+          console.warn("Could not enrich vendor companyDetails from rfqVendorContacts in GET:", err);
+        }
+      }
+    } else if (responseId && rfpId) {
+      // If responseId was provided but not found, attempt to find a vendor contact for this RFP and create draft
+      try {
+        const [contact] = await db
+          .select()
+          .from(rfqVendorContacts)
+          .where(eq(rfqVendorContacts.rfqId, rfpId))
+          .limit(1);
+
+        if (contact) {
+          const [newResp] = await db
+            .insert(vendorResponses)
+            .values({
+              vendorResponseId: responseId,
+              rfpId,
+              vendorId: "vendor_default",
+              vendorEmail: contact.email || "vendor@example.com",
+              status: "draft",
+            })
+            .returning();
+
+          const [newCompanyDetails] = await db
+            .insert(vendorCompanyDetails)
+            .values({
+              vendorResponseInternalId: newResp.id,
+              companyName: contact.companyName || "",
+              addressLine1: "",
+              phone: contact.mobileNo || "",
+              email: contact.email || "",
+              businessType: "",
+            })
+            .returning();
+
+          response = {
+            ...newResp,
+            companyDetails: newCompanyDetails,
+            revisions: [],
+          };
+        }
+      } catch (err) {
+        console.warn("Could not auto-create vendor response for responseId:", err);
+      }
     }
 
     if (response) {

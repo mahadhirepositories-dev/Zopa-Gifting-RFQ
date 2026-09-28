@@ -86,9 +86,7 @@ type DataType = {
   specialTerms?: {
     selectedTerms?: string[];
   };
-  documentsToShare?: {
-    documentsToShare?: string | Array<{ id?: string; name?: string }>;
-  };
+  documentsToShare?: any;
   vendors?: {
     vendorList?: string[];
     selectionMethod?: string;
@@ -193,6 +191,14 @@ export default function RFQVendorPreviewPage({
   const rfpUniqId = (rfpData as any).rfpUniqueId || (rfpData as any).rfpuniqId || `RFP-${rfpId.substring(0, 8)}`;
   const projectName = requirement.projectName || (rfpData as any).title || "Facility Expansion & Automation";
   const showTargetPrice = Array.isArray(boq) && boq.some((item) => item?.isVisible);
+
+  const isPhoneMasked =
+    company.isPhoneMasked === true ||
+    (contact as any).isPhoneMasked === true ||
+    (requirement as any).isPhoneMasked === true ||
+    (rfpData as any).isPhoneMasked === true ||
+    contact.contactPhone === "Masked from vendors" ||
+    contact.contactPhone === "Masked";
 
   return (
     <div className="min-h-screen bg-slate-100/60 font-mono text-slate-800 text-xs flex flex-col">
@@ -495,12 +501,15 @@ export default function RFQVendorPreviewPage({
 
             <ul className="space-y-2">
               {generalTerms.selectedTerms && generalTerms.selectedTerms.length > 0 ? (
-                generalTerms.selectedTerms.map((term: string, idx: number) => (
-                  <li key={idx} className="flex items-start gap-2 text-slate-700">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 shrink-0"></span>
-                    <span>{term}</span>
-                  </li>
-                ))
+                Array.from(new Set(generalTerms.selectedTerms)).map((term: any, idx: number) => {
+                  const text = typeof term === "string" ? term : term?.text || String(term);
+                  return (
+                    <li key={idx} className="flex items-start gap-2 text-slate-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 shrink-0"></span>
+                      <span>{text}</span>
+                    </li>
+                  );
+                })
               ) : (
                 <>
                   <li className="flex items-start gap-2 text-slate-700">
@@ -530,12 +539,15 @@ export default function RFQVendorPreviewPage({
             </h2>
             <ul className="space-y-2">
               {specialTerms.selectedTerms && specialTerms.selectedTerms.length > 0 ? (
-                specialTerms.selectedTerms.map((term: string, idx: number) => (
-                  <li key={idx} className="flex items-start gap-2 text-slate-700">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 shrink-0"></span>
-                    <span>{term}</span>
-                  </li>
-                ))
+                Array.from(new Set(specialTerms.selectedTerms)).map((term: any, idx: number) => {
+                  const text = typeof term === "string" ? term : term?.text || String(term);
+                  return (
+                    <li key={idx} className="flex items-start gap-2 text-slate-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 shrink-0"></span>
+                      <span>{text}</span>
+                    </li>
+                  );
+                })
               ) : (
                 <>
                   <li className="flex items-start gap-2 text-slate-700">
@@ -565,12 +577,46 @@ export default function RFQVendorPreviewPage({
             </h2>
             <ul className="space-y-2">
               {(() => {
-                const docsRaw = documentsToShare?.documentsToShare || documentsToShare;
-                const docsList: string[] = Array.isArray(docsRaw)
-                  ? docsRaw.map((d: any) => (typeof d === "string" ? d : d.name || d.label || String(d)))
-                  : typeof docsRaw === "string" && docsRaw.trim()
-                  ? [docsRaw]
-                  : [];
+                let docsRaw: any = documentsToShare?.documentsToShare || documentsToShare;
+                if (typeof docsRaw === "object" && !Array.isArray(docsRaw) && docsRaw !== null) {
+                  if (docsRaw.documentsToShare !== undefined) docsRaw = docsRaw.documentsToShare;
+                  else if (docsRaw.documents !== undefined) docsRaw = docsRaw.documents;
+                }
+
+                let docsList: Array<{ name: string; url?: string; path?: string; size?: number }> = [];
+
+                if (Array.isArray(docsRaw)) {
+                  docsList = docsRaw.map((d: any) => {
+                    if (typeof d === "string") return { name: d };
+                    return {
+                      name: d.name || d.label || String(d),
+                      url: d.url || d.path,
+                      path: d.path || d.url,
+                      size: d.size,
+                    };
+                  });
+                } else if (typeof docsRaw === "string" && docsRaw.trim()) {
+                  const trimmed = docsRaw.trim();
+                  try {
+                    const parsed = JSON.parse(trimmed);
+                    if (Array.isArray(parsed)) {
+                      docsList = parsed.map((d: any) => {
+                        if (typeof d === "string") return { name: d };
+                        return {
+                          name: d.name || d.label || String(d),
+                          url: d.url || d.path,
+                          path: d.path || d.url,
+                          size: d.size,
+                        };
+                      });
+                    }
+                  } catch {
+                    docsList = trimmed
+                      .split(",")
+                      .map((s) => ({ name: s.trim() }))
+                      .filter((d) => d.name.length > 0);
+                  }
+                }
 
                 if (docsList.length === 0) {
                   return (
@@ -587,12 +633,37 @@ export default function RFQVendorPreviewPage({
                   );
                 }
 
-                return docsList.map((docName: string, idx: number) => (
-                  <li key={idx} className="flex items-center gap-2 text-slate-700">
-                    <File className="w-4 h-4 text-blue-600 shrink-0" />
-                    <span>{docName}</span>
-                  </li>
-                ));
+                return docsList.map((doc, idx: number) => {
+                  const fileUrl = doc.url || doc.path;
+                  return (
+                    <li
+                      key={idx}
+                      className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-slate-50 border border-slate-100"
+                    >
+                      <div className="flex items-center gap-2.5 text-slate-700 min-w-0">
+                        <File className="w-4 h-4 text-blue-600 shrink-0" />
+                        <span className="truncate text-xs sm:text-sm font-medium">{doc.name}</span>
+                        {doc.size ? (
+                          <span className="text-[11px] text-slate-400 shrink-0">
+                            ({(doc.size / 1024).toFixed(1)} KB)
+                          </span>
+                        ) : null}
+                      </div>
+                      {fileUrl && (
+                        <a
+                          href={fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white text-xs font-semibold shrink-0 transition-colors shadow-2xs cursor-pointer"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Download
+                        </a>
+                      )}
+                    </li>
+                  );
+                });
               })()}
             </ul>
           </div>
@@ -639,7 +710,7 @@ export default function RFQVendorPreviewPage({
                 <Phone className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
                 <div>
                   <span className="text-[10px] text-slate-500 font-semibold block uppercase">Phone</span>
-                  <span className="font-bold text-slate-900">{company?.isPhoneMasked ? "Masked" : (contact?.contactPhone || "[Phone]")}</span>
+                  <span className="font-bold text-slate-900">{isPhoneMasked ? "Masked from vendors" : (contact?.contactPhone || "[Phone]")}</span>
                 </div>
               </div>
 

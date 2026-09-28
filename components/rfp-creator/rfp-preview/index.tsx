@@ -74,6 +74,15 @@ const updateRfpStatus = async (
 
     const dataToSave = {
       ...rfpData,
+      isPhoneMasked: rfpData.isPhoneMasked,
+      company: {
+        ...(rfpData.company || {}),
+        isPhoneMasked: rfpData.isPhoneMasked,
+      },
+      requirement: {
+        ...(rfpData.requirement || {}),
+        isPhoneMasked: rfpData.isPhoneMasked,
+      },
       vendorContacts: vendorContactsWithStatus,
       status: "Submitted",
       submissionDate: new Date().toISOString(),
@@ -176,6 +185,70 @@ export const Preview: React.FC<PreviewProps> = ({
   const [errorMessage, setErrorMessage] = useState<string>("");
   const safeDataRef = useRef<any>(null);
   const [acceptanceError, setAcceptanceError] = useState<string | null>(null);
+  const [isPhoneMasked, setIsPhoneMasked] = useState<boolean>(() => {
+    return (
+      data?.company?.isPhoneMasked === true ||
+      data?.requirement?.isPhoneMasked === true ||
+      data?.contact?.isPhoneMasked === true ||
+      data?.isPhoneMasked === true ||
+      false
+    );
+  });
+
+  useEffect(() => {
+    const masked =
+      data?.company?.isPhoneMasked === true ||
+      data?.requirement?.isPhoneMasked === true ||
+      data?.contact?.isPhoneMasked === true ||
+      data?.isPhoneMasked === true ||
+      false;
+    setIsPhoneMasked(masked);
+  }, [
+    data?.company?.isPhoneMasked,
+    data?.requirement?.isPhoneMasked,
+    data?.contact?.isPhoneMasked,
+    data?.isPhoneMasked,
+  ]);
+
+  const handleMaskPhoneChange = async (checked: boolean) => {
+    setIsPhoneMasked(checked);
+    const updated = {
+      isPhoneMasked: checked,
+      company: {
+        ...(data?.company || {}),
+        isPhoneMasked: checked,
+      },
+      requirement: {
+        ...(data?.requirement || {}),
+        isPhoneMasked: checked,
+      },
+      contact: {
+        ...(data?.contact || {}),
+        isPhoneMasked: checked,
+      },
+    };
+    if (onChange) {
+      onChange(updated);
+    }
+    if (rfpId) {
+      try {
+        await fetch(`/api/rfps/${rfpId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            rfpId,
+            isPhoneMasked: checked,
+            company: {
+              ...(data?.company || {}),
+              isPhoneMasked: checked,
+            },
+          }),
+        });
+      } catch (err) {
+        console.warn("Failed to update phone masking preference:", err);
+      }
+    }
+  };
   const { data: session } = useSession();
 
   const organizationId = (session?.session as any)?.activeOrganizationId;
@@ -577,12 +650,22 @@ export const Preview: React.FC<PreviewProps> = ({
       // Prepare RFP data
       const contactData = {
         ...data.contact,
+        isPhoneMasked,
         logoData: data.contact?.logoData || null,
         logoMimeType: data.contact?.logoMimeType || null,
       };
 
       const completeRfpData = {
         ...data,
+        isPhoneMasked,
+        company: {
+          ...(data?.company || {}),
+          isPhoneMasked,
+        },
+        requirement: {
+          ...(data?.requirement || {}),
+          isPhoneMasked,
+        },
         contact: contactData,
         sendTo: selectedEmailAddresses,
         sendMethod: "email",
@@ -639,6 +722,12 @@ export const Preview: React.FC<PreviewProps> = ({
                 status: "draft",
                 isFromMaster,
                 masterVendorId,
+                companyInfo: {
+                  companyName: contact.companyName || (contact as any).company || "",
+                  phone: contact.mobileNo || (contact as any).phone || "",
+                  email: contact.email,
+                  country: "India",
+                },
               }),
             });
 
@@ -896,6 +985,12 @@ export const Preview: React.FC<PreviewProps> = ({
           status: "draft",
           isFromMaster,
           masterVendorId,
+          companyInfo: {
+            companyName: contact.companyName || (contact as any).company || "",
+            phone: contact.mobileNo || (contact as any).phone || "",
+            email: contact.email,
+            country: "India",
+          },
         }),
       });
 
@@ -1197,6 +1292,23 @@ export const Preview: React.FC<PreviewProps> = ({
             <p className="text-red-500 text-xs">{acceptanceError}</p>
           </div>
         )}
+
+        {/* Mask Phone Checkbox */}
+        <div className="flex items-center space-x-2 mt-3 pt-1">
+          <Checkbox
+            id="mask-phone-preview"
+            checked={isPhoneMasked}
+            onCheckedChange={(checked) => handleMaskPhoneChange(checked === true)}
+            disabled={disabled}
+            className="h-4 w-4 rounded border-gray-300 data-[state=checked]:bg-[#1E6BFF]"
+          />
+          <label
+            htmlFor="mask-phone-preview"
+            className="text-xs font-normal text-slate-800 cursor-pointer"
+          >
+            Mask my phone number from vendors
+          </label>
+        </div>
       </div>
 
       {/* Footer Action Buttons */}

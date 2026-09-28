@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
-import { File } from "lucide-react";
+import { File, Download, FileText, FolderDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,8 +12,16 @@ import {
   AdditionalDocumentsProps,
 } from "@/lib/types/vendor-reply";
 
+const formatFileSize = (bytes?: number) => {
+  if (!bytes || bytes <= 0) return null;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  return `${(kb / 1024).toFixed(1)} MB`;
+};
+
 export const DocumentAttachments = ({
   requiredDocuments,
+  sharedDocuments = [],
   documentValidation,
   submissionAttempted,
   watch,
@@ -27,11 +35,78 @@ export const DocumentAttachments = ({
   handleFileChange,
   removeAttachment,
 }: DocumentAttachmentsProps) => {
+  const uploadedBuyerDocs = React.useMemo(() => {
+    return (sharedDocuments || []).filter(
+      (doc) => Boolean(doc.url || doc.path || doc.isUploaded),
+    );
+  }, [sharedDocuments]);
+
   return (
     <section id="document-attachments-section" className="bg-white rounded-lg border border-gray-100 shadow-sm p-6 space-y-6">
       <h2 className="text-xl font-semibold text-gray-700 mb-4">
         9. Attach Required Documents
       </h2>
+
+      {/* Documents Shared by Buyer */}
+      {uploadedBuyerDocs.length > 0 && (
+        <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                <FolderDown className="h-4 w-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Documents Shared by Buyer
+                </h3>
+                <p className="text-xs text-slate-500">
+                  The buyer has attached the following document(s) for your review and reference.
+                </p>
+              </div>
+            </div>
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 shrink-0">
+              {uploadedBuyerDocs.length} {uploadedBuyerDocs.length === 1 ? "document" : "documents"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+            {uploadedBuyerDocs.map((doc, idx) => {
+              const fileHref = doc.url || doc.path || "#";
+              return (
+                <div
+                  key={doc.id ?? idx}
+                  className="flex items-center justify-between p-3.5 bg-white rounded-lg border border-blue-100 shadow-2xs hover:border-blue-300 transition-all"
+                >
+                  <div className="flex items-center gap-3 min-w-0 mr-3">
+                    <div className="h-9 w-9 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-slate-900 truncate" title={doc.name}>
+                        {doc.name}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {formatFileSize(doc.size) || "Attached file"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <a
+                    href={fileHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white font-medium text-xs transition-colors shrink-0 cursor-pointer shadow-2xs"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Required Documents Section */}
       <div className="space-y-4">
@@ -43,22 +118,31 @@ export const DocumentAttachments = ({
         </div>
 
         <div className="space-y-4">
-          {requiredDocuments.map((documentName, index) => (
-            <DocumentItem
-              key={index}
-              index={index}
-              documentName={documentName}
-              documentValidation={documentValidation}
-              submissionAttempted={submissionAttempted}
-              watch={watch}
-              setValue={setValue}
-              documentAttachments={documentAttachments}
-              handleDocumentSelection={handleDocumentSelection}
-              handleDocumentFileChange={handleDocumentFileChange}
-              validateDocuments={validateDocuments}
-              removeDocumentAttachment={removeDocumentAttachment}
-            />
-          ))}
+          {requiredDocuments.map((documentName, index) => {
+            const matchingBuyerDoc = uploadedBuyerDocs.find((doc) => {
+              const nameA = doc.name.trim().toLowerCase();
+              const nameB = documentName.trim().toLowerCase();
+              return nameA === nameB || nameA.includes(nameB) || nameB.includes(nameA);
+            });
+
+            return (
+              <DocumentItem
+                key={index}
+                index={index}
+                documentName={documentName}
+                buyerUploadedFile={matchingBuyerDoc}
+                documentValidation={documentValidation}
+                submissionAttempted={submissionAttempted}
+                watch={watch}
+                setValue={setValue}
+                documentAttachments={documentAttachments}
+                handleDocumentSelection={handleDocumentSelection}
+                handleDocumentFileChange={handleDocumentFileChange}
+                validateDocuments={validateDocuments}
+                removeDocumentAttachment={removeDocumentAttachment}
+              />
+            );
+          })}
         </div>
       </div>
 
@@ -75,6 +159,7 @@ export const DocumentAttachments = ({
 const DocumentItem = ({
   index,
   documentName,
+  buyerUploadedFile,
   documentValidation,
   submissionAttempted,
   watch,
@@ -94,11 +179,25 @@ const DocumentItem = ({
       }`}
     >
       {/* Document Name */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center space-x-2">
-          <span className="h-2 w-2 rounded-full bg-blue-500"></span>
-          <p className="text-sm font-medium text-gray-900">{documentName}</p>
+      <div className="flex items-start justify-between mb-3 gap-2">
+        <div className="flex items-center space-x-2 min-w-0">
+          <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0"></span>
+          <p className="text-sm font-medium text-gray-900 truncate">{documentName}</p>
         </div>
+
+        {buyerUploadedFile && (buyerUploadedFile.url || buyerUploadedFile.path) && (
+          <a
+            href={buyerUploadedFile.url || buyerUploadedFile.path}
+            target="_blank"
+            rel="noopener noreferrer"
+            download
+            className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-md transition-colors shrink-0"
+            title="Download the file uploaded by the buyer"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Download Buyer File
+          </a>
+        )}
       </div>
 
       {/* Yes/No Selection */}

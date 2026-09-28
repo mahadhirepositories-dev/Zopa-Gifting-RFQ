@@ -65,6 +65,70 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
     return [];
   }, [rawDocuments]);
 
+  const generalTermsList = React.useMemo(() => {
+    const list: string[] = [];
+    const addTerm = (term: any) => {
+      const text = typeof term === "string" ? term.trim() : term?.text?.trim() || "";
+      if (text && !list.includes(text)) {
+        list.push(text);
+      }
+    };
+
+    if (Array.isArray(generalTerms?.selectedTerms)) {
+      generalTerms.selectedTerms.forEach(addTerm);
+    }
+    if (Array.isArray(generalTerms?.customTerms)) {
+      generalTerms.customTerms.forEach(addTerm);
+    }
+    if (Array.isArray(generalTerms)) {
+      generalTerms.forEach(addTerm);
+    }
+    if (list.length === 0 && typeof generalTerms?.generalTerms === "string" && generalTerms.generalTerms.trim()) {
+      generalTerms.generalTerms.split("\n\n").forEach(addTerm);
+    }
+    return list;
+  }, [generalTerms]);
+
+  const deliveryLocationsText = React.useMemo(() => {
+    if (!Array.isArray(generalTerms?.deliveryLocations) || generalTerms.deliveryLocations.length === 0) {
+      return "";
+    }
+    const formatted = generalTerms.deliveryLocations
+      .map((loc: any) =>
+        typeof loc === "string"
+          ? loc.trim()
+          : loc?.name && loc?.state
+          ? `${loc.name}, ${loc.state}`.trim()
+          : (loc?.name || String(loc)).trim(),
+      )
+      .filter(Boolean);
+    return Array.from(new Set(formatted)).join("; ");
+  }, [generalTerms?.deliveryLocations]);
+
+  const specialTermsList = React.useMemo(() => {
+    const list: string[] = [];
+    const addTerm = (term: any) => {
+      const text = typeof term === "string" ? term.trim() : term?.text?.trim() || "";
+      if (text && !list.includes(text)) {
+        list.push(text);
+      }
+    };
+
+    if (Array.isArray(specialTerms?.selectedTerms)) {
+      specialTerms.selectedTerms.forEach(addTerm);
+    }
+    if (Array.isArray(specialTerms?.customTerms)) {
+      specialTerms.customTerms.forEach(addTerm);
+    }
+    if (Array.isArray(specialTerms)) {
+      specialTerms.forEach(addTerm);
+    }
+    if (list.length === 0 && typeof specialTerms?.specialTerms === "string" && specialTerms.specialTerms.trim()) {
+      specialTerms.specialTerms.split("\n\n").forEach(addTerm);
+    }
+    return list;
+  }, [specialTerms]);
+
   useEffect(() => {
     // 1. Direct logo candidate properties
     const directLogo =
@@ -356,9 +420,8 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
 
       {/* 7. General Terms */}
       {(generalTerms?.deliveryTimeValue ||
-        (Array.isArray(generalTerms?.selectedTerms) && generalTerms.selectedTerms.length > 0) ||
-        (Array.isArray(generalTerms?.customTerms) && generalTerms.customTerms.length > 0) ||
-        (Array.isArray(generalTerms?.deliveryLocations) && generalTerms.deliveryLocations.length > 0)) && (
+        deliveryLocationsText ||
+        generalTermsList.length > 0) && (
         <div className="space-y-2">
           <h3 className="text-base font-bold text-slate-900">
             7. General Terms & Conditions
@@ -370,54 +433,28 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
                 {generalTerms.deliveryTimeUnit || "days"}
               </li>
             )}
-            {Array.isArray(generalTerms.deliveryLocations) &&
-              generalTerms.deliveryLocations.length > 0 && (
-                <li>
-                  Delivery Locations:{" "}
-                  {generalTerms.deliveryLocations
-                    .map((loc: any) =>
-                      typeof loc === "string"
-                        ? loc
-                        : loc?.name && loc?.state
-                        ? `${loc.name}, ${loc.state}`
-                        : loc?.name || String(loc),
-                    )
-                    .join("; ")}
-                </li>
-              )}
-            {Array.isArray(generalTerms.selectedTerms) &&
-              generalTerms.selectedTerms.map((term: string, idx: number) => (
-                <li key={`gt-${idx}`}>{term}</li>
-              ))}
-            {Array.isArray(generalTerms.customTerms) &&
-              generalTerms.customTerms.map((term: string, idx: number) => (
-                <li key={`gtc-${idx}`}>{term}</li>
-              ))}
+            {deliveryLocationsText && (
+              <li>
+                Delivery Locations: {deliveryLocationsText}
+              </li>
+            )}
+            {generalTermsList.map((term: string, idx: number) => (
+              <li key={`gt-${idx}`}>{term}</li>
+            ))}
           </ul>
         </div>
       )}
 
       {/* 8. Special Terms */}
-      {((Array.isArray(specialTerms?.selectedTerms) && specialTerms.selectedTerms.length > 0) ||
-        (Array.isArray(specialTerms?.customTerms) && specialTerms.customTerms.length > 0) ||
-        (Array.isArray(specialTerms) && specialTerms.length > 0)) && (
+      {specialTermsList.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-base font-bold text-slate-900">
             8. Special Terms & Conditions
           </h3>
           <ul className="list-disc pl-5 text-slate-700 space-y-1 font-mono text-xs sm:text-sm">
-            {Array.isArray(specialTerms.selectedTerms) &&
-              specialTerms.selectedTerms.map((term: string, idx: number) => (
-                <li key={`st-${idx}`}>{term}</li>
-              ))}
-            {Array.isArray(specialTerms.customTerms) &&
-              specialTerms.customTerms.map((term: string, idx: number) => (
-                <li key={`stc-${idx}`}>{term}</li>
-              ))}
-            {Array.isArray(specialTerms) &&
-              specialTerms.map((term: any, idx: number) => (
-                <li key={`starr-${idx}`}>{typeof term === "string" ? term : term.text || String(term)}</li>
-              ))}
+            {specialTermsList.map((term: string, idx: number) => (
+              <li key={`st-${idx}`}>{term}</li>
+            ))}
           </ul>
         </div>
       )}
@@ -516,7 +553,7 @@ export const PreviewDocument: React.FC<any> = ({ data = {} }) => {
           </p>
           <p>
             <strong className="font-sans text-slate-900">Phone:</strong>{" "}
-            {company.isPhoneMasked ? "Masked from vendors" : (contact.contactPhone || "+91 8909876545")}
+            {(company?.isPhoneMasked || requirement?.isPhoneMasked || data?.isPhoneMasked || contact?.isPhoneMasked || contact?.contactPhone === "Masked from vendors" || contact?.contactPhone === "Masked") ? "Masked from vendors" : (contact.contactPhone || "+91 8909876545")}
           </p>
           <p>
             <strong className="font-sans text-slate-900">Address:</strong>{" "}
