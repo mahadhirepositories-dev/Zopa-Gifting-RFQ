@@ -33,12 +33,20 @@ export function AddAdminForm() {
       const res = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name }),
+        credentials: "include",
+        body: JSON.stringify({ email: email.trim(), name: name.trim() }),
       });
 
       if (!res.ok) {
-        const err = await res.text();
-        throw new Error(err);
+        let errMessage = "Failed to add admin user";
+        try {
+          const errData = await res.json();
+          errMessage = errData.error || errData.message || errMessage;
+        } catch {
+          const errText = await res.text();
+          if (errText) errMessage = errText;
+        }
+        throw new Error(errMessage);
       }
 
       toast.success("Admin user added successfully.");
