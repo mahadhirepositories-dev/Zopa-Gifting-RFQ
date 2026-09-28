@@ -351,22 +351,27 @@ const CitiesLoadingSkeleton = () => (
   };
 
   const handleAddTerm = () => {
-    if (!customTermInput.trim()) return;
+    const trimmed = customTermInput.trim();
+    if (!trimmed) return;
 
     setAddingTerm(true);
 
     try {
-      const newCustomTerms = [
-        ...(safeData.customTerms || []),
-        customTermInput.trim(),
-      ];
+      const existingCustom = safeData.customTerms || [];
+      if (existingCustom.includes(trimmed)) {
+        setCustomTermInput("");
+        return;
+      }
+      const newCustomTerms = [...existingCustom, trimmed];
       const existingTerms = safeData.selectedTerms || [];
-      const newSelectedTerms = [
-        ...existingTerms.filter(
-          (term) => !isCustomTerm(term) && !isDeliveryTimeTerm(term),
-        ),
-        ...newCustomTerms,
-      ];
+      const newSelectedTerms = Array.from(
+        new Set([
+          ...existingTerms.filter(
+            (term) => !isCustomTerm(term) && !isDeliveryTimeTerm(term),
+          ),
+          ...newCustomTerms,
+        ]),
+      );
 
       setCustomTermInput("");
       onChange({

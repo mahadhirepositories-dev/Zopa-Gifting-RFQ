@@ -62,40 +62,7 @@ export async function POST(request: Request) {
     if (user.role === "admin") {
       redirectTarget = "/admin";
     } else {
-      let rfpId;
-      try {
-        const existingRfq = await db
-          .select()
-          .from(rfqs)
-          .where(eq(rfqs.userId, user.id))
-          .limit(1);
-
-        if (existingRfq.length > 0) {
-          rfpId = existingRfq[0].id;
-        } else {
-          rfpId = crypto.randomUUID();
-          await db.insert(rfqs).values({
-            id: rfpId,
-            userId: user.id,
-            title: "",
-            category: "Corporate Gifting",
-            quantity: 500,
-            status: "draft",
-          });
-        }
-        await upsertRfpCompany(rfpId, {
-          companyName: user.companyName,
-          addressLine1: user.addressLine1,
-          addressLine2: user.addressLine2,
-          city: user.city,
-          state: user.state,
-          postalCode: user.postalCode,
-          country: user.country,
-        });
-      } catch (dbErr) {
-        console.warn("DB RFP/company sync warning during login:", dbErr);
-      }
-      redirectTarget = `/rfq/${rfpId}/requirement`;
+      redirectTarget = "/dashboard";
     }
 
     const response = NextResponse.json({

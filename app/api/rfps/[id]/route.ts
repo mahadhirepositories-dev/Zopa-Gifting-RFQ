@@ -239,13 +239,21 @@ export async function GET(
         db
           .select()
           .from(users)
-          .where(eq(users.id, targetRfq.userId))
+          .where(eq(users.id, targetRfq.userId!))
           .limit(1)
       );
       if (foundUser) {
         creatorUser = foundUser;
       }
     }
+
+    const isMasked =
+      company?.isPhoneMasked === true ||
+      contactDetails?.isPhoneMasked === true;
+
+    const isOwner = Boolean(user && targetRfq?.userId && user.id === targetRfq.userId);
+    const rawPhone = contactDetails?.contactPhone || creatorUser?.mobileNumber || "";
+    const safeContactPhone = isMasked && !isOwner ? "Masked from vendors" : rawPhone;
 
     const formattedRfpUniqueId = targetRfpId.startsWith("RFP-")
       ? targetRfpId
@@ -255,6 +263,7 @@ export async function GET(
       rfpId: targetRfpId,
       rfpUniqueId: formattedRfpUniqueId,
       rfpuniqId: formattedRfpUniqueId,
+      isPhoneMasked: isMasked,
       creatorEmail: creatorUser?.email || contactDetails?.contactEmail || "",
       creatorUserId: targetRfq?.userId || creatorUser?.id || "",
       rfpsData: targetRfq || { status: "draft" },
@@ -272,9 +281,9 @@ export async function GET(
             purpose: requirement.purpose || "",
             rfpTitle: requirement.rfpTitle || "",
             briefRfp: requirement.briefRfp || "",
-            isPhoneMasked: company?.isPhoneMasked || false,
+            isPhoneMasked: isMasked,
           }
-        : { isPhoneMasked: company?.isPhoneMasked || false },
+        : { isPhoneMasked: isMasked },
       scope: {
         deliverables: scopeRow ? parseField(scopeRow.deliverables) || [] : [],
       },
@@ -443,12 +452,13 @@ export async function GET(
         postalCode: company?.postalCode || creatorUser?.postalCode || "",
         country: company?.country || creatorUser?.country || "India",
         businessType: company?.businessType || "",
-        isPhoneMasked: company?.isPhoneMasked || false,
+        isPhoneMasked: isMasked,
       },
       contact: {
         contactName: contactDetails?.contactName || creatorUser?.name || "",
         contactEmail: contactDetails?.contactEmail || creatorUser?.email || "",
-        contactPhone: contactDetails?.contactPhone || creatorUser?.mobileNumber || "",
+        contactPhone: safeContactPhone,
+        isPhoneMasked: isMasked,
         contactTitle: contactDetails?.contactTitle || "",
         contactDepartment: contactDetails?.contactDepartment || "",
         logoUrl: contactDetails?.logoUrl || null,
@@ -555,8 +565,43 @@ export async function POST(
       await upsertRfpFinancials(id, body.financials);
     }
 
+    const incomingIsPhoneMasked =
+      typeof body.isPhoneMasked === "boolean"
+        ? body.isPhoneMasked
+        : typeof body.company?.isPhoneMasked === "boolean"
+        ? body.company.isPhoneMasked
+        : typeof body.requirement?.isPhoneMasked === "boolean"
+        ? body.requirement.isPhoneMasked
+        : typeof body.contact?.isPhoneMasked === "boolean"
+        ? body.contact.isPhoneMasked
+        : undefined;
+
     if (body.company) {
-      await upsertRfpCompany(id, body.company);
+      await upsertRfpCompany(id, {
+        ...body.company,
+        ...(incomingIsPhoneMasked !== undefined ? { isPhoneMasked: incomingIsPhoneMasked } : {}),
+      });
+    } else if (incomingIsPhoneMasked !== undefined) {
+      await upsertRfpCompany(id, { isPhoneMasked: incomingIsPhoneMasked });
+    }
+
+    if (incomingIsPhoneMasked !== undefined) {
+      try {
+        const [contactMember] = await db
+          .select()
+          .from(rfqContactsMembers)
+          .where(eq(rfqContactsMembers.rfqId, id))
+          .limit(1);
+
+        if (contactMember?.rfqContactId) {
+          await db
+            .update(rfqContacts)
+            .set({ isPhoneMasked: incomingIsPhoneMasked })
+            .where(eq(rfqContacts.id, contactMember.rfqContactId));
+        }
+      } catch (err) {
+        console.warn("Could not update contact phone mask:", err);
+      }
     }
 
     if (body.generalTerms) {
@@ -604,6 +649,46 @@ export async function POST(
     console.error("Error updating RFQ data:", error);
     return NextResponse.json(
       { error: "Failed to update RFQ data." },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const user = await getSessionUser(request);
+    const { id } = await params;
+
+    const [existingRfq] = await db
+      .select()
+      .from(rfqs)
+      .where(eq(rfqs.id, id))
+      .limit(1);
+
+    if (!existingRfq) {
+      return NextResponse.json({ error: "RFQ not found" }, { status: 404 });
+    }
+
+    if (user && existingRfq.userId && existingRfq.userId !== user.id && user.role !== "admin") {
+      return NextResponse.json(
+        { error: "Unauthorized to delete this RFQ." },
+        { status: 403 },
+      );
+    }
+
+    await db.delete(rfqs).where(eq(rfqs.id, id));
+
+    return NextResponse.json({
+      success: true,
+      message: "RFQ deleted successfully.",
+    });
+  } catch (error: any) {
+    console.error("Error deleting RFQ:", error);
+    return NextResponse.json(
+      { error: error?.message || "Failed to delete RFQ." },
       { status: 500 },
     );
   }

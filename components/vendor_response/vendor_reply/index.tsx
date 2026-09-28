@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import {
   VendorReplyFormData,
   VendorReplyProps,
+  SharedDocumentItem,
 } from "@/lib/types/vendor-reply";
 import { HeaderSection } from "./header-section";
 import { BuyerSection } from "./buyer-section";
@@ -365,9 +366,13 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
               strVal === "Address 1" ||
               strVal === "Unknown" ||
               strVal === "000000" ||
-              strVal === "0000000000"
+              strVal === "0000000000" ||
+              strVal === ""
             ) {
-              setValue(`companydetails.${k}` as any, "");
+              const existingVal = getValues(`companydetails.${k}` as any);
+              if (!existingVal || existingVal === "Unknown") {
+                setValue(`companydetails.${k}` as any, "");
+              }
             } else {
               setValue(`companydetails.${k}` as any, v);
             }
@@ -386,22 +391,31 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
           }
         }
 
-        const vInfo = vendorDetails || organizationVendor;
+        const vInfo =
+          vendorDetails ||
+          organizationVendor ||
+          (buyerData?.vendorContacts && buyerData.vendorContacts.length === 1
+            ? buyerData.vendorContacts[0]
+            : null) ||
+          (buyerData?.vendorcontacts && buyerData.vendorcontacts.length === 1
+            ? buyerData.vendorcontacts[0]
+            : null);
+
         if (vInfo) {
           const currentCompany = getValues("companydetails.companyName");
           if (!currentCompany || currentCompany === "Unknown" || currentCompany.trim() === "") {
-            setValue("companydetails.companyName", vInfo.companyName || "");
+            setValue("companydetails.companyName", vInfo.companyName || vInfo.company || "");
           }
           const currentEmail = getValues("companydetails.email");
           if (!currentEmail || currentEmail === "Unknown" || currentEmail.trim() === "") {
-            setValue("companydetails.email", vInfo.email || "");
+            setValue("companydetails.email", vInfo.email || vInfo.vendorEmail || "");
           }
-          if (!contact.mobileNo && vInfo.mobileNo) {
-            const newMobileNo = vInfo.mobileNo;
+          const rawMobile = vInfo.mobileNo || vInfo.phone || vInfo.mobile;
+          if (rawMobile) {
             const newCountryCode = vInfo.countryCode || "+91";
-            const formattedPhone = newMobileNo.startsWith("+")
-              ? newMobileNo
-              : `${newCountryCode} ${newMobileNo}`.trim();
+            const formattedPhone = String(rawMobile).startsWith("+")
+              ? String(rawMobile)
+              : `${newCountryCode} ${rawMobile}`.trim();
             setContact((prev) => ({
               ...prev,
               mobileNo: formattedPhone,
@@ -555,6 +569,51 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
     loadRevisionData();
   }, [loadRevisionData]);
 
+  // Synchronize vendor contact info (company name, email, phone) from buyer data or vendorDetails
+  useEffect(() => {
+    const vInfo =
+      vendorDetails ||
+      organizationVendor ||
+      (buyerData?.vendorContacts && buyerData.vendorContacts.length === 1
+        ? buyerData.vendorContacts[0]
+        : null) ||
+      (buyerData?.vendorcontacts && buyerData.vendorcontacts.length === 1
+        ? buyerData.vendorcontacts[0]
+        : null);
+
+    if (!vInfo) return;
+
+    const compName = vInfo.companyName || vInfo.company || "";
+    if (compName) {
+      const curComp = getValues("companydetails.companyName");
+      if (!curComp || curComp === "Unknown" || curComp.trim() === "") {
+        setValue("companydetails.companyName", compName, { shouldValidate: true });
+      }
+    }
+
+    const compEmail = vInfo.email || vInfo.vendorEmail || "";
+    if (compEmail) {
+      const curEmail = getValues("companydetails.email");
+      if (!curEmail || curEmail === "Unknown" || curEmail.trim() === "") {
+        setValue("companydetails.email", compEmail, { shouldValidate: true });
+      }
+    }
+
+    const rawMobile = vInfo.mobileNo || vInfo.phone || vInfo.mobile || "";
+    if (rawMobile) {
+      const code = vInfo.countryCode || "+91";
+      const formatted = String(rawMobile).startsWith("+")
+        ? String(rawMobile)
+        : `${code} ${rawMobile}`.trim();
+      setContact((prev) => ({
+        ...prev,
+        mobileNo: formatted,
+        countryCode: code,
+      }));
+      setValue("companydetails.phone", formatted, { shouldValidate: true });
+    }
+  }, [vendorDetails, organizationVendor, buyerData, setValue, getValues]);
+
   const displayRevisionNumber =
     !isSubmitted && hasSubmittedPast
       ? latestRevisionNumber + 1
@@ -640,21 +699,79 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
     loadAllIndiaCities();
   }, []);
 
-  const requiredDocuments = useMemo(() => {
-    const docs =
+  const sharedDocuments = useMemo<SharedDocumentItem[]>(() => {
+    let raw =
       buyerData?.documentsToShare?.documentsToShare ||
-      buyerData?.documentsToShare;
-    if (Array.isArray(docs))
-      return docs.map((d: any) =>
-        typeof d === "object" ? d.name || d.id : String(d),
-      );
-    if (typeof docs === "string")
-      return docs.split(",").map((d: string) => d.trim());
+      buyerData?.documentsToShare ||
+      buyerData?.documents;
+
+    if (!raw) return [];
+
+    if (typeof raw === "object" && !Array.isArray(raw) && raw !== null) {
+      if (raw.documentsToShare !== undefined) raw = raw.documentsToShare;
+      else if (raw.documents !== undefined) raw = raw.documents;
+    }
+
+    if (Array.isArray(raw)) {
+      return raw
+        .map((item: any, index: number) => {
+          if (typeof item === "string") {
+            return { id: `doc-${index}`, name: item };
+          }
+          return {
+            id: item.id || `doc-${index}`,
+            name: item.name || item.fileName || "Document",
+            url: item.url || item.path,
+            path: item.path || item.url,
+            size: item.size,
+            type: item.type,
+            isUploaded: !!(item.url || item.path || item.isUploaded),
+          };
+        })
+        .filter((d: SharedDocumentItem) => Boolean(d.name && d.name.trim()));
+    }
+
+    if (typeof raw === "string") {
+      const trimmed = raw.trim();
+      if (!trimmed || trimmed === "[]" || trimmed === "{}") return [];
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((item: any, index: number) => {
+              if (typeof item === "string") return { id: `doc-${index}`, name: item };
+              return {
+                id: item.id || `doc-${index}`,
+                name: item.name || item.fileName || "Document",
+                url: item.url || item.path,
+                path: item.path || item.url,
+                size: item.size,
+                type: item.type,
+                isUploaded: !!(item.url || item.path || item.isUploaded),
+              };
+            })
+            .filter((d: SharedDocumentItem) => Boolean(d.name && d.name.trim()));
+        }
+      } catch {
+        return trimmed
+          .split(",")
+          .map((d: string, index: number) => ({ id: `doc-${index}`, name: d.trim() }))
+          .filter((d: SharedDocumentItem) => d.name.length > 0);
+      }
+    }
+
+    return [];
+  }, [buyerData]);
+
+  const requiredDocuments = useMemo(() => {
+    if (sharedDocuments.length > 0) {
+      return sharedDocuments.map((d) => d.name);
+    }
     return [
       "Pan Card / Registration Certificate",
       "ISO / Compliance Certificate",
     ];
-  }, [buyerData]);
+  }, [sharedDocuments]);
 
   const safeParseFloat = (value: any): number => {
     if (typeof value === "number") return value;
@@ -1212,6 +1329,7 @@ export const VendorReply: React.FC<VendorReplyProps> = ({
         priorityCities={priorityCities}
         loadingCities={loadingCities}
         requiredDocuments={requiredDocuments}
+        sharedDocuments={sharedDocuments}
         documentValidation={documentValidation}
         submissionAttempted={submissionAttempted}
         documentAttachments={documentAttachments}

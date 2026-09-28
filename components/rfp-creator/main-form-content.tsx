@@ -420,6 +420,20 @@ export const MainFormContent: React.FC<MainFormContentProps> = ({
             rfpId={rfpId !== null ? String(rfpId) : undefined}
             disabled={isFormDisabled}
             isLoggedIn={isLoggedIn}
+            onChange={(updatedData) => {
+              setFormData((prev: any) => ({
+                ...prev,
+                ...updatedData,
+                company: {
+                  ...(prev.company || {}),
+                  ...(updatedData.company || {}),
+                },
+                requirement: {
+                  ...(prev.requirement || {}),
+                  ...(updatedData.requirement || {}),
+                },
+              }));
+            }}
           />
         )}
       </div>

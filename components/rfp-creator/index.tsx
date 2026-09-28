@@ -325,28 +325,32 @@ export const MainContent: React.FC<MainContentProps> = ({
   return (
     <div className="flex flex-1 flex-col h-full">
       {/* Top Action Bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0 shadow-2xs">
-        <div className="flex items-center gap-3">
-          {hasVendorReplies && (
+      {(hasVendorReplies || isSubmitted) && (
+        <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0 shadow-2xs">
+          <div className="flex items-center gap-3">
+            {hasVendorReplies && (
+              <Button
+                variant="outline"
+                onClick={handleViewBuyerPreview}
+                className="border-blue-600 text-blue-600 hover:bg-blue-50 text-xs font-bold uppercase flex items-center gap-2 h-9 px-4 rounded-lg cursor-pointer"
+              >
+                <Eye className="w-4 h-4 text-blue-600" />
+                View Buyer Preview
+              </Button>
+            )}
+          </div>
+
+          {isSubmitted && (
             <Button
-              variant="outline"
-              onClick={handleViewBuyerPreview}
-              className="border-blue-600 text-blue-600 hover:bg-blue-50 text-xs font-bold uppercase flex items-center gap-2 h-9 px-4 rounded-lg cursor-pointer"
+              onClick={() => navigateToSection("vendorcontacts")}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold uppercase flex items-center gap-2 h-9 px-4 rounded-lg shadow-xs cursor-pointer"
             >
-              <Eye className="w-4 h-4 text-blue-600" />
-              View Buyer Preview
+              <UserPlus className="w-4 h-4" />
+              Add Vendors
             </Button>
           )}
         </div>
-
-        <Button
-          onClick={() => navigateToSection("vendorcontacts")}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold uppercase flex items-center gap-2 h-9 px-4 rounded-lg shadow-xs cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4" />
-          Add Vendors
-        </Button>
-      </div>
+      )}
 
       <div className="flex overflow-hidden bg-background h-full">
         <div className="w-1/2 p-6 overflow-y-auto h-full relative bg-white">

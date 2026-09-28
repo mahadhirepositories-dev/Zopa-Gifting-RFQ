@@ -14,6 +14,8 @@ import {
   rfqVendors,
   rfqVendorContacts,
   rfqDates,
+  rfqs,
+  users,
 } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 
@@ -43,21 +45,14 @@ interface CategorySourceData {
 }
 
 export async function upsertRfpCompany(rfpId: string, data: CompanySourceData) {
-  const name = (data.companyName || (data as any).name)?.trim();
-  if (!name) return;
-
-  const values = {
-    rfqId: rfpId,
-    name,
-    addressLine1: data.addressLine1?.trim() || "Not provided",
-    addressLine2: data.addressLine2?.trim() || null,
-    city: data.city?.trim() || "Unknown",
-    state: data.state?.trim() || "Unknown",
-    postalCode: data.postalCode?.trim() || "Unknown",
-    country: data.country?.trim() || "Unknown",
-    businessType: data.businessType ? String(data.businessType).trim() : null,
-    isPhoneMasked: data.isPhoneMasked === true,
-  };
+  let name = (data.companyName || (data as any).name)?.trim();
+  let addressLine1 = data.addressLine1?.trim();
+  let addressLine2 = data.addressLine2?.trim() || null;
+  let city = data.city?.trim();
+  let state = data.state?.trim();
+  let postalCode = data.postalCode?.trim();
+  let country = data.country?.trim();
+  let businessType = data.businessType ? String(data.businessType).trim() : null;
 
   const [existing] = await db
     .select({ id: rfqCompanies.id })
@@ -66,13 +61,72 @@ export async function upsertRfpCompany(rfpId: string, data: CompanySourceData) {
     .limit(1);
 
   if (existing) {
+    const updateValues: Record<string, any> = {
+      updatedAt: new Date(),
+    };
+    if (name) updateValues.name = name;
+    if (addressLine1) updateValues.addressLine1 = addressLine1;
+    if (typeof addressLine2 !== "undefined") updateValues.addressLine2 = addressLine2;
+    if (city) updateValues.city = city;
+    if (state) updateValues.state = state;
+    if (postalCode) updateValues.postalCode = postalCode;
+    if (country) updateValues.country = country;
+    if (typeof businessType !== "undefined") updateValues.businessType = businessType;
+    if (typeof data.isPhoneMasked === "boolean") updateValues.isPhoneMasked = data.isPhoneMasked;
+
     await db
       .update(rfqCompanies)
-      .set({ ...values, updatedAt: new Date() })
+      .set(updateValues)
       .where(eq(rfqCompanies.rfqId, rfpId));
-  } else {
-    await db.insert(rfqCompanies).values(values);
+    return;
   }
+
+  // If no existing row, create one.
+  // Fall back to the creator user's profile if company details are incomplete
+  if (!name || !addressLine1) {
+    try {
+      const [rfqRow] = await db
+        .select({ userId: rfqs.userId })
+        .from(rfqs)
+        .where(eq(rfqs.id, rfpId))
+        .limit(1);
+
+      if (rfqRow?.userId) {
+        const [userRow] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, rfqRow.userId))
+          .limit(1);
+
+        if (userRow) {
+          if (!name) name = userRow.companyName?.trim() || userRow.name?.trim() || "Organization";
+          if (!addressLine1) addressLine1 = userRow.addressLine1?.trim() || "Not provided";
+          if (!addressLine2 && userRow.addressLine2) addressLine2 = userRow.addressLine2.trim();
+          if (!city && userRow.city) city = userRow.city.trim();
+          if (!state && userRow.state) state = userRow.state.trim();
+          if (!postalCode && userRow.postalCode) postalCode = userRow.postalCode.trim();
+          if (!country && userRow.country) country = userRow.country.trim();
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch user fallback for rfqCompany insert:", err);
+    }
+  }
+
+  const values = {
+    rfqId: rfpId,
+    name: name || "Organization",
+    addressLine1: addressLine1 || "Not provided",
+    addressLine2: addressLine2 || null,
+    city: city || "Unknown",
+    state: state || "Unknown",
+    postalCode: postalCode || "Unknown",
+    country: country || "India",
+    businessType: businessType || null,
+    isPhoneMasked: data.isPhoneMasked === true,
+  };
+
+  await db.insert(rfqCompanies).values(values);
 }
 
 export async function upsertRfpRequirement(
@@ -82,31 +136,31 @@ export async function upsertRfpRequirement(
   const projectName = data.projectName?.trim();
   const purpose = data.purpose?.trim();
 
-  if (!projectName && !purpose) return;
+  if (projectName || purpose) {
+    const values = {
+      rfqId: rfpId,
+      projectName: projectName || "Gifting Project",
+      purpose: purpose || "Gifting Requirement",
+    };
 
-  const values = {
-    rfqId: rfpId,
-    projectName: projectName || "Gifting Project",
-    purpose: purpose || "Gifting Requirement",
-  };
+    const [existing] = await db
+      .select({ id: rfqRequirements.id })
+      .from(rfqRequirements)
+      .where(eq(rfqRequirements.rfqId, rfpId))
+      .limit(1);
 
-  const [existing] = await db
-    .select({ id: rfqRequirements.id })
-    .from(rfqRequirements)
-    .where(eq(rfqRequirements.rfqId, rfpId))
-    .limit(1);
-
-  if (existing) {
-    await db
-      .update(rfqRequirements)
-      .set({ ...values, updatedAt: new Date() })
-      .where(eq(rfqRequirements.rfqId, rfpId));
-  } else {
-    await db.insert(rfqRequirements).values(values);
+    if (existing) {
+      await db
+        .update(rfqRequirements)
+        .set({ ...values, updatedAt: new Date() })
+        .where(eq(rfqRequirements.rfqId, rfpId));
+    } else {
+      await db.insert(rfqRequirements).values(values);
+    }
   }
 
-  if (typeof (data as any).isPhoneMasked !== 'undefined') {
-    await db.update(rfqCompanies).set({ isPhoneMasked: (data as any).isPhoneMasked === true }).where(eq(rfqCompanies.rfqId, rfpId));
+  if (typeof (data as any).isPhoneMasked !== "undefined") {
+    await upsertRfpCompany(rfpId, { isPhoneMasked: (data as any).isPhoneMasked === true });
   }
 }
 
