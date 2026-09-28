@@ -121,7 +121,7 @@ export function AdminSidebar({ user: initialUser }: AdminSidebarProps) {
         console.error("SignOut error:", err);
       }
     } finally {
-      window.location.href = "/admin/login";
+      window.location.href = "/";
     }
   };
 
