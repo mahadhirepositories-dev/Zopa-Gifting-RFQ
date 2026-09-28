@@ -320,9 +320,9 @@ export default function BuyerDashboardPage() {
         </div>
 
         {/* Metric Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pt-1 sm:pt-2">
           <Card className="border border-slate-200 bg-white shadow-2xs">
-            <CardContent className="p-5">
+            <CardContent className="p-5 sm:p-6 pt-5 sm:pt-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -340,7 +340,7 @@ export default function BuyerDashboardPage() {
           </Card>
 
           <Card className="border border-slate-200 bg-white shadow-2xs">
-            <CardContent className="p-5">
+            <CardContent className="p-5 sm:p-6 pt-5 sm:pt-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -358,7 +358,7 @@ export default function BuyerDashboardPage() {
           </Card>
 
           <Card className="border border-slate-200 bg-white shadow-2xs">
-            <CardContent className="p-5">
+            <CardContent className="p-5 sm:p-6 pt-5 sm:pt-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -376,7 +376,7 @@ export default function BuyerDashboardPage() {
           </Card>
 
           <Card className="border border-slate-200 bg-white shadow-2xs">
-            <CardContent className="p-5">
+            <CardContent className="p-5 sm:p-6 pt-5 sm:pt-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
