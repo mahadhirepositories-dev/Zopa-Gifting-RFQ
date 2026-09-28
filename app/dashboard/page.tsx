@@ -580,10 +580,14 @@ export default function BuyerDashboardPage() {
                               <span>{rfq.responsesCount} {rfq.responsesCount === 1 ? "quote" : "quotes"} received</span>
                             </Link>
                           ) : rfq.vendorsCount > 0 ? (
-                            <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
-                              <Users className="w-3.5 h-3.5 text-slate-400" />
+                            <Link
+                              href={`/rfq/preview/${rfq.id}`}
+                              className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 transition-colors"
+                              title="View RFQ Preview"
+                            >
+                              <Users className="w-3.5 h-3.5 text-slate-500" />
                               <span>{rfq.vendorsCount} invited (0 quotes)</span>
-                            </span>
+                            </Link>
                           ) : (
                             <span className="text-xs text-slate-400">No vendors invited</span>
                           )}
