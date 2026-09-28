@@ -675,7 +675,7 @@ const Footer = ({
       <View style={styles.footerContactContainer}>
         <View style={styles.footerItem}>
           <Text style={styles.footerText}>
-            {buyerData?.company?.isPhoneMasked ? "Masked" : (buyerData?.contact?.contactPhone || "Phone")}
+            {buyerData?.company?.isPhoneMasked || buyerData?.contact?.isPhoneMasked || buyerData?.isPhoneMasked || buyerData?.contact?.contactPhone === "Masked from vendors" || buyerData?.contact?.contactPhone === "Masked" ? "Masked from vendors" : (buyerData?.contact?.contactPhone || "Phone")}
           </Text>
         </View>
 
@@ -2059,7 +2059,7 @@ export const VendorResponseDocument = ({
               </Text>
               <Text style={styles.text}>
                 <Text style={styles.boldText}>Phone: </Text>
-                {buyerData?.company?.isPhoneMasked ? "Masked" : (buyerData?.contact?.contactPhone || "Buyer Phone")}
+                {buyerData?.company?.isPhoneMasked || buyerData?.contact?.isPhoneMasked || buyerData?.isPhoneMasked || buyerData?.contact?.contactPhone === "Masked from vendors" || buyerData?.contact?.contactPhone === "Masked" ? "Masked from vendors" : (buyerData?.contact?.contactPhone || "Buyer Phone")}
               </Text>
               <Text style={styles.text}>
                 <Text style={styles.boldText}>Address: </Text>

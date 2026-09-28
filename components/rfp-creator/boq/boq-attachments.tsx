@@ -231,7 +231,7 @@ export const BOQAttachments: React.FC<BOQAttachmentsProps> = ({
 
               <Button
                 type="button"
-                size="iconSmall"
+                size="icon-xs"
                 variant="destructive"
                 onClick={() => handleRemove(i)}
                 disabled={disabled || att.isUploading}

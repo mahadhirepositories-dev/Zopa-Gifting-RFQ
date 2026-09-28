@@ -130,8 +130,19 @@ export interface BOQItem {
   specification?: string;
 }
 
+export interface SharedDocumentItem {
+  id?: string | number;
+  name: string;
+  url?: string;
+  path?: string;
+  size?: number;
+  type?: string;
+  isUploaded?: boolean;
+}
+
 export interface DocumentAttachmentsProps {
   requiredDocuments: string[];
+  sharedDocuments?: SharedDocumentItem[];
   documentValidation: Record<
     number,
     {
@@ -167,6 +178,7 @@ export interface DocumentAttachmentsProps {
 export interface DocumentItemProps {
   index: number;
   documentName: string;
+  buyerUploadedFile?: SharedDocumentItem;
   documentValidation: Record<
     number,
     {

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
 import { useForm } from "react-hook-form";
-import { VendorReplyFormData } from "@/lib/types/vendor-reply";
+import { VendorReplyFormData, SharedDocumentItem } from "@/lib/types/vendor-reply";
 import { CompanyIntroduction } from "../section/company-introduction";
 import { ScopeOfWork } from "../section/scope-of-work";
 import { BOQSection } from "../section/boq-section";
@@ -43,6 +43,7 @@ interface VendorReplyFormProps {
   priorityCities: string[];
   loadingCities: boolean;
   requiredDocuments: string[];
+  sharedDocuments?: SharedDocumentItem[];
   documentValidation: Record<
     number,
     { message: React.ReactNode; valid?: boolean; selected?: boolean }
@@ -113,6 +114,7 @@ export const VendorReplyForm: React.FC<VendorReplyFormProps> = ({
   priorityCities,
   loadingCities,
   requiredDocuments,
+  sharedDocuments = [],
   documentValidation,
   submissionAttempted,
   documentAttachments,
@@ -234,6 +236,7 @@ export const VendorReplyForm: React.FC<VendorReplyFormProps> = ({
 
       <DocumentAttachments
         requiredDocuments={requiredDocuments}
+        sharedDocuments={sharedDocuments}
         documentValidation={documentValidation}
         submissionAttempted={submissionAttempted}
         register={register}

@@ -10,6 +10,7 @@ import {
   Mail,
   Shield,
   Building,
+  LayoutDashboard,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -180,6 +181,14 @@ export function NavUser() {
               sideOffset={8}
               className="w-48 rounded-lg bg-white border border-slate-200 shadow-lg p-1 text-slate-700"
             >
+              <DropdownMenuItem
+                onClick={() => router.push("/dashboard")}
+                className="flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-md cursor-pointer"
+              >
+                <LayoutDashboard className="w-4 h-4 text-blue-600" />
+                <span className="font-medium text-slate-800">Buyer Dashboard</span>
+              </DropdownMenuItem>
+
               <DropdownMenuItem
                 onClick={() => setShowProfileModal(true)}
                 className="flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-md cursor-pointer"

@@ -81,3 +81,68 @@ export async function createAndSetAuthSession(
     return null;
   }
 }
+
+/**
+ * Resolves the authenticated user from session token or email cookie
+ */
+export async function getSessionUser(request: Request | any) {
+  let sessionToken: string | undefined;
+
+  try {
+    if (typeof request.cookies?.get === "function") {
+      sessionToken =
+        request.cookies.get("better-auth.session_token")?.value ||
+        request.cookies.get("__Secure-better-auth.session_token")?.value;
+    }
+  } catch {
+    // ignore
+  }
+
+  if (!sessionToken && typeof request.headers?.get === "function") {
+    const cookieHeader = request.headers.get("cookie") || "";
+    const match = cookieHeader.match(/(?:__Secure-)?better-auth\.session_token=([^;]+)/);
+    if (match) sessionToken = decodeURIComponent(match[1]);
+  }
+
+  if (sessionToken) {
+    const activeSessions = await db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.token, sessionToken))
+      .limit(1);
+
+    if (
+      activeSessions.length > 0 &&
+      new Date(activeSessions[0].expiresAt) > new Date()
+    ) {
+      const userRows = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, activeSessions[0].userId))
+        .limit(1);
+
+      if (userRows.length > 0) return userRows[0];
+    }
+  }
+
+  let emailCookie: string | undefined;
+  if (typeof request.cookies?.get === "function") {
+    emailCookie = request.cookies.get("zopa_user_email")?.value;
+  } else if (typeof request.headers?.get === "function") {
+    const cookieHeader = request.headers.get("cookie") || "";
+    const match = cookieHeader.match(/zopa_user_email=([^;]+)/);
+    if (match) emailCookie = decodeURIComponent(match[1]);
+  }
+
+  if (emailCookie) {
+    const userRows = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, emailCookie.trim().toLowerCase()))
+      .limit(1);
+
+    if (userRows.length > 0) return userRows[0];
+  }
+
+  return null;
+}

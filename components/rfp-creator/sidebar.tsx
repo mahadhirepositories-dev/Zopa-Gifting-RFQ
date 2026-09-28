@@ -2,6 +2,7 @@
 
 import React, { useMemo, memo } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useNavigation } from "@/components/navigation-context";
 import { cn } from "@/lib/utils";
 import {
@@ -18,9 +19,8 @@ import {
   CalendarDays,
   Eye,
   Lock,
-  Plus,
+  LayoutDashboard,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
   Sidebar as ShadcnSidebar,
   SidebarContent,
@@ -46,11 +46,6 @@ export const Sidebar: React.FC<SidebarProps> = memo(({ isSubmitted }) => {
     navigateToSection,
     canNavigateToSection,
   } = useNavigation();
-
-  const handleCreateNewRfp = () => {
-    const newRfpId = window.crypto.randomUUID();
-    window.location.href = `/rfq/${newRfpId}/requirement`;
-  };
 
   const currentActive = activeSection || currentSection;
 
@@ -118,13 +113,13 @@ export const Sidebar: React.FC<SidebarProps> = memo(({ isSubmitted }) => {
           className="w-4/5 h-auto max-h-10 object-contain"
           priority
         />
-        <Button
-          onClick={handleCreateNewRfp}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2 px-3 rounded-lg shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+        <Link
+          href="/dashboard"
+          className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-blue-600 hover:bg-white/80 py-1.5 px-3 rounded-lg transition-colors border border-slate-200/80 bg-white/50 shadow-2xs"
         >
-          <Plus className="w-4 h-4" />
-          <span>Create New RFQ</span>
-        </Button>
+          <LayoutDashboard className="w-3.5 h-3.5 text-blue-600" />
+          <span>Buyer Dashboard</span>
+        </Link>
       </SidebarHeader>
 
       <SidebarContent className="p-2 space-y-1 overflow-y-auto min-h-0 flex-1">

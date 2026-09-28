@@ -61,9 +61,7 @@ type DataType = {
   specialTerms?: {
     selectedTerms?: string[];
   };
-  documentsToShare?: {
-    documentsToShare?: string | Array<{ id: string; name: string }>;
-  };
+  documentsToShare?: any;
   rfpDates?: {
     startDate?: string;
     endDate?: string;
@@ -142,24 +140,49 @@ export default function VendorReplyPage({
           const respRes = await fetch(queryUrl);
           if (respRes.ok) {
             const respJson = await respRes.json();
-            if (respJson?.data?.vendorResponseId) {
-              responseId = respJson.data.vendorResponseId;
+            const rData = Array.isArray(respJson?.data) ? respJson.data[0] : respJson?.data;
+            if (rData?.vendorResponseId) {
+              responseId = rData.vendorResponseId;
             }
-            if (respJson?.data?.status === "submitted") {
+            if (rData?.status === "submitted") {
               setIsSubmitted(false);
             }
-            if (respJson?.data?.vendorEmail && fetchedBuyerData?.vendorContacts) {
-              const matchedVendor = fetchedBuyerData.vendorContacts.find(
-                (contact: any) => contact.email?.toLowerCase() === respJson.data.vendorEmail?.toLowerCase()
+
+            const allContacts = fetchedBuyerData?.vendorContacts || fetchedBuyerData?.vendorcontacts || [];
+            let matched = null;
+            const targetEmail = rData?.vendorEmail || rData?.companyInfo?.email || rData?.companyDetails?.email;
+            if (targetEmail && allContacts.length > 0) {
+              matched = allContacts.find(
+                (contact: any) => contact.email?.trim().toLowerCase() === targetEmail.trim().toLowerCase()
               );
-              if (matchedVendor) {
-                setVendorDetails(matchedVendor);
-                setOrganizationVendor(matchedVendor);
-              }
+            }
+            if (!matched && allContacts.length === 1) {
+              matched = allContacts[0];
+            }
+
+            if (matched) {
+              setVendorDetails(matched);
+              setOrganizationVendor(matched);
+            } else if (rData?.companyInfo || rData?.companyDetails) {
+              const ci = rData?.companyInfo || rData?.companyDetails;
+              const fallbackDetails = {
+                companyName: ci.companyName || "",
+                email: ci.email || targetEmail || "",
+                mobileNo: ci.phone || "",
+                countryCode: "+91",
+              };
+              setVendorDetails(fallbackDetails);
+              setOrganizationVendor(fallbackDetails);
             }
           }
         } catch (e) {
           console.warn("Could not load vendor response status:", e);
+        }
+
+        const remainingContacts = fetchedBuyerData?.vendorContacts || fetchedBuyerData?.vendorcontacts || [];
+        if (remainingContacts.length === 1) {
+          setVendorDetails((prev: any) => prev || remainingContacts[0]);
+          setOrganizationVendor((prev: any) => prev || remainingContacts[0]);
         }
 
         if (!responseId) {
