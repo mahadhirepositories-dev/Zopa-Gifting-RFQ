@@ -25,12 +25,7 @@ function checkRateLimit(
 
 
 function getAuthToken(request: NextRequest): string | undefined {
-  return (
-    getSessionCookie(request) ||
-    request.cookies.get("better-auth.session_token")?.value ||
-    request.cookies.get("__Secure-better-auth.session_token")?.value ||
-    request.cookies.get("zopa_user_email")?.value
-  );
+  return getSessionCookie(request) || undefined;
 }
 
 

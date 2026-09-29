@@ -1,11 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, rfqs, pendingRegistrations } from "@/db/schema";
+import { users, pendingRegistrations } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { EmailService } from "@/lib/email/email-service";
-import { createAndSetAuthSession } from "@/lib/auth-session";
-import { upsertRfpCompany } from "@/lib/rfq-updates";
+import { auth } from "@/lib/auth";
 import { isWorkEmail } from "@/lib/validations/work-email";
 
 const formatLocationField = (val: any): string => {
@@ -78,31 +76,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const userId = crypto.randomUUID();
-    const rfpId = crypto.randomUUID();
-
+    // Stage the registration data in pendingRegistrations.
+    // When the user clicks the magic link, better-auth creates the user
+    // and the databaseHooks.user.create.before hook in lib/auth.ts
+    // merges this staged data into the new user record.
     try {
-      const userValues = {
-        name: nameClean,
-        email: emailClean,
-        mobileNumber: mobileClean,
-        companyName: companyClean,
-        addressLine1: addressLine1Clean,
-        addressLine2: addressLine2Clean,
-        country: countryClean,
-        state: stateClean,
-        city: cityClean,
-        postalCode: postalCodeClean,
-        updatedAt: new Date(),
-      };
-
-      await db.insert(users).values({
-        id: userId,
-        ...userValues,
-        emailVerified: true,
-      });
-
-
       const pendingValues = {
         email: emailClean,
         name: nameClean,
@@ -130,76 +108,33 @@ export async function POST(request: Request) {
           .set(pendingValues)
           .where(eq(pendingRegistrations.email, emailClean));
       }
-
-      await db.insert(rfqs).values({
-        id: rfpId,
-        userId: userId,
-        title: "",
-        category: "Corporate Gifting",
-        quantity: 500,
-        status: "draft",
-      });
-
-      await upsertRfpCompany(rfpId, {
-        companyName: companyClean,
-        addressLine1: addressLine1Clean,
-        addressLine2: addressLine2Clean,
-        city: cityClean,
-        state: stateClean,
-        postalCode: postalCodeClean,
-        country: countryClean,
-        businessType: body.businessType || null,
-      });
     } catch (dbError) {
       console.warn(
-        "DB connection warning, using session memory fallback:",
+        "DB connection warning, pending registration staging failed:",
         dbError,
       );
     }
 
-    const requirementUrl = `/rfq/${rfpId}/requirement`;
-
-    try {
-      await EmailService.sendWelcomeEmail({
+    // Send magic link email via better-auth — NO session is created here.
+    // The user account and session are only created when the link is clicked.
+    // better-auth will auto-create the user (disableSignUp is not set), and
+    // the databaseHooks.user.create.before hook merges the pending data.
+    await auth.api.signInMagicLink({
+      body: {
         email: emailClean,
         name: nameClean,
-        url: requirementUrl,
-      });
-    } catch (emailErr) {
-      console.warn("Welcome email service warning during registration:", emailErr);
-    }
+        callbackURL: "/dashboard",
+      },
+      headers: request.headers,
+    });
 
-    const response = NextResponse.json({
-      message: `Registration successful! Welcome email sent to ${emailClean}.`,
+    return NextResponse.json({
+      status: "magic_link_sent",
+      message: `A magic link has been sent to ${emailClean}. Please check your email and click the link to complete registration.`,
       email: emailClean,
       name: nameClean,
       company: companyClean,
-      magicLinkUrl: requirementUrl,
-      redirectUrl: requirementUrl,
     });
-
-    response.cookies.set("zopa_user_email", emailClean, {
-      path: "/",
-      maxAge: 86400,
-    });
-    response.cookies.set("zopa_user_name", nameClean, {
-      path: "/",
-      maxAge: 86400,
-    });
-    if (mobileClean) {
-      response.cookies.set("zopa_user_mobile", mobileClean, {
-        path: "/",
-        maxAge: 86400,
-      });
-    }
-    response.cookies.set("zopa_user_company", companyClean, {
-      path: "/",
-      maxAge: 86400,
-    });
-
-    await createAndSetAuthSession(userId, response);
-
-    return response;
   } catch (error: any) {
     console.error("Magic link registration error:", error);
     return NextResponse.json(
