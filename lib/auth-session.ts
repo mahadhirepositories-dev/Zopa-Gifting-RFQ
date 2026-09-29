@@ -3,7 +3,8 @@ import { sessions, users } from "@/db/schema";
 import { eq, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
+import { getSessionCookie } from "better-auth/cookies";
 
 /**
  * Creates a valid Better Auth session in the DB and attaches the
@@ -114,39 +115,55 @@ export async function getSessionUser(request?: Request | any) {
         return session.user as any;
       }
     }
-  } catch {
-    // Continue to database / cookie fallback
+  } catch (err) {
+    console.warn("[getSessionUser] auth.api.getSession fallback:", err);
   }
 
-  // 2. Try better-auth.session_token cookie lookup in database
+  // 2. Try better-auth session token lookup in database
   let sessionToken: string | undefined;
 
-  try {
-    if (typeof request?.cookies?.get === "function") {
-      sessionToken =
-        request.cookies.get("better-auth.session_token")?.value ||
-        request.cookies.get("__Secure-better-auth.session_token")?.value;
+  // Check request headers/cookies if request is provided
+  if (request) {
+    try {
+      sessionToken = getSessionCookie(request) || undefined;
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
+
+    if (!sessionToken && typeof request.cookies?.get === "function") {
+      sessionToken =
+        request.cookies.get("__Secure-better-auth.session_token")?.value ||
+        request.cookies.get("better-auth.session_token")?.value;
+    }
   }
 
+  // Fallback to Next.js cookies() for Server Components
   if (!sessionToken) {
-    let cookieHeader = "";
-    if (typeof request?.headers?.get === "function") {
-      cookieHeader = request.headers.get("cookie") || "";
+    try {
+      const cookieStore = await cookies();
+      sessionToken =
+        cookieStore.get("__Secure-better-auth.session_token")?.value ||
+        cookieStore.get("better-auth.session_token")?.value;
+    } catch {
+      // ignore
     }
-    if (!cookieHeader) {
-      try {
-        const nextHeaders = await headers();
-        cookieHeader = nextHeaders.get("cookie") || "";
-      } catch {
-        // ignore
-      }
-    }
+  }
 
-    const match = cookieHeader.match(/(?:__Secure-)?better-auth\.session_token=([^;]+)/);
-    if (match) sessionToken = decodeURIComponent(match[1]);
+  // Fallback to Next.js headers()
+  if (!sessionToken) {
+    try {
+      const nextHeaders = await headers();
+      sessionToken = getSessionCookie(nextHeaders) || undefined;
+      if (!sessionToken) {
+        const cookieHeader = nextHeaders.get("cookie") || "";
+        const secureMatch = cookieHeader.match(/__Secure-better-auth\.session_token=([^;]+)/);
+        const standardMatch = cookieHeader.match(/(?:^|;\s*)better-auth\.session_token=([^;]+)/);
+        const match = secureMatch || standardMatch;
+        if (match) sessionToken = decodeURIComponent(match[1]);
+      }
+    } catch {
+      // ignore
+    }
   }
 
   if (sessionToken) {
@@ -192,20 +209,12 @@ export async function getSessionUser(request?: Request | any) {
   }
 
   if (!emailCookie) {
-    let cookieHeader = "";
-    if (typeof request?.headers?.get === "function") {
-      cookieHeader = request.headers.get("cookie") || "";
+    try {
+      const cookieStore = await cookies();
+      emailCookie = cookieStore.get("zopa_user_email")?.value;
+    } catch {
+      // ignore
     }
-    if (!cookieHeader) {
-      try {
-        const nextHeaders = await headers();
-        cookieHeader = nextHeaders.get("cookie") || "";
-      } catch {
-        // ignore
-      }
-    }
-    const match = cookieHeader.match(/zopa_user_email=([^;]+)/);
-    if (match) emailCookie = decodeURIComponent(match[1]);
   }
 
   if (emailCookie) {
@@ -226,7 +235,11 @@ export async function getSessionUser(request?: Request | any) {
  */
 export async function getAdminUser(request?: Request | any) {
   const user = await getSessionUser(request);
-  if (!user || user.role !== "admin") {
+  if (!user) {
+    return null;
+  }
+  const role = String(user.role || "").toLowerCase().trim();
+  if (role !== "admin" && role !== "superadmin") {
     return null;
   }
   return user;
