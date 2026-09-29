@@ -690,7 +690,9 @@ export const Preview: React.FC<PreviewProps> = ({
       }
 
       let baseUrl =
-        process.env.NEXT_PUBLIC_APP_URL || "https://staging-rfp.zopapro.com";
+        (typeof window !== "undefined" && window.location.origin)
+          ? window.location.origin
+          : (process.env.NEXT_PUBLIC_APP_URL || "https://staging-rfp.zopapro.com");
       if (!baseUrl.startsWith("http")) baseUrl = `https://${baseUrl}`;
 
       // Only process vendors if there are vendors to email
@@ -936,7 +938,9 @@ export const Preview: React.FC<PreviewProps> = ({
     try {
       setResendingEmail(email);
       let baseUrl =
-        process.env.NEXT_PUBLIC_APP_URL || "https://staging-rfp.zopapro.com";
+        (typeof window !== "undefined" && window.location.origin)
+          ? window.location.origin
+          : (process.env.NEXT_PUBLIC_APP_URL || "https://staging-rfp.zopapro.com");
       if (!baseUrl.startsWith("http")) baseUrl = `https://${baseUrl}`;
 
       const contact = data.vendorContacts.find(

@@ -22,7 +22,7 @@ import {
   sessions,
 } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getSessionCookie } from "better-auth/cookies";
+import { getSessionUser } from "@/lib/auth-session";
 import {
   upsertRfpRequirement,
   upsertRfpCompany,
@@ -42,47 +42,6 @@ import {
   scopeSchema
 } from "@/lib/validations/rfq-creator-schema";
 
-async function getSessionUser(request: NextRequest) {
-  const sessionToken =
-    getSessionCookie(request) ||
-    request.cookies.get("better-auth.session_token")?.value ||
-    request.cookies.get("__Secure-better-auth.session_token")?.value;
-
-  if (sessionToken) {
-    const activeSessions = await db
-      .select()
-      .from(sessions)
-      .where(eq(sessions.token, sessionToken))
-      .limit(1);
-
-    if (
-      activeSessions.length > 0 &&
-      new Date(activeSessions[0].expiresAt) > new Date()
-    ) {
-      const userRows = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, activeSessions[0].userId))
-        .limit(1);
-
-      if (userRows.length > 0) return userRows[0];
-    }
-  }
-
-  const emailCookie = request.cookies.get("zopa_user_email")?.value;
-  if (emailCookie) {
-    const userRows = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, emailCookie.trim().toLowerCase()))
-      .limit(1);
-
-    if (userRows.length > 0) return userRows[0];
-  }
-
-  return null;
-}
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -93,34 +52,28 @@ export async function GET(
     let targetRfpId = id;
     let targetRfq: typeof rfqs.$inferSelect | undefined;
 
-    if (user) {
-      // Check if RFQ exists for user in DB
-      const [rfq] = await db
-        .select()
-        .from(rfqs)
-        .where(and(eq(rfqs.id, id), eq(rfqs.userId, user.id)))
-        .limit(1);
+    // Check if RFQ exists in DB
+    const [existingRfq] = await db
+      .select()
+      .from(rfqs)
+      .where(eq(rfqs.id, id))
+      .limit(1);
 
-      if (rfq) {
-        targetRfq = rfq;
-      } else {
-        await ensureRfqExists(id, user);
-        targetRfpId = id;
-        const [createdRfq] = await db
-          .select()
-          .from(rfqs)
-          .where(eq(rfqs.id, id))
-          .limit(1);
-        targetRfq = createdRfq;
+    if (existingRfq) {
+      targetRfq = existingRfq;
+      // If user is logged in and RFQ has no owner, associate it
+      if (user && !existingRfq.userId) {
+        await db.update(rfqs).set({ userId: user.id }).where(eq(rfqs.id, id));
       }
-    } else {
-      // Guest access for preview
-      const [rfq] = await db
+    } else if (user) {
+      await ensureRfqExists(id, user);
+      targetRfpId = id;
+      const [createdRfq] = await db
         .select()
         .from(rfqs)
         .where(eq(rfqs.id, id))
         .limit(1);
-      targetRfq = rfq;
+      targetRfq = createdRfq;
     }
 
     if (!targetRfq) {
@@ -486,10 +439,13 @@ async function ensureRfqExists(id: string, user: typeof users.$inferSelect) {
     .limit(1);
 
   if (existing) {
-    if (existing.userId !== user.id) {
+    if (existing.userId && existing.userId !== user.id && user.role !== "admin") {
       throw Object.assign(new Error("RFQ belongs to a different user."), {
         statusCode: 403,
       });
+    }
+    if (!existing.userId) {
+      await db.update(rfqs).set({ userId: user.id }).where(eq(rfqs.id, id));
     }
     return; 
   }
@@ -693,3 +649,5 @@ export async function DELETE(
     );
   }
 }
+
+export const PUT = POST;

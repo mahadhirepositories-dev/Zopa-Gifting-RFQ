@@ -233,6 +233,12 @@ export default function BuyerPreviewPage() {
 
     const userEmail = session?.user?.email?.toLowerCase();
     const userId = session?.user?.id;
+    const role = ((session?.user as any)?.role || "").toLowerCase().trim();
+
+    if (role === "admin" || searchParams.get("from") === "admin") {
+      setUserRole("admin");
+      return;
+    }
 
     // Check if user is an explicitly assigned level 1 or level 2 approver for THIS specific RFP
     if (currentApproval) {
@@ -500,19 +506,42 @@ export default function BuyerPreviewPage() {
           <div className="pt-2 flex flex-col sm:flex-row gap-2.5 justify-center">
             {isDraft ? (
               <Button
-                onClick={() => router.push(`/rfq/${rfpId}/requirement`)}
+                onClick={() =>
+                  router.push(
+                    userRole === "admin" || searchParams.get("from") === "admin"
+                      ? `/admin/rfqs/${rfpId}`
+                      : `/rfq/${rfpId}/requirement`
+                  )
+                }
                 className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Edit className="w-4 h-4" />
-                Continue Editing RFQ
+                {userRole === "admin" || searchParams.get("from") === "admin"
+                  ? "Back to Admin RFQ"
+                  : "Continue Editing RFQ"}
               </Button>
             ) : null}
             <Button
               variant="outline"
-              onClick={() => router.push(isLoggedIn ? "/dashboard" : "/")}
+              onClick={() => {
+                const isAdmin =
+                  userRole === "admin" ||
+                  searchParams.get("from") === "admin" ||
+                  ((session?.user as any)?.role || "").toLowerCase().trim() === "admin";
+
+                if (isAdmin) {
+                  router.push("/admin");
+                } else if (isLoggedIn) {
+                  router.push("/dashboard");
+                } else {
+                  router.push("/");
+                }
+              }}
               className="border-slate-200 text-slate-700 hover:bg-slate-50 font-medium text-xs px-4 py-2 rounded-lg cursor-pointer"
             >
-              {isLoggedIn ? "Go to Dashboard" : "Return Home"}
+              {isLoggedIn || userRole === "admin" || searchParams.get("from") === "admin"
+                ? "Go to Dashboard"
+                : "Return Home"}
             </Button>
           </div>
         </div>

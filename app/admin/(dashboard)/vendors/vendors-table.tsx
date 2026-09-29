@@ -43,6 +43,36 @@ interface VendorsTableProps {
   initialVendors: Vendor[];
 }
 
+function ProductCell({ product }: { product: string | null }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!product) return <span className="text-slate-400 text-xs">-</span>;
+
+  const isLong = product.length > 35;
+  if (!isLong) {
+    return <span className="text-xs text-slate-700 font-medium">{product}</span>;
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <span
+        className={`text-xs text-slate-700 font-medium leading-relaxed ${
+          expanded ? "whitespace-normal" : "line-clamp-1"
+        }`}
+        title={product}
+      >
+        {product}
+      </span>
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="text-[11px] text-blue-600 hover:text-blue-700 hover:underline font-medium cursor-pointer"
+      >
+        {expanded ? "Show less" : "Show more"}
+      </button>
+    </div>
+  );
+}
+
 export function VendorsTable({ initialVendors }: VendorsTableProps) {
   const [search, setSearch] = useState("");
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
@@ -80,7 +110,9 @@ export function VendorsTable({ initialVendors }: VendorsTableProps) {
         <Table>
           <TableHeader className="bg-slate-50">
             <TableRow>
-              <TableHead className="w-[260px]">Company Name</TableHead>
+              <TableHead className="w-[200px] min-w-[180px]">Company Name</TableHead>
+              <TableHead className="w-[130px]">Category</TableHead>
+              <TableHead className="w-[220px] max-w-[220px]">Product</TableHead>
               <TableHead>Contact Person</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Mobile</TableHead>
@@ -93,7 +125,7 @@ export function VendorsTable({ initialVendors }: VendorsTableProps) {
             {filteredVendors.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={9}
                   className="text-center text-slate-500 py-10 text-sm"
                 >
                   {search ? "No vendors matching your search." : "No registered vendors found."}
@@ -102,22 +134,21 @@ export function VendorsTable({ initialVendors }: VendorsTableProps) {
             ) : (
               filteredVendors.map((vendor) => (
                 <TableRow key={vendor.id} className="hover:bg-slate-50/70">
-                  <TableCell>
+                  <TableCell className="w-[200px] min-w-[180px]">
                     <div className="flex items-center gap-2.5">
                       <div className="p-2 rounded-md bg-emerald-50 text-emerald-600 shrink-0">
                         <Building2 className="w-4 h-4" />
                       </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-semibold text-slate-900 text-sm truncate">
-                          {vendor.companyName}
-                        </span>
-                        {vendor.category && (
-                          <span className="text-[11px] text-slate-500 truncate">
-                            {vendor.category}
-                          </span>
-                        )}
-                      </div>
+                      <span className="font-semibold text-slate-900 text-sm truncate" title={vendor.companyName}>
+                        {vendor.companyName}
+                      </span>
                     </div>
+                  </TableCell>
+                  <TableCell className="text-xs font-medium text-slate-600 whitespace-nowrap">
+                    Gifting Items
+                  </TableCell>
+                  <TableCell className="w-[220px] max-w-[220px]">
+                    <ProductCell product={vendor.category} />
                   </TableCell>
                   <TableCell className="text-sm font-medium text-slate-700">
                     {vendor.name || "-"}
@@ -218,13 +249,23 @@ export function VendorsTable({ initialVendors }: VendorsTableProps) {
                   </span>
                 </div>
 
+                <div className="flex items-center justify-between p-2.5 rounded-md border border-slate-100 bg-slate-50/50">
+                  <span className="text-slate-500 flex items-center gap-2 font-medium">
+                    <Tag className="w-4 h-4 text-slate-400" />
+                    Category
+                  </span>
+                  <span className="font-medium text-slate-800">
+                    Gifting Items
+                  </span>
+                </div>
+
                 {selectedVendor.category && (
                   <div className="flex items-center justify-between p-2.5 rounded-md border border-slate-100 bg-slate-50/50">
                     <span className="text-slate-500 flex items-center gap-2 font-medium">
                       <Tag className="w-4 h-4 text-slate-400" />
-                      Category
+                      Product
                     </span>
-                    <span className="font-medium text-slate-800">
+                    <span className="font-medium text-slate-800 text-right max-w-[240px]">
                       {selectedVendor.category}
                     </span>
                   </div>

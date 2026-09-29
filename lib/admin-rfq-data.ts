@@ -19,7 +19,7 @@ import {
   rfqVendorContacts,
   rfqDates,
 } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 
 const safeSelect = async <T>(queryFn: () => Promise<T[]>): Promise<T | null> => {
   try {
@@ -53,8 +53,21 @@ export async function getBuyerWithRfqs(buyerId: string) {
 
   // Retrieve RFQs submitted by this buyer
   const buyerRfqs = await db
-    .select()
+    .select({
+      id: rfqs.id,
+      userId: rfqs.userId,
+      title: sql<string>`COALESCE(NULLIF(${rfqRequirements.projectName}, ''), NULLIF(${rfqs.title}, ''), 'Corporate Gifting RFQ')`,
+      category: rfqs.category,
+      quantity: rfqs.quantity,
+      estimatedBudget: rfqs.estimatedBudget,
+      deliveryLocation: rfqs.deliveryLocation,
+      customizationDetails: rfqs.customizationDetails,
+      status: rfqs.status,
+      createdAt: rfqs.createdAt,
+      updatedAt: rfqs.updatedAt,
+    })
     .from(rfqs)
+    .leftJoin(rfqRequirements, eq(rfqs.id, rfqRequirements.rfqId))
     .where(eq(rfqs.userId, buyerId))
     .orderBy(desc(rfqs.createdAt));
 
@@ -185,7 +198,10 @@ export async function getAdminRfqDetails(rfqId: string) {
   );
 
   return {
-    rfq,
+    rfq: {
+      ...rfq,
+      title: requirement?.projectName || rfq.title || "Corporate Gifting RFQ",
+    },
     creatorUser,
     company: {
       name: company?.name || creatorUser?.companyName || "Not provided",
