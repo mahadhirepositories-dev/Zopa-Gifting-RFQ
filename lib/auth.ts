@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { magicLink } from "better-auth/plugins";
+import { nextCookies } from "better-auth/next-js";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -145,5 +146,6 @@ export const auth = betterAuth({
         });
       },
     }),
+    nextCookies(),
   ],
 });
