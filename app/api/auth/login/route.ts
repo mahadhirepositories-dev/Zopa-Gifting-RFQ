@@ -1,11 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, rfqs } from "@/db/schema";
+import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { EmailService } from "@/lib/email/email-service";
-import { createAndSetAuthSession } from "@/lib/auth-session";
-import { upsertRfpCompany } from "@/lib/rfq-updates";
+import { auth } from "@/lib/auth";
 import { isWorkEmail } from "@/lib/validations/work-email";
 
 export async function GET() {
@@ -57,45 +55,24 @@ export async function POST(request: Request) {
 
     const user = existing[0];
 
-    let redirectTarget = "/";
+    // Determine the redirect target based on user role
+    const callbackURL = user.role === "admin" ? "/admin" : "/dashboard";
 
-    if (user.role === "admin") {
-      redirectTarget = "/admin";
-    } else {
-      redirectTarget = "/dashboard";
-    }
+    // Send magic link email via better-auth — NO session is created here.
+    // The session is only created when the user clicks the link.
+    await auth.api.signInMagicLink({
+      body: {
+        email: emailClean,
+        callbackURL,
+      },
+      headers: request.headers,
+    });
 
-    const response = NextResponse.json({
-      message: `Login successful!`,
+    return NextResponse.json({
+      status: "magic_link_sent",
+      message: `A magic link has been sent to ${emailClean}. Please check your email and click the link to sign in.`,
       email: emailClean,
-      name: user.name,
-      company: user.companyName,
-      magicLinkUrl: redirectTarget,
-      redirectUrl: redirectTarget,
     });
-
-    response.cookies.set("zopa_user_email", emailClean, {
-      path: "/",
-      maxAge: 86400,
-    });
-    response.cookies.set("zopa_user_name", user.name || "", {
-      path: "/",
-      maxAge: 86400,
-    });
-    if (user.mobileNumber)
-      response.cookies.set("zopa_user_mobile", user.mobileNumber, {
-        path: "/",
-        maxAge: 86400,
-      });
-    if (user.companyName)
-      response.cookies.set("zopa_user_company", user.companyName, {
-        path: "/",
-        maxAge: 86400,
-      });
-
-    await createAndSetAuthSession(user.id, response);
-
-    return response;
   } catch (error: any) {
     console.error("Login route error:", error);
     return NextResponse.json(
