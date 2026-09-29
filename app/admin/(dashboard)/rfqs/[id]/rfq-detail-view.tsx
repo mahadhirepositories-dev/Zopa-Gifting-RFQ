@@ -20,6 +20,8 @@ import {
   ShieldCheck,
   CheckCircle2,
   XCircle,
+  Check,
+  X,
   Download,
   ExternalLink,
   Users,
@@ -40,6 +42,90 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+const formatDeliveryLocation = (loc: any): string => {
+  if (!loc) return "";
+  let obj = loc;
+  if (typeof loc === "string") {
+    const trimmed = loc.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        obj = JSON.parse(trimmed);
+      } catch {
+        return trimmed;
+      }
+    } else {
+      return trimmed;
+    }
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(formatDeliveryLocation).filter(Boolean).join("; ");
+  }
+  if (typeof obj === "object" && obj !== null) {
+    const parts = [obj.name || obj.city, obj.state, obj.country || "India"].filter(Boolean);
+    if (parts.length > 0) {
+      return parts.join(", ");
+    }
+  }
+  return String(loc);
+};
+
+interface ParsedDocumentItem {
+  id?: string;
+  name: string;
+  isUploaded?: boolean;
+  url?: string;
+}
+
+const parseDocumentsToShare = (raw: any): ParsedDocumentItem[] => {
+  if (!raw) return [];
+  let current: any = raw;
+
+  if (typeof current === "object" && current !== null && !Array.isArray(current)) {
+    if (current.documentsToShare !== undefined) {
+      current = current.documentsToShare;
+    } else if (current.documents !== undefined) {
+      current = current.documents;
+    }
+  }
+
+  if (typeof current === "string") {
+    const trimmed = current.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return parseDocumentsToShare(parsed);
+      } catch {
+        return trimmed
+          .split(",")
+          .map((s, idx) => ({ id: `doc-${idx}`, name: s.trim(), isUploaded: false }))
+          .filter((d) => d.name.length > 0);
+      }
+    } else if (trimmed) {
+      return trimmed
+        .split(",")
+        .map((s, idx) => ({ id: `doc-${idx}`, name: s.trim(), isUploaded: false }))
+        .filter((d) => d.name.length > 0);
+    }
+    return [];
+  }
+
+  if (Array.isArray(current)) {
+    return current.map((item: any, idx: number) => {
+      if (typeof item === "string") {
+        return { id: `doc-${idx}`, name: item, isUploaded: false };
+      }
+      return {
+        id: item.id || `doc-${idx}`,
+        name: item.name || item.title || item.fileName || "Document",
+        isUploaded: Boolean(item.isUploaded || item.url || item.path),
+        url: item.url || item.path,
+      };
+    });
+  }
+
+  return [];
+};
 
 interface AdminRfqDetailViewProps {
   data: any;
@@ -662,18 +748,47 @@ export function AdminRfqDetailView({ data, fromBuyerId }: AdminRfqDetailViewProp
                         </div>
                       )}
 
-                      {Array.isArray(generalTerms.deliveryLocations) && generalTerms.deliveryLocations.length > 0 && (
-                        <div className="pt-2 border-t border-slate-200/50">
-                          <span className="text-slate-500 font-medium block mb-1">Delivery Locations:</span>
-                          <div className="flex flex-wrap gap-1.5">
-                            {generalTerms.deliveryLocations.map((loc: any, idx: number) => (
-                              <Badge key={idx} variant="outline" className="text-xs bg-white">
-                                {typeof loc === "string" ? loc : JSON.stringify(loc)}
-                              </Badge>
-                            ))}
+                      {(() => {
+                        let locations: any[] = [];
+                        if (Array.isArray(generalTerms.deliveryLocations)) {
+                          locations = generalTerms.deliveryLocations;
+                        } else if (
+                          typeof generalTerms.deliveryLocations === "string" &&
+                          generalTerms.deliveryLocations.trim()
+                        ) {
+                          try {
+                            const parsed = JSON.parse(generalTerms.deliveryLocations);
+                            locations = Array.isArray(parsed) ? parsed : [parsed];
+                          } catch {
+                            locations = [generalTerms.deliveryLocations];
+                          }
+                        }
+
+                        if (locations.length === 0) return null;
+
+                        return (
+                          <div className="pt-2 border-t border-slate-200/50">
+                            <span className="text-slate-500 font-medium block mb-1">
+                              Delivery Locations:
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {locations.map((loc: any, idx: number) => {
+                                const formatted = formatDeliveryLocation(loc);
+                                return (
+                                  <Badge
+                                    key={idx}
+                                    variant="outline"
+                                    className="text-xs bg-white text-slate-800 font-medium px-2.5 py-1 flex items-center gap-1.5"
+                                  >
+                                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    <span>{formatted}</span>
+                                  </Badge>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {Array.isArray(generalTerms.selectedTerms) && generalTerms.selectedTerms.length > 0 && (
                         <div className="pt-2 border-t border-slate-200/50">
@@ -741,32 +856,66 @@ export function AdminRfqDetailView({ data, fromBuyerId }: AdminRfqDetailViewProp
 
                   {/* Documents to Share */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                      Documents to Share
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center justify-between">
+                      <span>Documents to Share</span>
                     </h4>
-                    <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-100 text-xs">
-                      {documentsToShare ? (
-                        typeof documentsToShare === "string" ? (
-                          <p className="text-slate-800 leading-relaxed whitespace-pre-wrap">
-                            {documentsToShare}
-                          </p>
-                        ) : Array.isArray(documentsToShare) ? (
-                          <ul className="list-disc list-inside space-y-1 text-slate-800">
-                            {documentsToShare.map((doc: any, idx: number) => (
-                              <li key={idx}>
-                                {typeof doc === "string" ? doc : doc.name || JSON.stringify(doc)}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <pre className="text-xs text-slate-800 whitespace-pre-wrap font-mono">
-                            {JSON.stringify(documentsToShare, null, 2)}
-                          </pre>
-                        )
-                      ) : (
-                        <p className="text-slate-500">No documents configured to share.</p>
-                      )}
-                    </div>
+                    {(() => {
+                      const docsList = parseDocumentsToShare(documentsToShare);
+                      if (docsList.length === 0) {
+                        return (
+                          <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-100 text-xs text-slate-500">
+                            No documents configured to share.
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-100 shadow-2xs">
+                          {docsList.map((doc, idx) => (
+                            <div
+                              key={doc.id || idx}
+                              className="flex items-center justify-between p-3 hover:bg-slate-50/60 transition-colors"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0 pr-4">
+                                <div className="p-1.5 rounded-md bg-slate-100 text-slate-600 shrink-0">
+                                  <FileText className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <span className="text-xs font-semibold text-slate-800 block truncate">
+                                    {doc.name}
+                                  </span>
+                                  {doc.url && (
+                                    <a
+                                      href={doc.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-[11px] text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1 mt-0.5"
+                                    >
+                                      <Download className="w-3 h-3" />
+                                      <span>Download attachment</span>
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="shrink-0">
+                                {doc.isUploaded ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+                                    Provided
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                    <X className="w-3.5 h-3.5 text-rose-500 stroke-[2.5]" />
+                                    Not Provided
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </CardContent>
               </Card>

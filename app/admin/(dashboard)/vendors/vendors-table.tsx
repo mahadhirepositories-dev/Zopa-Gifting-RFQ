@@ -47,28 +47,42 @@ function ProductCell({ product }: { product: string | null }) {
   const [expanded, setExpanded] = useState(false);
   if (!product) return <span className="text-slate-400 text-xs">-</span>;
 
-  const isLong = product.length > 35;
-  if (!isLong) {
-    return <span className="text-xs text-slate-700 font-medium">{product}</span>;
-  }
+  const isLong = product.length > 25;
 
   return (
-    <div className="flex flex-col items-start gap-1">
-      <span
-        className={`text-xs text-slate-700 font-medium leading-relaxed ${
-          expanded ? "whitespace-normal" : "line-clamp-1"
-        }`}
-        title={product}
-      >
-        {product}
-      </span>
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="text-[11px] text-blue-600 hover:text-blue-700 hover:underline font-medium cursor-pointer"
-      >
-        {expanded ? "Show less" : "Show more"}
-      </button>
+    <div className="w-[180px] max-w-[180px] overflow-hidden">
+      {!expanded ? (
+        <div className="flex flex-col items-start gap-1">
+          <p
+            className="text-xs text-slate-700 font-medium truncate w-full"
+            title={product}
+          >
+            {product}
+          </p>
+          {isLong && (
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline font-semibold cursor-pointer"
+            >
+              Show more
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col items-start gap-1.5">
+          <div className="text-xs text-slate-700 font-medium leading-relaxed max-h-32 overflow-y-auto whitespace-normal break-words bg-slate-50 p-2 rounded border border-slate-200 w-full">
+            {product}
+          </div>
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline font-semibold cursor-pointer"
+          >
+            Show less
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -110,15 +124,15 @@ export function VendorsTable({ initialVendors }: VendorsTableProps) {
         <Table>
           <TableHeader className="bg-slate-50">
             <TableRow>
-              <TableHead className="w-[200px] min-w-[180px]">Company Name</TableHead>
-              <TableHead className="w-[130px]">Category</TableHead>
-              <TableHead className="w-[220px] max-w-[220px]">Product</TableHead>
-              <TableHead>Contact Person</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Mobile</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="w-[180px] min-w-[160px]">Company Name</TableHead>
+              <TableHead className="w-[110px]">Category</TableHead>
+              <TableHead className="w-[180px] max-w-[180px]">Product</TableHead>
+              <TableHead className="w-[130px]">Contact Person</TableHead>
+              <TableHead className="w-[180px]">Email</TableHead>
+              <TableHead className="w-[130px]">Mobile</TableHead>
+              <TableHead className="w-[140px]">Location</TableHead>
+              <TableHead className="w-[90px]">Status</TableHead>
+              <TableHead className="text-right w-[80px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -134,35 +148,35 @@ export function VendorsTable({ initialVendors }: VendorsTableProps) {
             ) : (
               filteredVendors.map((vendor) => (
                 <TableRow key={vendor.id} className="hover:bg-slate-50/70">
-                  <TableCell className="w-[200px] min-w-[180px]">
+                  <TableCell className="w-[180px] min-w-[160px]">
                     <div className="flex items-center gap-2.5">
                       <div className="p-2 rounded-md bg-emerald-50 text-emerald-600 shrink-0">
                         <Building2 className="w-4 h-4" />
                       </div>
-                      <span className="font-semibold text-slate-900 text-sm truncate" title={vendor.companyName}>
+                      <span className="font-semibold text-slate-900 text-sm truncate max-w-[130px]" title={vendor.companyName}>
                         {vendor.companyName}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-xs font-medium text-slate-600 whitespace-nowrap">
+                  <TableCell className="w-[110px] text-xs font-medium text-slate-600 whitespace-nowrap">
                     Gifting Items
                   </TableCell>
-                  <TableCell className="w-[220px] max-w-[220px]">
+                  <TableCell className="w-[180px] max-w-[180px] overflow-hidden whitespace-normal align-top">
                     <ProductCell product={vendor.category} />
                   </TableCell>
-                  <TableCell className="text-sm font-medium text-slate-700">
+                  <TableCell className="w-[130px] text-sm font-medium text-slate-700 truncate max-w-[130px]" title={vendor.name || ""}>
                     {vendor.name || "-"}
                   </TableCell>
-                  <TableCell className="text-sm text-slate-600">
+                  <TableCell className="w-[180px] text-sm text-slate-600 truncate max-w-[180px]" title={vendor.email}>
                     {vendor.email}
                   </TableCell>
-                  <TableCell className="text-sm text-slate-600">
+                  <TableCell className="w-[130px] text-sm text-slate-600 whitespace-nowrap">
                     {vendor.mobileNo || "-"}
                   </TableCell>
-                  <TableCell className="text-xs text-slate-500">
+                  <TableCell className="w-[140px] text-xs text-slate-500 truncate max-w-[140px]" title={vendor.city ? `${vendor.city}, ${vendor.state || ""}` : ""}>
                     {vendor.city ? `${vendor.city}, ${vendor.state || ""}` : "-"}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="w-[90px]">
                     <Badge
                       variant="outline"
                       className="text-emerald-700 bg-emerald-50 border-emerald-200 text-[10px] font-semibold capitalize"
@@ -170,7 +184,7 @@ export function VendorsTable({ initialVendors }: VendorsTableProps) {
                       {vendor.status || "active"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="w-[80px] text-right">
                     <Button
                       variant="outline"
                       size="sm"
@@ -260,12 +274,12 @@ export function VendorsTable({ initialVendors }: VendorsTableProps) {
                 </div>
 
                 {selectedVendor.category && (
-                  <div className="flex items-center justify-between p-2.5 rounded-md border border-slate-100 bg-slate-50/50">
-                    <span className="text-slate-500 flex items-center gap-2 font-medium">
+                  <div className="flex items-start justify-between gap-3 p-2.5 rounded-md border border-slate-100 bg-slate-50/50">
+                    <span className="text-slate-500 flex items-center gap-2 font-medium shrink-0">
                       <Tag className="w-4 h-4 text-slate-400" />
                       Product
                     </span>
-                    <span className="font-medium text-slate-800 text-right max-w-[240px]">
+                    <span className="font-medium text-slate-800 text-right max-w-[280px] break-words">
                       {selectedVendor.category}
                     </span>
                   </div>
