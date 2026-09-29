@@ -9,8 +9,10 @@ import {
   accounts,
   verifications,
   pendingRegistrations,
+  rfqs,
 } from "@/db/schema";
 import { EmailService } from "@/lib/email/email-service";
+import { upsertRfpCompany } from "@/lib/rfq-updates";
 
 function getServerBaseURL(): string | undefined {
   let url = process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL;
@@ -94,6 +96,35 @@ export const auth = betterAuth({
           };
         },
         after: async (user) => {
+          // Create a draft RFQ for the new user so they can start building
+          // their gifting requirement right away from the dashboard.
+          try {
+            const rfpId = crypto.randomUUID();
+            await db.insert(rfqs).values({
+              id: rfpId,
+              userId: user.id,
+              title: "",
+              category: "Corporate Gifting",
+              quantity: 500,
+              status: "draft",
+            });
+
+            // Attach company info from the user profile to the RFQ
+            const userAny = user as any;
+            await upsertRfpCompany(rfpId, {
+              companyName: userAny.companyName || null,
+              addressLine1: userAny.addressLine1 || null,
+              addressLine2: userAny.addressLine2 || null,
+              city: userAny.city || null,
+              state: userAny.state || null,
+              postalCode: userAny.postalCode || null,
+              country: userAny.country || null,
+              businessType: null,
+            });
+          } catch (rfqError) {
+            console.warn("Draft RFQ creation in after-hook failed:", rfqError);
+          }
+
           // Staging row has done its job — clean it up either way so it
           // doesn't linger or get reused by a future signup with the same
           // email.

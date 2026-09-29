@@ -131,12 +131,13 @@ export default function ZopaGiftingRFQPage() {
         );
       }
 
-      const targetUrl =
-        data.redirectUrl ||
-        data.magicLinkUrl ||
-        "/";
-
-      window.location.href = targetUrl;
+      // Show "Check your inbox" screen — the user must click the magic link
+      // in their email to complete registration and get a session.
+      setMagicLinkState({
+        sent: true,
+        email: data.email || regForm.email,
+      });
+      setIsSubmitting(false);
     } catch (err: any) {
       setFeedback({
         type: "error",
@@ -181,7 +182,7 @@ export default function ZopaGiftingRFQPage() {
 
       if (!res.ok) {
         if (data.isNotRegistered) {
-          setRegForm((prev) => ({ ...prev, email: loginEmail }));
+          setRegForm((prev: any) => ({ ...prev, email: loginEmail }));
         }
         throw new Error(
           data.error ||
@@ -189,12 +190,13 @@ export default function ZopaGiftingRFQPage() {
         );
       }
 
-      const targetUrl =
-        data.redirectUrl ||
-        data.magicLinkUrl ||
-        "/";
-
-      window.location.href = targetUrl;
+      // Show "Check your inbox" screen — the user must click the magic link
+      // in their email to sign in and get a session.
+      setMagicLinkState({
+        sent: true,
+        email: data.email || loginEmail,
+      });
+      setIsSubmitting(false);
     } catch (err: any) {
       setFeedback({
         type: "error",
