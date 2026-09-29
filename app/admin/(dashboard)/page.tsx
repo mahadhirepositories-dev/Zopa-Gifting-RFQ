@@ -1,8 +1,8 @@
 import React from "react";
 import Link from "next/link";
 import { db } from "@/db";
-import { users, giftingVendors, rfqs } from "@/db/schema";
-import { eq, count, desc } from "drizzle-orm";
+import { users, giftingVendors, rfqs, rfqRequirements } from "@/db/schema";
+import { eq, count, desc, sql } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Table,
@@ -45,8 +45,15 @@ export default async function AdminDashboard() {
       .limit(5);
 
     recentRfqs = await db
-      .select()
+      .select({
+        id: rfqs.id,
+        title: sql<string>`COALESCE(NULLIF(${rfqRequirements.projectName}, ''), NULLIF(${rfqs.title}, ''), 'Corporate Gifting RFQ')`,
+        category: rfqs.category,
+        status: rfqs.status,
+        createdAt: rfqs.createdAt,
+      })
       .from(rfqs)
+      .leftJoin(rfqRequirements, eq(rfqs.id, rfqRequirements.rfqId))
       .orderBy(desc(rfqs.createdAt))
       .limit(5);
   } catch (error: any) {

@@ -151,7 +151,7 @@ export function RfqsTable({ initialRfqs }: RfqsTableProps) {
                         </div>
                         <div className="flex flex-col min-w-0">
                           <span className="font-semibold text-slate-900 text-sm truncate max-w-[220px]">
-                            {rfq.title || "Untitled RFQ"}
+                            {rfq.title || "Corporate Gifting RFQ"}
                           </span>
                           <span className="text-[11px] text-slate-400 font-mono">
                             ID: {rfq.id.substring(0, 8)}...
@@ -327,7 +327,7 @@ export function RfqsTable({ initialRfqs }: RfqsTableProps) {
                   className="w-full border-slate-200 text-slate-700 gap-2"
                 >
                   <Link
-                    href={`/rfq/buyer-preview/${selectedRfq.id}`}
+                    href={`/rfq/buyer-preview/${selectedRfq.id}?from=admin`}
                     target="_blank"
                   >
                     <span>Open Live Buyer Preview</span>
