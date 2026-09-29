@@ -1,14 +1,14 @@
 import React from "react";
 import { db } from "@/db";
-import { rfqs, users } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { rfqs, users, rfqRequirements } from "@/db/schema";
+import { desc, eq, sql } from "drizzle-orm";
 import { RfqsTable } from "./rfqs-table";
 
 export default async function AdminRFQsPage() {
   const rfqList = await db
     .select({
       id: rfqs.id,
-      title: rfqs.title,
+      title: sql<string>`COALESCE(NULLIF(${rfqRequirements.projectName}, ''), NULLIF(${rfqs.title}, ''), 'Corporate Gifting RFQ')`,
       status: rfqs.status,
       category: rfqs.category,
       quantity: rfqs.quantity,
@@ -22,6 +22,7 @@ export default async function AdminRFQsPage() {
     })
     .from(rfqs)
     .leftJoin(users, eq(rfqs.userId, users.id))
+    .leftJoin(rfqRequirements, eq(rfqs.id, rfqRequirements.rfqId))
     .orderBy(desc(rfqs.createdAt));
 
   return (

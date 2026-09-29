@@ -126,7 +126,7 @@ export function AdminRfqDetailView({ data, fromBuyerId }: AdminRfqDetailViewProp
             className="text-blue-600 hover:text-blue-700 text-xs gap-1.5 h-9"
           >
             <Link
-              href={`/rfq/buyer-preview/${rfq.id}`}
+              href={`/rfq/buyer-preview/${rfq.id}?from=admin`}
               target="_blank"
               rel="noopener noreferrer"
             >

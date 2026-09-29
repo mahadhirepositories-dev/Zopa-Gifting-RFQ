@@ -47,6 +47,37 @@ interface VendorShareStatus {
   vendorResponseId?: string;
 }
 
+function cleanWhatsAppPhoneNumber(phone: string, countryCode: string = "91"): string {
+  if (!phone) return "";
+  let digits = phone.replace(/\D/g, "");
+  const cleanCountry = countryCode.replace(/\D/g, "") || "91";
+  
+  while (digits.startsWith(cleanCountry + cleanCountry)) {
+    digits = digits.substring(cleanCountry.length);
+  }
+  
+  if (digits.startsWith("0") && digits.length === 11) {
+    digits = digits.substring(1);
+  }
+  
+  if (!digits.startsWith(cleanCountry) && digits.length === 10) {
+    digits = cleanCountry + digits;
+  }
+  
+  return digits;
+}
+
+function formatPhoneForDisplay(phone: string, countryCode: string = "+91"): string {
+  if (!phone) return "";
+  const trimmed = phone.trim();
+  let cleaned = trimmed.replace(/^(\+91\s*)+/g, "+91 ");
+  if (!cleaned.startsWith("+")) {
+    const cc = countryCode.startsWith("+") ? countryCode : `+${countryCode}`;
+    cleaned = `${cc} ${cleaned}`;
+  }
+  return cleaned;
+}
+
 export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   isOpen,
   onClose,
@@ -64,9 +95,15 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   >(new Map());
   const [showResults, setShowResults] = useState(false);
 
-  let baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL || "https://staging-rfp.zopapro.com";
-  if (!baseUrl.startsWith("http")) baseUrl = `https://${baseUrl}`;
+  const getBaseUrl = () => {
+    if (typeof window !== "undefined" && window.location.origin) {
+      return window.location.origin;
+    }
+    let url =
+      process.env.NEXT_PUBLIC_APP_URL || "https://staging-rfp.zopapro.com";
+    if (!url.startsWith("http")) url = `https://${url}`;
+    return url;
+  };
 
   // Filter vendors who have valid phone numbers
   const vendorsWithPhone = vendors.filter(
@@ -115,16 +152,15 @@ Thank you!`;
   }> => {
     try {
       // Step 1: Create or get vendor
-      let vendorId;
-      let vendorData;
+      let vendorId: string | undefined;
 
       const vendorRes = await fetch(
         `/api/vendors?email=${encodeURIComponent(vendor.email)}`,
       );
 
       if (vendorRes.ok) {
-        vendorData = await vendorRes.json();
-        vendorId = vendorData.id;
+        const vendorData = await vendorRes.json();
+        vendorId = String(vendorData.id);
       } else if (vendorRes.status === 404) {
         const createRes = await fetch("/api/vendors", {
           method: "POST",
@@ -138,12 +174,18 @@ Thank you!`;
         });
 
         if (!createRes.ok) {
-          const err = await createRes.json();
-          throw new Error(err?.error || "Failed to create vendor");
+          let errorMsg = "Failed to create vendor";
+          try {
+            const err = await createRes.json();
+            errorMsg = err?.error || errorMsg;
+          } catch {
+            errorMsg = await createRes.text().catch(() => errorMsg);
+          }
+          throw new Error(errorMsg);
         }
 
-        vendorData = await createRes.json();
-        vendorId = vendorData.id;
+        const vendorData = await createRes.json();
+        vendorId = String(vendorData.id);
       } else {
         throw new Error(`Failed to fetch vendor: ${vendorRes.statusText}`);
       }
@@ -154,43 +196,36 @@ Thank you!`;
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           rfpId,
-          vendorId,
+          vendorId: vendorId || "vendor_default",
           vendorEmail: vendor.email,
           status: "draft",
           isFromMaster: vendor.isFromMaster || false,
           masterVendorId: vendor.masterVendorId || null,
+          companyInfo: {
+            companyName: vendor.companyName || vendor.name || "Vendor",
+            phone: vendor.mobileNo || "",
+            email: vendor.email,
+            country: "India",
+          },
         }),
       });
 
       if (!responseRes.ok) {
-        const err = await responseRes.json();
-        throw new Error(err?.error || "Failed to create vendor response");
+        let errorMsg = "Failed to create vendor response";
+        try {
+          const err = await responseRes.json();
+          errorMsg = err?.error || errorMsg;
+        } catch {
+          errorMsg = await responseRes.text().catch(() => errorMsg);
+        }
+        throw new Error(errorMsg);
       }
 
       const { vendorResponseId } = await responseRes.json();
 
-      // Step 3: Create access token by calling the same API endpoint that email uses
-      // This will generate session ID and token, and store it in rfp_access_tokens table
-      const tokenRes = await fetch("/api/rfp-auth/create-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: vendor.email,
-          rfpId: rfpId,
-          vendorResponseId: vendorResponseId,
-          expiresAt: endDate, // Use the RFQ end date
-        }),
-      });
-
-      if (!tokenRes.ok) {
-        const err = await tokenRes.json();
-        throw new Error(err?.error || "Failed to create access token");
-      }
-
-      const { sessionId } = await tokenRes.json();
-
-      // Step 4: Generate unique URL with both response and sid parameters
-      const vendorUrl = `${baseUrl}/rfq/preview/${rfpId}?response=${vendorResponseId}&sid=${sessionId}`;
+      // Step 3: Generate unique URL with response parameter
+      const baseUrl = getBaseUrl();
+      const vendorUrl = `${baseUrl}/rfq/preview/${rfpId}?response=${vendorResponseId}`;
 
       return { success: true, url: vendorUrl, vendorResponseId };
     } catch (error) {
@@ -226,7 +261,10 @@ Thank you!`;
       const result = await createVendorResponseAndGetLink(vendor);
 
       if (result.success && result.url && result.vendorResponseId) {
-        const phoneNumber = vendor.mobileNo.replace(/[^0-9+]/g, "");
+        const phoneNumber = cleanWhatsAppPhoneNumber(
+          vendor.mobileNo,
+          vendor.countryCode || "91",
+        );
         const message = generateWhatsAppMessage(
           vendor.name || vendor.companyName || "Vendor",
           result.url,
@@ -393,7 +431,7 @@ Thank you!`;
                       <div className="flex gap-4 text-xs text-gray-500 mt-1">
                         <span>{vendor.email}</span>
                         <span>
-                          {vendor.countryCode || "+91"} {vendor.mobileNo}
+                          {formatPhoneForDisplay(vendor.mobileNo, vendor.countryCode || "+91")}
                         </span>
                       </div>
                     </div>
@@ -464,8 +502,7 @@ Thank you!`;
                             {getVendorDisplayName(vendor)}
                           </p>
                           <p className="text-xs text-gray-500 font-mono mt-0.5">
-                            {email} • {vendor.countryCode || "+91"}{" "}
-                            {vendor.mobileNo}
+                            {email} • {formatPhoneForDisplay(vendor.mobileNo, vendor.countryCode || "+91")}
                           </p>
                         </div>
                         {status.status === "processing" && (

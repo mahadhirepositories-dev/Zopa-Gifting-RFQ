@@ -157,6 +157,13 @@ export async function upsertRfpRequirement(
     } else {
       await db.insert(rfqRequirements).values(values);
     }
+
+    if (projectName) {
+      await db
+        .update(rfqs)
+        .set({ title: projectName, updatedAt: new Date() })
+        .where(eq(rfqs.id, rfpId));
+    }
   }
 
   if (typeof (data as any).isPhoneMasked !== "undefined") {
