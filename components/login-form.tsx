@@ -256,7 +256,7 @@ export const LoginForm = ({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                 <span className="absolute bottom-2 left-2.5 text-white text-[11px] font-bold drop-shadow-md">
-                  Custom Merch
+                  Custom Merchandise
                 </span>
               </div>
             </div>
