@@ -208,7 +208,7 @@ export function VendorsTable({ initialVendors }: VendorsTableProps) {
         onOpenChange={(open) => !open && setSelectedVendor(null)}
       >
         {selectedVendor && (
-          <DialogContent className="sm:max-w-lg bg-white">
+          <DialogContent className="sm:max-w-lg bg-white max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-emerald-600" />
