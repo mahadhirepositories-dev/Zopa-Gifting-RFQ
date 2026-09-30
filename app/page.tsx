@@ -57,7 +57,7 @@ export default function ZopaGiftingRFQPage() {
     },
     {
       stepNumber: "2",
-      title: "Connect & Sample",
+      title: "Connect to vendors",
       description: "Connect to top vendors and receive samples.",
       badge: "Step 2",
     },
