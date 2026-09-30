@@ -161,26 +161,25 @@ export const LoginForm = ({
               </Badge>
             </div>
 
+            <p className="text-xs font-extrabold uppercase text-blue-800 tracking-wider">
+              How ZOPA gifting works
+            </p>
+
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-900 leading-[1.15] tracking-tight">
-              How{" "}
               <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-700 bg-clip-text text-transparent">
-                ZOPA Gifting RFQ
+                GIFTING RFQ
               </span>{" "}
-              Works
+              BY ZOPA
             </h1>
 
             <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
-              Streamline corporate gifting procurement in 4 simple steps. Create
-              your requirements, share with approved vendors, compare
-              competitive bids, and select the lowest (L1) vendor effortlessly.
+              Streamline corporate gifting procurement with FLUX, powered with
+              vendor discovery and competitive bids.
             </p>
           </div>
 
           {/* 4 Core Workflow Step Cards */}
           <div className="space-y-3">
-            <h2 className="text-xs font-extrabold uppercase text-blue-800 tracking-wider">
-              Step-by-Step RFQ Workflow
-            </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {rfqSteps.map((step) => (
                 <div
@@ -210,8 +209,7 @@ export const LoginForm = ({
               ))}
             </div>
           </div>
-
-          {/* Gifting Category Showcase Images */}
+           {/* Gifting Category Showcase Images */}
           <div className="space-y-2">
             <h2 className="text-xs font-extrabold uppercase text-blue-800 tracking-wider">
               Popular Corporate Gifting Categories
@@ -271,12 +269,12 @@ export const LoginForm = ({
             <CardHeader className="pb-3">
               <CardTitle className="text-xl">
                 {authMode === "register"
-                  ? "Create RFQ Account"
+                  ? "Create FLUX Account"
                   : "Sign In to Workspace"}
               </CardTitle>
               <CardDescription className="text-sm">
                 {authMode === "register"
-                  ? "Register your details to create your RFQ account."
+                  ? "Register your details to create your FLUX account."
                   : "Enter your work email address to sign in to your RFQ account."}
               </CardDescription>
             </CardHeader>
