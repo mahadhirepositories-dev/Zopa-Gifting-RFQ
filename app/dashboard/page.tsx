@@ -517,7 +517,7 @@ export default function BuyerDashboardPage() {
                       RFQ Details
                     </TableHead>
                     <TableHead className="font-semibold text-xs text-slate-700">
-                      Category & Quantity
+                      Category
                     </TableHead>
                     <TableHead className="font-semibold text-xs text-slate-700">
                       Vendor Quotes
@@ -560,15 +560,12 @@ export default function BuyerDashboardPage() {
                           </div>
                         </TableCell>
 
-                        {/* Category & Quantity */}
+                        {/* Category */}
                         <TableCell>
-                          <div className="space-y-1 text-xs">
+                          <div className="text-xs">
                             <span className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">
                               {rfq.category}
                             </span>
-                            <p className="text-slate-600 font-mono">
-                              Qty: {rfq.quantity?.toLocaleString() || "—"}
-                            </p>
                           </div>
                         </TableCell>
 
