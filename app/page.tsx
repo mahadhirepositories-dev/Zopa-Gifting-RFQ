@@ -52,27 +52,27 @@ export default function ZopaGiftingRFQPage() {
       stepNumber: "1",
       title: "Create RFQ",
       description:
-        "Create your gifting requirement with the required items, quantities, and specifications.",
+        "Create the RFQ effortlessly with ready templates.",
       badge: "Step 1",
     },
     {
       stepNumber: "2",
-      title: "Receive Samples",
-      description: "Receive product samples from vendors to evaluate quality and suitability.",
+      title: "Connect to vendors",
+      description: "Connect to top vendors and receive samples.",
       badge: "Step 2",
     },
     {
       stepNumber: "3",
-      title: "Compare Quotes",
+      title: "Compare Responses",
       description:
-        "Vendors submit their quotes. Compare the responses in one place.",
+        "Compare the responses at one place.",
       badge: "Step 3",
     },
     {
       stepNumber: "4",
-      title: "Approve Vendors",
+      title: "Streamline Approvals",
       description:
-        "Review the comparative quotes and approve the best vendors based on your requirement.",
+        "Streamline the approval flow.",
       badge: "Step 4",
     },
   ];
